@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+
+    <!--
+        PRODUCTION: JSON output — keeps {name} placeholders literal in msg
+        and stores values in kv for downstream tools to reconstruct.
+    -->
+    <appender name="JSON" class="hr.hrg.dialog.logback.ConsoleAppenderJson">
+        <includeMDC>true</includeMDC>
+        <includeKeys>true</includeKeys>
+        <includeSource>false</includeSource>
+        <prettyPrint>false</prettyPrint>
+    </appender>
+
+    <!--
+        DEVELOPMENT: Human-readable text — expands {name} placeholders
+        from kv pairs so you see the actual values in the console.
+        No change to the msg field in the event — only display is affected.
+    -->
+    <appender name="DEV" class="hr.hrg.dialog.logback.ConsoleAppenderDev">
+        <expandPlaceholders>true</expandPlaceholders>
+    </appender>
+
+    <!-- Use JSON for production, DEV for local dev -->
+    <root level="DEBUG">
+        <appender-ref ref="JSON" />
+    </root>
+
+</configuration>
