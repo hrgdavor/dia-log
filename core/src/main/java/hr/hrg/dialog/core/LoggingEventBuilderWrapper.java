@@ -35,12 +35,10 @@ import java.util.function.Supplier;
  *     .kv("state", state)
  *     .log("Change state to {state}");
  * }</pre>
- * <ul>
- * <li>TRACE off → clean message: {@code "Change state to RUNNING"}</li>
- * <li>TRACE on  → same message with throwable showing call stack</li>
- * </ul>
+ *
+ * @param <L> the concrete subclass type, enabling fluent methods to return the correct type
  */
-public class LoggingEventBuilderWrapper implements LoggingEventBuilder, AutoCloseable {
+public abstract class LoggingEventBuilderWrapper<L extends LoggingEventBuilderWrapper<L>> implements LoggingEventBuilder, AutoCloseable {
 
     private final LoggingEventBuilder delegate;
     private final Runnable clear;
@@ -48,6 +46,12 @@ public class LoggingEventBuilderWrapper implements LoggingEventBuilder, AutoClos
     private final List<String> contextKeys = new ArrayList<>();
     private boolean stackWhenTrace;
     private boolean closed;
+
+    /**
+     * Returns {@code this} cast to the concrete subclass type.
+     * Subclasses must implement this to enable fluent method chaining.
+     */
+    public abstract L self();
 
     /**
      * Creates a new wrapper around the given {@link LoggingEventBuilder}.
@@ -85,71 +89,71 @@ public class LoggingEventBuilderWrapper implements LoggingEventBuilder, AutoClos
      *     .log("Change state to {state}");
      * }</pre>
      */
-    public LoggingEventBuilderWrapper stackWhenTrace() {
+    public L stackWhenTrace() {
         this.stackWhenTrace = true;
-        return this;
+        return self();
     }
 
     /** Shorthand for {@link #addKeyValue(String, Object)}. */
-    public LoggingEventBuilderWrapper kv(String key, Object value) {
+    public L kv(String key, Object value) {
         return addKeyValue(key, value);
     }
 
     // ---- LoggingEventBuilder delegation ----
 
     @Override
-    public LoggingEventBuilderWrapper setCause(Throwable t) {
+    public L setCause(Throwable t) {
         delegate.setCause(t);
-        return this;
+        return self();
     }
 
     @Override
-    public LoggingEventBuilderWrapper addMarker(Marker marker) {
+    public L addMarker(Marker marker) {
         delegate.addMarker(marker);
-        return this;
+        return self();
     }
 
     @Override
-    public LoggingEventBuilderWrapper addKeyValue(String key, Object value) {
+    public L addKeyValue(String key, Object value) {
         delegate.addKeyValue(key, value);
         contextKeys.add(key);
         MDC.put(String.valueOf(key), String.valueOf(value));
-        return this;
+        return self();
     }
 
     @Override
-    public LoggingEventBuilderWrapper addKeyValue(String key, Supplier<Object> valueSupplier) {
+    public L addKeyValue(String key, Supplier<Object> valueSupplier) {
         delegate.addKeyValue(key, valueSupplier);
         contextKeys.add(key);
         Object value = valueSupplier.get();
         if (value != null) {
             MDC.put(key, String.valueOf(value));
         }
-        return this;
+        return self();
     }
 
     @Override
-    public LoggingEventBuilderWrapper addArgument(Object arg) {
+    public L addArgument(Object arg) {
         delegate.addArgument(arg);
-        return this;
+        return self();
     }
 
     @Override
-    public LoggingEventBuilderWrapper addArgument(Supplier<?> argSupplier) {
+    public L addArgument(Supplier<?> argSupplier) {
         delegate.addArgument(argSupplier);
-        return this;
+        return self();
     }
 
     @Override
-    public LoggingEventBuilderWrapper setMessage(String message) {
+    public L setMessage(String message) {
         delegate.setMessage(message);
-        return this;
+        return self();
     }
 
     @Override
-    public LoggingEventBuilderWrapper setMessage(Supplier<String> messageSupplier) {
+    public L setMessage(Supplier<String> messageSupplier) {
         delegate.setMessage(messageSupplier);
-        return this;
+        return self();
     }
 
     // ---- log() overloads with automatic context close and optional trace cause ----

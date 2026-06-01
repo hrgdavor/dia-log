@@ -1,13 +1,12 @@
 package hr.hrg.dialog.logback;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import hr.hrg.dialog.core.LoggingEventBuilderWrapper;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.slf4j.Marker;
@@ -16,7 +15,8 @@ import org.slf4j.spi.LoggingEventBuilder;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.spi.LoggingEvent;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for {@link LoggingEventBuilderWrapper}.
@@ -38,8 +38,8 @@ class LoggingEventBuilderWrapperTest {
         wrapper.addKeyValue("requestId", "123");
 
         // Keys should be in MDC during building
-        Assertions.assertEquals("alice", MDC.get("userId"));
-        Assertions.assertEquals("123", MDC.get("requestId"));
+        assertEquals("alice", MDC.get("userId"));
+        assertEquals("123", MDC.get("requestId"));
 
         wrapper.log("test message");
 
@@ -55,7 +55,7 @@ class LoggingEventBuilderWrapperTest {
         LoggingEventBuilderWrapper wrapper = new LoggingEventBuilderWrapper(delegate, () -> {});
         wrapper.addKeyValue("computed", () -> "dynamic-value");
 
-        Assertions.assertEquals("dynamic-value", MDC.get("computed"));
+        assertEquals("dynamic-value", MDC.get("computed"));
 
         wrapper.log("test");
 
@@ -170,7 +170,7 @@ class LoggingEventBuilderWrapperTest {
         LoggingEventBuilderWrapper wrapper = new LoggingEventBuilderWrapper(delegate, () -> {});
 
         wrapper.kv("myKey", "myValue");
-        Assertions.assertEquals("myValue", MDC.get("myKey"));
+        assertEquals("myValue", MDC.get("myKey"));
 
         wrapper.log("test");
         Assertions.assertNull(MDC.get("myKey"));

@@ -5,15 +5,24 @@ import org.slf4j.Marker;
 import org.slf4j.event.Level;
 import org.slf4j.spi.LoggingEventBuilder;
 
-public abstract class DiaLogger implements Logger {
+public abstract class DiaLogger<L extends LoggingEventBuilderWrapper> implements Logger {
 
 	protected Logger delegate;
 	public DiaLogger(Logger delegate) {
 		this.delegate = delegate;
 	}
 
-	protected abstract void contextStart(LoggingEventBuilder builder);
+	protected abstract void contextStart(L builder);
 	protected abstract void contextEnd();
+
+	/**
+	 * 	example: return new LoggingEventBuilderWrapper(builder, this::contextEnd, delegate);
+	 * @param builder
+	 * @return
+	 */
+	protected abstract L initBuilder(LoggingEventBuilder builder);
+	protected abstract L noOpWrapper();
+
 	protected String prefix;
 
 	/**
@@ -22,12 +31,13 @@ public abstract class DiaLogger implements Logger {
 	 * called automatically after any {@code log()} method, so no manual
 	 * {@link #contextEnd()} is needed.
 	 */
-	protected LoggingEventBuilderWrapper _contextStart(LoggingEventBuilder builder) {
-		LoggingEventBuilderWrapper wrapper = new LoggingEventBuilderWrapper(builder, this::contextEnd, delegate);
+	protected L _contextStart(LoggingEventBuilder builder) {
+		L wrapper = initBuilder(builder);
 		if(prefix != null && !prefix.isEmpty()) wrapper.addKeyValue("prefix", prefix);
 		contextStart(wrapper);
 		return wrapper;
 	}
+
 
 	public synchronized void addPrefix(String prefix){
 		if(this.prefix == null)
@@ -36,7 +46,7 @@ public abstract class DiaLogger implements Logger {
 			this.prefix = prefix+this.prefix;
 	}
 
-	public static LoggingEventBuilder addKeyValues(LoggingEventBuilder builder, Object ...keyVal) {
+	public static  <L1 extends  LoggingEventBuilderWrapper> L1 addKeyValues(L1 builder, Object ...keyVal) {
 		for(int i=1; i< keyVal.length; i+=2) {
 			Object key = keyVal[i-1];
 			if(key == null) continue;
@@ -57,58 +67,58 @@ public abstract class DiaLogger implements Logger {
 	 * reference so that {@link LoggingEventBuilderWrapper#stackWhenTrace()} can still
 	 * emit a TRACE-level log even when the original level (e.g. DEBUG) is disabled.
 	 */
-	public LoggingEventBuilderWrapper atDebug() {
-		if(!isDebugEnabled()) return new LoggingEventBuilderWrapper(delegate.atDebug(), NOOP, delegate);
+	public L atDebug() {
+		if(!isDebugEnabled()) return noOpWrapper();
 		return _contextStart(delegate.atDebug());
 	}
 
-	public LoggingEventBuilderWrapper atDebug(Object ...keyVal) {
-		return (LoggingEventBuilderWrapper) addKeyValues(atDebug(), keyVal);
+	public L atDebug(Object ...keyVal) {
+		return addKeyValues(atDebug(), keyVal);
 	}
 
-	public LoggingEventBuilderWrapper atError() {
-		if(!isErrorEnabled()) return new LoggingEventBuilderWrapper(delegate.atError(), NOOP, delegate);
+	public L atError() {
+		if(!isErrorEnabled()) return noOpWrapper();
 		return _contextStart(delegate.atError());
 	}
 
-	public LoggingEventBuilderWrapper atError(Object ...keyVal) {
-		return (LoggingEventBuilderWrapper) addKeyValues(atError(), keyVal);
+	public L atError(Object ...keyVal) {
+		return addKeyValues(atError(), keyVal);
 	}
 
-	public LoggingEventBuilderWrapper atInfo() {
-		if(!isInfoEnabled()) return new LoggingEventBuilderWrapper(delegate.atInfo(), NOOP, delegate);
+	public L atInfo() {
+		if(!isInfoEnabled()) return noOpWrapper();
 		return _contextStart(delegate.atInfo());
 	}
 
-	public LoggingEventBuilderWrapper atInfo(Object ...keyVal) {
-		return (LoggingEventBuilderWrapper) addKeyValues(atInfo(), keyVal);
+	public L atInfo(Object ...keyVal) {
+		return addKeyValues(atInfo(), keyVal);
 	}
 
-	public LoggingEventBuilderWrapper atLevel(Level level) {
-		if(!isEnabledForLevel(level)) return new LoggingEventBuilderWrapper(delegate.atLevel(level), NOOP, delegate);
+	public L atLevel(Level level) {
+		if(!isEnabledForLevel(level)) return noOpWrapper();
 		return _contextStart(delegate.atLevel(level));
 	}
 
-	public LoggingEventBuilderWrapper atLevel(Level level, Object ...keyVal) {
-		return (LoggingEventBuilderWrapper) addKeyValues(atLevel(level), keyVal);
+	public L atLevel(Level level, Object ...keyVal) {
+		return addKeyValues(atLevel(level), keyVal);
 	}
 
-	public LoggingEventBuilderWrapper atTrace() {
-		if(!isTraceEnabled()) return new LoggingEventBuilderWrapper(delegate.atTrace(), NOOP, delegate);
+	public L atTrace() {
+		if(!isTraceEnabled()) return noOpWrapper();
 		return _contextStart(delegate.atTrace());
 	}
 
-	public LoggingEventBuilderWrapper atTrace(Object ...keyVal) {
-		return (LoggingEventBuilderWrapper) addKeyValues(atTrace(), keyVal);
+	public L atTrace(Object ...keyVal) {
+		return addKeyValues(atTrace(), keyVal);
 	}
 
-	public LoggingEventBuilderWrapper atWarn() {
-		if(!isWarnEnabled()) return new LoggingEventBuilderWrapper(delegate.atWarn(), NOOP, delegate);
+	public L atWarn() {
+		if(!isWarnEnabled()) return noOpWrapper();
 		return _contextStart(delegate.atWarn());
 	}
 
-	public LoggingEventBuilderWrapper atWarn(Object ...keyVal) {
-		return (LoggingEventBuilderWrapper) addKeyValues(atWarn(), keyVal);
+	public L atWarn(Object ...keyVal) {
+		return addKeyValues(atWarn(), keyVal);
 	}
 
 	// ---- void debug() overloads (no manual contextEnd) ----
