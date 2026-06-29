@@ -64,7 +64,7 @@ public abstract class DiaLogger<L extends LoggingEventBuilderWrapper> implements
 
 	/**
 	 * When the original level is disabled, we still create a wrapper with the Logger
-	 * reference so that {@link LoggingEventBuilderWrapper#stackWhenTrace()} can still
+	 * reference so that {@link LoggingEventBuilderWrapper#stackWhenTraceEnabled()} can still
 	 * emit a TRACE-level log even when the original level (e.g. DEBUG) is disabled.
 	 */
 	public L atDebug() {

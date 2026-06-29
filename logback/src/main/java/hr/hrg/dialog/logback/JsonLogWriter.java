@@ -183,45 +183,35 @@ public class JsonLogWriter extends ContextAwareBase {
             // Formatted message
             gen.writeStringField("msg", event.getFormattedMessage());
 
-            // Structured key-value pairs (from SLF4J 2.0 addKeyValue)
+            java.util.Set<String> allKeys = new java.util.HashSet<>();
+
+            // Structured key-value pairs and MDC context with kv priority over MDC for overlapping keys
             if (includeKeys) {
+                // Collect all unique key names from both sources, prioritizing kv keys
+
+                // Add kv keys first
                 List<KeyValuePair> pairs = event.getKeyValuePairs();
                 if (pairs != null && !pairs.isEmpty()) {
-                    gen.writeObjectFieldStart("kv");
-                    for (KeyValuePair kv : pairs) {
-                        if (kv.key != null) {
-                            gen.writeFieldName(kv.key);
-                            gen.writeObject(kv.value);
+                    for (KeyValuePair kvPair : pairs) {
+                        if (kvPair.key != null) {
+                            allKeys.add(kvPair.key);
+                            addKey(gen, kvPair.key, kvPair.value);
                         }
                     }
-                    gen.writeEndObject();
                 }
             }
-
-            // MDC context map
             if (includeMDC) {
+                // Add MDC keys, but only if not already in kv
                 Map<String, String> mdcMap = event.getMDCPropertyMap();
                 if (mdcMap != null && !mdcMap.isEmpty()) {
-                    gen.writeObjectFieldStart("ctx");
                     for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
-                        if (entry.getKey() != null && entry.getValue() != null) {
-                            gen.writeStringField(entry.getKey(), entry.getValue());
+                        if (entry.getKey() != null) {
+                            // Only add MDC key if it's not already in kv (kv takes priority)
+                            if (!allKeys.contains(entry.getKey())) {
+                                gen.writeStringField(entry.getKey(), entry.getValue());
+                            }
                         }
                     }
-                    gen.writeEndObject();
-                }
-            }
-
-            // Source location (caller class/method/line)
-            if (includeSource) {
-                StackTraceElement[] callerData = event.getCallerData();
-                if (callerData != null && callerData.length > 0) {
-                    StackTraceElement caller = callerData[0];
-                    gen.writeObjectFieldStart("source");
-                    gen.writeStringField("class", caller.getClassName());
-                    gen.writeStringField("method", caller.getMethodName());
-                    gen.writeNumberField("line", caller.getLineNumber());
-                    gen.writeEndObject();
                 }
             }
 
@@ -258,7 +248,18 @@ public class JsonLogWriter extends ContextAwareBase {
 
                 // Also include the raw message template for structured error analysis
                 gen.writeStringField("msgTpl", event.getMessage());
+            }else if (includeSource) {
+                StackTraceElement[] callerData = event.getCallerData();
+                if (callerData != null && callerData.length > 0) {
+                    StackTraceElement caller = callerData[0];
+                    gen.writeObjectFieldStart("source");
+                    gen.writeStringField("class", caller.getClassName());
+                    gen.writeStringField("method", caller.getMethodName());
+                    gen.writeNumberField("line", caller.getLineNumber());
+                    gen.writeEndObject();
+                }
             }
+
 
             // Custom static fields
             if (parsedCustomFields != null) {
@@ -284,6 +285,17 @@ public class JsonLogWriter extends ContextAwareBase {
         }
     }
 
+    protected void addKey(JsonGenerator gen, String key, Object value) throws IOException {
+        if(value == null) return;
+
+        gen.writeFieldName(key);
+        if (value instanceof String) {
+            gen.writeStringField(key, (String) value);
+        } else {
+            gen.writePOJO(value);
+        }
+    }
+
     // ========== Helper ==========
 
     /**
@@ -301,4 +313,51 @@ public class JsonLogWriter extends ContextAwareBase {
         }
         return JavaStackSanitizer.getSanitizedFrames(frames, maxStackFrames);
     }
+
+    private List<String> getSanitizedFrames(IThrowableProxy tp) {
+        StackTraceElementProxy[] steArray = tp.getStackTraceElementProxyArray();
+        if (steArray == null || steArray.length == 0) {
+            return List.of();
+        }
+        StackTraceElement[] frames = new StackTraceElement[steArray.length];
+        for (int i = 0; i < steArray.length; i++) {
+            frames[i] = steArray[i].getStackTraceElement();
+        }
+        return JavaStackSanitizer.getSanitizedFrames(frames, maxStackFrames);
+    }
+
+    public static void writeTraceString(JsonGenerator gen, StackTraceElement[] frames) throws IOException {
+// 1. Manually open the JSON string quote
+        gen.writeRaw(':');
+        gen.writeRaw('"');
+
+        // 2. Stream frames directly to Jackson's buffer
+        for (StackTraceElement frame : frames) {
+            if (isSpringOrJdk(frame)) {
+                continue; // Your fingerprint filtering logic
+            }
+
+            // Stream components directly to avoid ANY string concatenation
+            gen.writeRaw("\tat ");
+            gen.writeRaw(frame.getClassName());
+            gen.writeRaw('.');
+            gen.writeRaw(frame.getMethodName());
+            gen.writeRaw('(');
+            if (frame.getFileName() != null) {
+                gen.writeRaw(frame.getFileName());
+                if (frame.getLineNumber() >= 0) {
+                    gen.writeRaw(':');
+                    gen.writeRaw(String.valueOf(frame.getLineNumber())); // Minimal allocation (cached integers)
+                }
+            } else {
+                gen.writeRaw("Unknown Source");
+            }
+            gen.writeRaw("\\n"); // Escaped newline literal for JSON string compliance
+        }
+
+        // 3. Manually close the JSON string quote
+        gen.writeRaw('"');
+    }
+
+
 }

@@ -1,7 +1,10 @@
 package hr.hrg.dialog.core;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -19,67 +22,91 @@ import java.util.stream.Collectors;
  */
 public class JavaStackSanitizer {
 
-    /**
-     * Returns individually sanitized frame strings from a throwable's stack trace.
-     * Each frame is cleaned to be deterministic: no line numbers, no lambda IDs,
-     * no reflection boilerplate.
-     *
-     * @param throwable the exception to sanitize
-     * @param maxFrames maximum number of frames to include
-     * @return list of cleaned frame strings like {@code "com.example.MyClass.method"}
-     */
-    public static List<String> getSanitizedFrames(Throwable throwable, int maxFrames) {
-        if (throwable == null) return List.of();
-        return getSanitizedFrames(throwable.getStackTrace(), maxFrames);
-    }
+    public static final byte[] DOT = {'.'};
+    public static final byte[] NEWLINE = {'\n'};
+    public static final byte[] LAMBDA_METHOD = "lambda".getBytes(StandardCharsets.UTF_8);
 
     /**
-     * Returns individually sanitized frame strings from a stack trace array.
+     * Create method fingerprinting stack traces. If not app frames are found, fallback
+     * by taking the top 3 frames from the raw stack trace (regardless of whether they are system/framework).
      *
-     * @param frames    the raw stack trace elements
-     * @param maxFrames maximum number of frames to include
-     * @return list of cleaned frame strings
+     * @param rootCause
+     * @return
      */
-    public static List<String> getSanitizedFrames(StackTraceElement[] frames, int maxFrames) {
-        if (frames == null || frames.length == 0) return List.of();
-        return Arrays.stream(frames)
-            .filter(f -> !f.getClassName().startsWith("jdk.internal."))
-            .filter(f -> !f.getClassName().startsWith("sun.reflect."))
-            .limit(maxFrames)
-            .map(JavaStackSanitizer::cleanFrame)
-            .collect(Collectors.toList());
+    private static String fingerprint(Throwable rootCause, Predicate<String> filter) {
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+
+        // 1. Exception type
+        byte[] exBytes = rootCause.getClass().getName().getBytes(StandardCharsets.UTF_8);
+        stream.update(exBytes, 0, exBytes.length);
+        stream.update(NEWLINE, 0, 1);
+
+        addFromTrace(rootCause.getStackTrace(), filter, stream);
+
+        long hash = stream.finalHash();
+        return HexFormat.of().toHexDigits(hash);
     }
 
-    /**
-     * Returns a pipe-delimited fingerprint of the sanitized stack trace.
-     * Suitable for hashing and deduplication.
-     *
-     * @param throwable the exception to fingerprint
-     * @param maxFrames maximum number of frames to include
-     * @return pipe-delimited sanitized frames, e.g.
-     *         {@code "com.example.MyClass.method|com.example.Main.main"}
-     */
-    public static String getFingerprint(Throwable throwable, int maxFrames) {
-        if (throwable == null) return "";
-        return getSanitizedFrames(throwable, maxFrames).stream()
-            .collect(Collectors.joining("|"));
-    }
+    public static void addFromTrace(StackTraceElement[] trace , Predicate<String> filter, Wyhash64.Streaming stream) {
+        boolean isFirstFrame = true;
 
-    private static String cleanFrame(StackTraceElement frame) {
-        String className = frame.getClassName();
+        for (StackTraceElement el : trace) {
+            String className = el.getClassName();
+            if (!filter.test(className)) continue;
 
-        // Clear out dynamic JVM Lambda identifiers
-        if (className.contains("$$Lambda")) {
-            className = className.replaceAll("\\$\\$Lambda\\$[0-9]+/.*", "$$Lambda");
+            // Delimiter between frames
+            if (!isFirstFrame) {
+                stream.update(NEWLINE, 0, 1);
+            }
+            isFirstFrame = false;
+
+            String methodName = el.getMethodName();
+
+            // -------- Class name (strip $$Lambda$ suffix) --------
+            int lambdaClassIdx = className.indexOf("$$Lambda$");
+            int classEnd = (lambdaClassIdx != -1) ? lambdaClassIdx : className.length();
+            byte[] classBytes = className.getBytes(StandardCharsets.UTF_8);
+            // Feed only the enclosing class part (skip synthetic suffix)
+            stream.update(classBytes, 0, classEnd);
+
+            stream.update(DOT, 0, 1);
+
+            // -------- Method name (extract original from lambda$...) --------
+            if (lambdaClassIdx != -1) {
+                // Method reference → group by enclosing class + "lambda"
+                stream.update(LAMBDA_METHOD, 0, LAMBDA_METHOD.length);
+            } else {
+                byte[] methodBytes = methodName.getBytes(StandardCharsets.UTF_8);
+                int start = 0;
+                int end = methodBytes.length;
+
+                if (methodName.startsWith("lambda$")) {
+                    // pattern: lambda$originalMethod$number → extract "originalMethod"
+                    int firstDollar = methodName.indexOf('$');
+                    if (firstDollar != -1) {
+                        int secondDollar = methodName.indexOf('$', firstDollar + 1);
+                        start = firstDollar + 1;
+                        if (secondDollar != -1) {
+                            end = secondDollar; // feed only between the first and second '$'
+                        }
+                        // else feed until end of string
+                    }
+                }
+                stream.update(methodBytes, start, end - start);
+            }
         }
 
-        String methodName = frame.getMethodName();
-
-        // Standardize native calls, omit line numbers
-        if (frame.isNativeMethod()) {
-            return className + "." + methodName + "(native)";
+        // Fallback: if all frames were skipped, hash top 3 (cleaned)
+        if (isFirstFrame) {
+            int limit = Math.min(3, trace.length);
+            for (int i = 0; i < limit; i++) {
+                if (i > 0) stream.update(NEWLINE, 0, 1);
+                StackTraceElement el = trace[i];
+                byte[] fb = (el.getClassName() + "." + el.getMethodName())
+                        .getBytes(StandardCharsets.UTF_8); // fallback only – rare
+                stream.update(fb, 0, fb.length);
+            }
         }
-
-        return className + "." + methodName;
     }
+
 }

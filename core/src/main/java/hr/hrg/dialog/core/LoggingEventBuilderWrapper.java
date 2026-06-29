@@ -26,12 +26,12 @@ import java.util.function.Supplier;
  * }
  * }</pre>
  * <p>
- * Additionally, {@link #stackWhenTrace()} optionally attaches the caller's
+ * Additionally, {@link #stackWhenTraceEnabled()} optionally attaches the caller's
  * stack trace as a throwable when TRACE is enabled. This produces a single
  * log line — no duplicates — but adds call-stack visibility when trace
  * logging is turned on:
  * <pre>{@code
- * log.atDebug().stackWhenTrace()
+ * log.atDebug().stackWhenTraceEnabled()
  *     .kv("state", state)
  *     .log("Change state to {state}");
  * }</pre>
@@ -42,9 +42,9 @@ public abstract class LoggingEventBuilderWrapper<L extends LoggingEventBuilderWr
 
     private final LoggingEventBuilder delegate;
     private final Runnable clear;
-    private final Logger logger; // nullable — used for stackWhenTrace isTraceEnabled check
+    private final Logger logger; // nullable — used for stackWhenTraceEnabled isTraceEnabled check
     private final List<String> contextKeys = new ArrayList<>();
-    private boolean stackWhenTrace;
+    private boolean stackWhenTraceEnabled;
     private boolean closed;
 
     /**
@@ -64,7 +64,7 @@ public abstract class LoggingEventBuilderWrapper<L extends LoggingEventBuilderWr
     }
 
     /**
-     * Creates a new wrapper with a Logger reference (needed for {@link #stackWhenTrace()}).
+     * Creates a new wrapper with a Logger reference (needed for {@link #stackWhenTraceEnabled()}).
      *
      * @param delegate the builder to delegate to; must not be null
      * @param clear    optional runnable to execute on context close
@@ -84,13 +84,13 @@ public abstract class LoggingEventBuilderWrapper<L extends LoggingEventBuilderWr
      * <b>single</b> log line — no duplicate at trace level — but adds call-stack
      * visibility when tracing is turned on.
      * <pre>{@code
-     * log.atDebug().stackWhenTrace()
+     * log.atDebug().stackWhenTraceEnabled()
      *     .kv("state", state)
      *     .log("Change state to {state}");
      * }</pre>
      */
-    public L stackWhenTrace() {
-        this.stackWhenTrace = true;
+    public L stackWhenTraceEnabled() {
+        this.stackWhenTraceEnabled = true;
         return self();
     }
 
@@ -210,13 +210,13 @@ public abstract class LoggingEventBuilderWrapper<L extends LoggingEventBuilderWr
     // ---- internal ----
 
     /**
-     * If {@link #stackWhenTrace()} was called and TRACE is enabled, attach a
+     * If {@link #stackWhenTraceEnabled()} was called and TRACE is enabled, attach a
      * {@link Throwable} as the cause so the output shows the call stack that
      * triggered this log. Only attaches if no cause was already set.
      */
     private void maybeAttachTraceCause() {
-        if (stackWhenTrace && logger != null && logger.isTraceEnabled()) {
-            delegate.setCause(new Throwable("stackWhenTrace"));
+        if (stackWhenTraceEnabled && logger != null && logger.isTraceEnabled()) {
+            delegate.setCause(new Throwable("stackWhenTraceEnabled"));
         }
     }
 
