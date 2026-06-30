@@ -30,7 +30,7 @@ public class JavaStackSanitizerLogback {
      * @param rootCause
      * @return
      */
-    private static String fingerprint(IThrowableProxy rootCause, Predicate<String> filter) {
+    public static String fingerprint(IThrowableProxy rootCause, Predicate<String> filter) {
         Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
 
         // 1. Exception type

@@ -223,17 +223,15 @@ public class JsonLogWriter extends ContextAwareBase {
                 gen.writeStringField("msg", tp.getMessage());
 
                 // Sanitized stack trace — deterministic frames for deduplication
-                List<String> sanitizedFrames = getSanitizedFrames(tp);
-                gen.writeArrayFieldStart("stack");
-                for (String frame : sanitizedFrames) {
-                    gen.writeString(frame);
-                }
-                gen.writeEndArray();
+//                List<String> sanitizedFrames = getSanitizedFrames(tp);
+//                gen.writeArrayFieldStart("stack");
+//                for (String frame : sanitizedFrames) {
+//                    gen.writeString(frame);
+//                }
+//                gen.writeEndArray();
 
                 // Hash of the sanitized trace for fast deduplication
-                String fingerprint = String.join("|", sanitizedFrames);
-                long hash = Wyhash64.hash(0, fingerprint.getBytes(StandardCharsets.UTF_8));
-                gen.writeNumberField("hash", hash);
+                gen.writeStringField("hash", JavaStackSanitizerLogback.fingerprint(tp,elem->true));
 
                 // Cause chain
                 IThrowableProxy cause = tp.getCause();
@@ -297,35 +295,6 @@ public class JsonLogWriter extends ContextAwareBase {
     }
 
     // ========== Helper ==========
-
-    /**
-     * Extracts stack trace frames from an {@link IThrowableProxy} and sanitizes
-     * them via {@link JavaStackSanitizer} for deterministic, hashable output.
-     */
-    private List<String> getSanitizedFrames(IThrowableProxy tp) {
-        StackTraceElementProxy[] steArray = tp.getStackTraceElementProxyArray();
-        if (steArray == null || steArray.length == 0) {
-            return List.of();
-        }
-        StackTraceElement[] frames = new StackTraceElement[steArray.length];
-        for (int i = 0; i < steArray.length; i++) {
-            frames[i] = steArray[i].getStackTraceElement();
-        }
-        return JavaStackSanitizer.getSanitizedFrames(frames, maxStackFrames);
-    }
-
-    private List<String> getSanitizedFrames(IThrowableProxy tp) {
-        StackTraceElementProxy[] steArray = tp.getStackTraceElementProxyArray();
-        if (steArray == null || steArray.length == 0) {
-            return List.of();
-        }
-        StackTraceElement[] frames = new StackTraceElement[steArray.length];
-        for (int i = 0; i < steArray.length; i++) {
-            frames[i] = steArray[i].getStackTraceElement();
-        }
-        return JavaStackSanitizer.getSanitizedFrames(frames, maxStackFrames);
-    }
-
     public static void writeTraceString(JsonGenerator gen, StackTraceElement[] frames) throws IOException {
 // 1. Manually open the JSON string quote
         gen.writeRaw(':');
@@ -333,9 +302,9 @@ public class JsonLogWriter extends ContextAwareBase {
 
         // 2. Stream frames directly to Jackson's buffer
         for (StackTraceElement frame : frames) {
-            if (isSpringOrJdk(frame)) {
-                continue; // Your fingerprint filtering logic
-            }
+//            if (isSpringOrJdk(frame)) {
+//                continue; // Your fingerprint filtering logic
+//            }
 
             // Stream components directly to avoid ANY string concatenation
             gen.writeRaw("\tat ");
