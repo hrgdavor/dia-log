@@ -33,7 +33,7 @@ Full stack trace is written to log, but fingerprint hash uses sanitized frames. 
 The **traceparent** header format is `00-{traceId}-{spanId}-{flags}`. W3C standard ensures interoperability across Java, Node.js, Go, etc.
 
 
- **TraceId** never changes, **SpanId** changes at every hop (caller puts its own active **SpanId**), TraceFlags controls recording. OpenTelemetry Java handles it automatically via instrumentation.
+**TraceId** never changes, **SpanId** changes at every hop (caller puts its own active **SpanId**), TraceFlags controls recording. OpenTelemetry Java handles it automatically via instrumentation.
 
 [Full document](traceid.md)
 
