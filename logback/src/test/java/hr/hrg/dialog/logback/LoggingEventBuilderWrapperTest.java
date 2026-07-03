@@ -29,16 +29,12 @@ class LoggingEventBuilderWrapperTest {
     /**
      * Concrete test subclass to allow instantiation (the base class is abstract).
      */
-    private static class TestWrapper extends LoggingEventBuilderWrapper<TestWrapper> {
+    private static class TestWrapper extends LoggingEventBuilderWrapper {
         TestWrapper(LoggingEventBuilder delegate, Runnable clear) {
             super(delegate, clear);
         }
         TestWrapper(LoggingEventBuilder delegate, Runnable clear, org.slf4j.Logger logger) {
             super(delegate, clear, logger);
-        }
-        @Override
-        public TestWrapper self() {
-            return this;
         }
     }
 
