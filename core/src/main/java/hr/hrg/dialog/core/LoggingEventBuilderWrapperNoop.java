@@ -24,40 +24,40 @@ public final class LoggingEventBuilderWrapperNoop extends LoggingEventBuilderWra
 
     // ---- Fluent configuration ----
 
-    public LoggingEventBuilderWrapperBase stackWhenTraceEnabled() { return this;}
+    public LoggingEventBuilderWrapperBase stackWhenTraceEnabled() { return INSTANCE;}
 
     public LoggingEventBuilderWrapperNoop kv(String key, Object value) {
-        return this;
+        return INSTANCE;
     }
 
     // ---- LoggingEventBuilder delegation ----
 
-    public LoggingEventBuilderWrapperNoop with(LogFiller filler) { return this;}
-    public LoggingEventBuilderWrapperNoop with(LogFiller filler1, LogFiller filler2) { return this;}
+    public LoggingEventBuilderWrapperNoop with(LogFiller filler) { return INSTANCE;}
+    public LoggingEventBuilderWrapperNoop with(LogFiller filler1, LogFiller filler2) { return INSTANCE;}
 
     @Override
-    public LoggingEventBuilderWrapperNoop setCause(Throwable t) { return this; }
+    public LoggingEventBuilderWrapperNoop setCause(Throwable t) { return INSTANCE; }
 
     @Override
-    public LoggingEventBuilderWrapperNoop addMarker(Marker marker) { return this; }
+    public LoggingEventBuilderWrapperNoop addMarker(Marker marker) { return INSTANCE; }
 
     @Override
-    public LoggingEventBuilderWrapperNoop addKeyValue(String key, Object value) { return this;}
+    public LoggingEventBuilderWrapperNoop addKeyValue(String key, Object value) { return INSTANCE;}
 
     @Override
-    public LoggingEventBuilderWrapperNoop addKeyValue(String key, Supplier<Object> valueSupplier) { return this;}
+    public LoggingEventBuilderWrapperNoop addKeyValue(String key, Supplier<Object> valueSupplier) { return INSTANCE;}
 
     @Override
-    public LoggingEventBuilderWrapperNoop addArgument(Object arg) { return this; }
+    public LoggingEventBuilderWrapperNoop addArgument(Object arg) { return INSTANCE; }
 
     @Override
-    public LoggingEventBuilderWrapperNoop addArgument(Supplier<?> argSupplier) { return this; }
+    public LoggingEventBuilderWrapperNoop addArgument(Supplier<?> argSupplier) { return INSTANCE; }
 
     @Override
-    public LoggingEventBuilderWrapperNoop setMessage(String message) { return this; }
+    public LoggingEventBuilderWrapperNoop setMessage(String message) { return INSTANCE; }
 
     @Override
-    public LoggingEventBuilderWrapperNoop setMessage(Supplier<String> messageSupplier) { return this; }
+    public LoggingEventBuilderWrapperNoop setMessage(Supplier<String> messageSupplier) { return INSTANCE; }
 
     @Override
     public void log() {}
