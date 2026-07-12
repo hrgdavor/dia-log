@@ -1,14 +1,8 @@
 package hr.hrg.dialog.core;
 
-import org.slf4j.Logger;
-import org.slf4j.MDC;
 import org.slf4j.Marker;
-import org.slf4j.spi.LoggingEventBuilder;
 import org.slf4j.spi.NOPLoggingEventBuilder;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
 import java.util.function.Supplier;
 
 public final class LoggingEventBuilderWrapperNoop extends LoggingEventBuilderWrapperBase {

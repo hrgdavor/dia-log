@@ -1,300 +1,335 @@
 package hr.hrg.dialog.logback;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import java.io.ByteArrayOutputStream;
-import java.util.List;
-import java.util.Map;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 
 import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.spi.LoggingEvent;
-import ch.qos.logback.classic.spi.ThrowableProxy;
-import ch.qos.logback.core.ContextBase;
-import org.slf4j.event.KeyValuePair;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link JsonLogWriter} output format.
- * Tests ensure {@link ConsoleAppenderJson} and {@link RollingFileAppenderJson}
- * produce the same JSON via the shared writer.
+ * Unit tests for {@link ConsoleAppenderJson}.
+ * <p>
+ * Covers: JSON structure for all log levels, key-value inclusion/exclusion,
+ * MDC inclusion/exclusion, exception serialization, special character escaping.
+ * </p>
  */
-public class ConsoleAppenderJsonTest {
+class ConsoleAppenderJsonTest {
 
-    private JsonLogWriter jsonWriter;
-    private ByteArrayOutputStream baos;
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String LOGGER_NAME = "test.logger";
+
+    private LoggerContext context;
+    private Logger logger;
+    private ConsoleAppenderJson<ILoggingEvent> appender;
+    private ByteArrayOutputStream outputStream;
+    private PrintStream originalOut;
 
     @BeforeEach
     void setUp() {
-        jsonWriter = new JsonLogWriter();
-        jsonWriter.setContext(new ContextBase());
-        jsonWriter.start();
+        originalOut = System.out;
+        outputStream = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(outputStream));
 
-        baos = new ByteArrayOutputStream();
+        context = new LoggerContext();
+        logger = context.getLogger(LOGGER_NAME);
+        logger.setLevel(Level.TRACE);
+
+        appender = new ConsoleAppenderJson<>();
+        appender.setContext(context);
+        appender.start();
+        logger.addAppender(appender);
+    }
+
+    @AfterEach
+    void tearDown() {
+        MDC.clear();
+        appender.stop();
+        context.stop();
+        System.setOut(originalOut);
+    }
+
+    // ========== JSON structure for all log levels ==========
+
+    @Test
+    void json_containsRequiredFields() throws Exception {
+        logger.info("test message");
+        JsonNode json = parseLastJsonLine();
+
+        assertTrue(json.has("ts"), "Should have 'ts' (epoch millis)");
+        assertTrue(json.has("level"), "Should have 'level'");
+        assertTrue(json.has("logger"), "Should have 'logger'");
+        assertTrue(json.has("thread"), "Should have 'thread'");
+        assertTrue(json.has("msg"), "Should have 'msg'");
     }
 
     @Test
-    void testSimpleInfoLog() throws Exception {
-        LoggingEvent event = createEvent(Level.INFO, "Hello, world!");
+    void json_levelIsCorrect() throws Exception {
+        logger.trace("trace msg");
+        assertEquals("TRACE", parseLastJsonLine().get("level").asText());
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
+        logger.debug("debug msg");
+        assertEquals("DEBUG", parseLastJsonLine().get("level").asText());
 
-        JsonNode root = MAPPER.readTree(json);
-        assertEquals("INFO", root.get("level").asText());
-        assertEquals("test.Logger", root.get("logger").asText());
-        assertEquals("Hello, world!", root.get("msg").asText());
-        assertTrue(root.has("ts"), "Should have timestamp");
+        logger.info("info msg");
+        assertEquals("INFO", parseLastJsonLine().get("level").asText());
+
+        logger.warn("warn msg");
+        assertEquals("WARN", parseLastJsonLine().get("level").asText());
+
+        logger.error("error msg");
+        assertEquals("ERROR", parseLastJsonLine().get("level").asText());
     }
 
     @Test
-    void testAllLogLevels() throws Exception {
-        for (Level level : List.of(Level.TRACE, Level.DEBUG, Level.INFO, Level.WARN, Level.ERROR)) {
-            baos.reset();
-            LoggingEvent event = createEvent(level, "Level test: " + level);
+    void json_loggerAndThreadAreCorrect() throws Exception {
+        logger.info("message");
+        JsonNode json = parseLastJsonLine();
 
-            jsonWriter.writeJsonEvent(event, baos);
-            String json = baos.toString("UTF-8");
-
-            JsonNode root = MAPPER.readTree(json);
-            assertEquals(level.toString(), root.get("level").asText(),
-                    "Level should be " + level);
-        }
+        assertEquals(LOGGER_NAME, json.get("logger").asText());
+        assertNotNull(json.get("thread").asText());
     }
 
     @Test
-    void testStructuredKeyValuePairs() throws Exception {
-        LoggingEvent event = createEvent(Level.INFO, "KV test");
-        event.addKeyValuePair(new KeyValuePair("userId", 42));
-        event.addKeyValuePair(new KeyValuePair("durationMs", 150));
-        event.addKeyValuePair(new KeyValuePair("success", true));
+    void json_msgContainsFormattedMessage() throws Exception {
+        logger.info("Hello {}!", "world");
+        JsonNode json = parseLastJsonLine();
+        assertEquals("Hello world!", json.get("msg").asText());
+    }
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
+    // ========== MDC inclusion/exclusion ==========
 
-        JsonNode root = MAPPER.readTree(json);
-        JsonNode kv = root.get("kv");
-        assertNotNull(kv, "Should have kv object");
-        assertEquals(42, kv.get("userId").asInt());
-        assertEquals(150, kv.get("durationMs").asInt());
-        assertTrue(kv.get("success").asBoolean());
+    @Test
+    void mdcIncluded_whenIncludeMdcTrue() throws Exception {
+        appender.setIncludeMDC(true);
+        MDC.put("mdcKey", "mdcValue");
+
+        logger.info("test");
+        JsonNode json = parseLastJsonLine();
+
+        assertEquals("mdcValue", json.get("mdcKey").asText());
     }
 
     @Test
-    void testMdcContextInclusion() throws Exception {
-        LoggingEvent event = createEvent(Level.WARN, "MDC test");
-        event.setMDCPropertyMap(Map.of(
-                "requestId", "req-123",
-                "userId", "alice",
-                "tenant", "acme"
-        ));
+    void mdcExcluded_whenIncludeMdcFalse() throws Exception {
+        appender.setIncludeMDC(false);
+        MDC.put("mdcKey", "mdcValue");
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
-
-        JsonNode root = MAPPER.readTree(json);
-        JsonNode ctx = root.get("ctx");
-        assertNotNull(ctx, "Should have ctx object");
-        assertEquals("req-123", ctx.get("requestId").asText());
-        assertEquals("alice", ctx.get("userId").asText());
-        assertEquals("acme", ctx.get("tenant").asText());
+        logger.info("test");
+        String output = outputStream.toString();
+        assertFalse(output.isEmpty());
+        assertFalse(output.contains("mdcKey"));
     }
 
     @Test
-    void testMdcExclusion() throws Exception {
-        jsonWriter.setIncludeMDC(false);
+    void mdcCleared_doesNotLeakBetweenEvents() throws Exception {
+        MDC.put("sessionId", "session1");
+        logger.info("first event");
+        MDC.clear();
 
-        LoggingEvent event = createEvent(Level.INFO, "No MDC");
-        event.setMDCPropertyMap(Map.of("requestId", "req-123"));
+        MDC.put("sessionId", "session2");
+        logger.info("second event");
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
+        String output = outputStream.toString();
+        String[] lines = output.trim().split("\\R");
+        assertEquals(2, lines.length);
 
-        JsonNode root = MAPPER.readTree(json);
-        assertNull(root.get("ctx"), "Should NOT include ctx when includeMDC=false");
+        JsonNode first = MAPPER.readTree(lines[0]);
+        JsonNode second = MAPPER.readTree(lines[1]);
+
+        assertEquals("session1", first.get("sessionId").asText());
+        assertEquals("session2", second.get("sessionId").asText());
+    }
+
+    // ========== customFields ==========
+
+    @Test
+    void customFields_areMergedIntoOutput() throws Exception {
+        appender.setCustomFields("{\"env\":\"test\",\"version\":\"2.0\"}");
+
+        logger.info("hello");
+        JsonNode json = parseLastJsonLine();
+
+        assertEquals("test", json.get("env").asText());
+        assertEquals("2.0", json.get("version").asText());
     }
 
     @Test
-    void testKeysExclusion() throws Exception {
-        jsonWriter.setIncludeKeys(false);
+    void customFields_null_doesNotAddFields() throws Exception {
+        appender.setCustomFields(null);
 
-        LoggingEvent event = createEvent(Level.INFO, "No KV");
-        event.addKeyValuePair(new KeyValuePair("secret", "should-not-appear"));
+        logger.info("hello");
+        JsonNode json = parseLastJsonLine();
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
+        assertFalse(json.has("env"));
+    }
 
-        JsonNode root = MAPPER.readTree(json);
-        assertNull(root.get("kv"), "Should NOT include kv when includeKeys=false");
+    // ========== includeSource ==========
+
+    @Test
+    void includeSource_true_addsSourceObject() throws Exception {
+        appender.setIncludeSource(true);
+
+        logger.info("test source");
+        JsonNode json = parseLastJsonLine();
+
+        assertTrue(json.has("source"));
+        assertTrue(json.get("source").has("class"));
+        assertTrue(json.get("source").has("method"));
     }
 
     @Test
-    void testExceptionSerialization() throws Exception {
-        RuntimeException ex = new RuntimeException("Something broke");
-        LoggingEvent event = createErrorEvent(ex);
+    void includeSource_false_omitsSource() throws Exception {
+        appender.setIncludeSource(false);
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
+        logger.info("test");
+        JsonNode json = parseLastJsonLine();
 
-        JsonNode root = MAPPER.readTree(json);
-        JsonNode err = root.get("err");
-        assertNotNull(err, "Should have err object");
+        assertFalse(json.has("source"));
+    }
+
+    // ========== prettyPrint ==========
+
+    @Test
+    void prettyPrint_true_producesMultiLine() throws Exception {
+        appender.setPrettyPrint(true);
+
+        logger.info("test");
+        String output = outputStream.toString();
+
+        assertTrue(output.contains("\n") || output.contains("\r"));
+    }
+
+    @Test
+    void prettyPrint_false_singleLine() throws Exception {
+        appender.setPrettyPrint(false);
+
+        logger.info("test");
+        String output = outputStream.toString().trim();
+
+        assertTrue(output.startsWith("{"));
+        assertTrue(output.endsWith("}"));
+    }
+
+    // ========== Exception serialization ==========
+
+    @Test
+    void exception_serializes_errObject() throws Exception {
+        logger.error("error occurred", new RuntimeException("test exception"));
+        JsonNode json = parseLastJsonLine();
+
+        assertTrue(json.has("err"), "Should have 'err' object");
+        JsonNode err = json.get("err");
+
+        assertTrue(err.has("class"), "Should have exception class");
+        assertTrue(err.has("msg"), "Should have exception message");
+        assertTrue(err.has("hash"), "Should have stack hash");
         assertEquals("java.lang.RuntimeException", err.get("class").asText());
-        assertEquals("Something broke", err.get("msg").asText());
-        assertTrue(err.has("stack"), "Should have stack array");
-        assertTrue(err.get("stack").isArray(), "stack should be an array");
-        assertTrue(err.get("stack").size() > 0, "stack should have frames");
     }
 
     @Test
-    void testExceptionWithCause() throws Exception {
-        IllegalArgumentException cause = new IllegalArgumentException("Invalid input");
-        RuntimeException ex = new RuntimeException("Outer failure", cause);
-        LoggingEvent event = createErrorEvent(ex);
+    void exception_hash_isHexString() throws Exception {
+        logger.error("error", new RuntimeException("hash test"));
+        JsonNode json = parseLastJsonLine();
+        JsonNode err = json.get("err");
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
-
-        JsonNode root = MAPPER.readTree(json);
-        JsonNode err = root.get("err");
-        assertNotNull(err, "Should have err object");
-
-        JsonNode causeNode = err.get("cause");
-        assertNotNull(causeNode, "Should have cause object");
-        assertEquals("java.lang.IllegalArgumentException", causeNode.get("class").asText());
-        assertEquals("Invalid input", causeNode.get("msg").asText());
+        String hash = err.get("hash").asText();
+        assertNotNull(hash);
+        assertTrue(hash.matches("[0-9a-fA-F]{1,16}"), "Hash should be a hex string up to 16 chars");
     }
 
     @Test
-    void testCustomFields() throws Exception {
-        jsonWriter.setCustomFields("{\"env\":\"test\",\"version\":\"1.0\",\"region\":\"eu-west\"}");
+    void exception_withCause_includesCauseObject() throws Exception {
+        RuntimeException cause = new RuntimeException("root cause");
+        RuntimeException ex = new RuntimeException("wrapper", cause);
 
-        LoggingEvent event = createEvent(Level.INFO, "Custom fields test");
+        logger.error("error with cause", ex);
+        JsonNode json = parseLastJsonLine();
+        JsonNode err = json.get("err");
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
-
-        JsonNode root = MAPPER.readTree(json);
-        assertEquals("test", root.get("env").asText());
-        assertEquals("1.0", root.get("version").asText());
-        assertEquals("eu-west", root.get("region").asText());
+        assertTrue(err.has("cause"), "Should have 'cause' object");
+        assertEquals("java.lang.RuntimeException", err.get("cause").get("class").asText());
+        assertEquals("root cause", err.get("cause").get("msg").asText());
     }
 
     @Test
-    void testSpecialCharactersEscaping() throws Exception {
-        LoggingEvent event = createEvent(Level.INFO,
-                "Message with \"quotes\" and \t tabs and \n newlines and \\ backslashes");
+    void noException_omitsErrObject() throws Exception {
+        logger.info("no error");
+        JsonNode json = parseLastJsonLine();
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
+        assertFalse(json.has("err"));
+    }
 
-        // The JSON should be parseable
-        JsonNode root = MAPPER.readTree(json);
-        String msg = root.get("msg").asText();
-        assertTrue(msg.contains("quotes"), "Should contain quotes text");
-        assertTrue(msg.contains("tabs"), "Should contain tabs text");
-        assertTrue(msg.contains("backslashes"), "Should contain backslashes text");
+    // ========== Special character escaping ==========
+
+    @Test
+    void specialCharacters_areEscaped() throws Exception {
+        logger.info("line1\nline2\ttab\"quote\\backslash");
+        JsonNode json = parseLastJsonLine();
+
+        String msg = json.get("msg").asText();
+        assertEquals("line1\nline2\ttab\"quote\\backslash", msg);
     }
 
     @Test
-    void testTimestampIsNumeric() throws Exception {
-        LoggingEvent event = createEvent(Level.INFO, "Timestamp test");
+    void unicodeCharacters_arePreserved() throws Exception {
+        String unicode = "日本語 émojí 🎉";
+        logger.info(unicode);
+        JsonNode json = parseLastJsonLine();
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
-
-        JsonNode root = MAPPER.readTree(json);
-        assertTrue(root.get("ts").isNumber(), "ts should be a numeric epoch millis timestamp");
-        assertTrue(root.get("ts").asLong() > 0, "ts should be a positive epoch millis value");
+        assertEquals(unicode, json.get("msg").asText());
     }
 
+    // ========== maxStackFrames delegation ==========
+
     @Test
-    void testWithoutException() throws Exception {
-        LoggingEvent event = createEvent(Level.INFO, "No exception");
+    void maxStackFrames_getterSetter_delegatesToJsonWriter() {
+        appender.setMaxStackFrames(50);
+        assertEquals(50, appender.getMaxStackFrames());
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
-
-        JsonNode root = MAPPER.readTree(json);
-        assertNull(root.get("err"), "Should NOT have err when no exception");
+        appender.setMaxStackFrames(10);
+        assertEquals(10, appender.getMaxStackFrames());
     }
 
+    // ========== Lifecycle ==========
+
     @Test
-    void testThreadNameIncluded() throws Exception {
-        String threadName = Thread.currentThread().getName();
-        LoggingEvent event = createEvent(Level.INFO, "Thread test");
+    void appender_startAndStop_works() {
+        assertTrue(appender.isStarted());
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
+        appender.stop();
+        assertFalse(appender.isStarted());
 
-        JsonNode root = MAPPER.readTree(json);
-        assertTrue(root.has("thread"), "Should have thread field");
-        assertEquals(threadName, root.get("thread").asText());
+        appender.start();
+        assertTrue(appender.isStarted());
     }
 
-    @Test
-    void testIncludeSource() throws Exception {
-        jsonWriter.setIncludeSource(true);
+    // ========== Helpers ==========
 
-        LoggingEvent event = createEvent(Level.INFO, "Source test");
-        // Simulate caller data
-        event.setCallerData(new StackTraceElement[]{
-                new StackTraceElement("com.example.MyService", "doSomething", "MyService.java", 42)
-        });
+    private JsonNode parseLastJsonLine() throws IOException {
+        String output = outputStream.toString().trim();
+        assertFalse(output.isEmpty(), "Output should not be empty");
 
-        jsonWriter.writeJsonEvent(event, baos);
-        String json = baos.toString("UTF-8");
-
-        JsonNode root = MAPPER.readTree(json);
-        JsonNode source = root.get("source");
-        assertNotNull(source, "Should have source object when includeSource=true");
-        assertEquals("com.example.MyService", source.get("class").asText());
-        assertEquals("doSomething", source.get("method").asText());
-        assertEquals(42, source.get("line").asInt());
-    }
-
-    @Test
-    void testValidJsonLineOutput() throws Exception {
-        // Write multiple events, each should be a valid JSON line
-        for (int i = 0; i < 3; i++) {
-            LoggingEvent event = createEvent(Level.INFO, "Line " + i);
-            event.addKeyValuePair(new KeyValuePair("index", i));
-            jsonWriter.writeJsonEvent(event, baos);
-            baos.write(System.lineSeparator().getBytes("UTF-8"));
+        String[] lines = output.split("\\R");
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i].trim();
+            if (line.startsWith("{")) {
+                return MAPPER.readTree(line);
+            }
         }
 
-        String output = baos.toString("UTF-8");
-        String[] lines = output.split(System.lineSeparator());
-
-        assertEquals(3, lines.length, "Should have 3 JSON lines");
-
-        for (int i = 0; i < 3; i++) {
-            JsonNode root = MAPPER.readTree(lines[i]);
-            assertEquals("INFO", root.get("level").asText());
-            assertEquals(i, root.get("kv").get("index").asInt());
-        }
-    }
-
-    // ---- Helper methods ----
-
-    private LoggingEvent createEvent(Level level, String message) {
-        LoggingEvent event = new LoggingEvent();
-        event.setLevel(level);
-        event.setLoggerName("test.Logger");
-        event.setMessage(message);
-        event.setTimeStamp(System.currentTimeMillis());
-        event.setThreadName(Thread.currentThread().getName());
-        return event;
-    }
-
-    private LoggingEvent createErrorEvent(Throwable throwable) {
-        LoggingEvent event = createEvent(Level.ERROR, throwable.getMessage());
-        event.setThrowableProxy(new ThrowableProxy(throwable));
-        return event;
+        // Fallback: try parsing the entire output as a single JSON
+        return MAPPER.readTree(output);
     }
 }

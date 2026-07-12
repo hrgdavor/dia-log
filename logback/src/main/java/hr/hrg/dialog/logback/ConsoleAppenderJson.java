@@ -82,6 +82,14 @@ public class ConsoleAppenderJson<E> extends ConsoleAppender<E> {
         return jsonWriter.getCustomFields();
     }
 
+    public void setMaxStackFrames(int maxStackFrames) {
+        jsonWriter.setMaxStackFrames(maxStackFrames);
+    }
+
+    public int getMaxStackFrames() {
+        return jsonWriter.getMaxStackFrames();
+    }
+
     // ========== Lifecycle ==========
 
     @Override

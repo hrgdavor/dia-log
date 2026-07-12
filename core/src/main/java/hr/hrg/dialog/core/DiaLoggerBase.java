@@ -5,7 +5,7 @@ import org.slf4j.Marker;
 import org.slf4j.event.Level;
 import org.slf4j.spi.LoggingEventBuilder;
 
-public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapper> implements Logger {
+public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> implements Logger {
 
 	protected Logger delegate;
 	public DiaLoggerBase(Logger delegate) {
@@ -45,7 +45,7 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapper> implem
 			this.prefix = prefix+this.prefix;
 	}
 
-	public static  <L1 extends  LoggingEventBuilderWrapper> L1 addKeyValues(L1 builder, Object ...keyVal) {
+	public static  <L1 extends  LoggingEventBuilderWrapperBase> L1 addKeyValues(L1 builder, Object ...keyVal) {
 		for(int i=1; i< keyVal.length; i+=2) {
 			Object key = keyVal[i-1];
 			if(key == null) continue;
