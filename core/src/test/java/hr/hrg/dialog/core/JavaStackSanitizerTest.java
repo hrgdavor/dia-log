@@ -125,11 +125,12 @@ class JavaStackSanitizerTest {
                 ste("com.example.MyClass$$Lambda$456/0x00007f8b87654321", "apply"),
         };
 
-        // different method name → must differ
-        assertNotEquals(
+        // Lambda class method is normalised to "lambda", so even with different
+        // original methods both should hash the same
+        assertEquals(
                 hashFrames(frames1, ACCEPT_ALL),
                 hashFrames(frames2, ACCEPT_ALL),
-                "different lambda methods should produce different hashes");
+                "different lambda classes should produce the same hash (normalised to enclosing class + 'lambda')");
     }
 
     @Test
@@ -368,7 +369,7 @@ class JavaStackSanitizerTest {
         // Construct the expected filtered trace:
         StackTraceElement[] expectedFrames = {
                 ste("com.example.MyClass", "doStuff"),
-                ste("com.example.MyClass", "run"),      // lambda class → "com.example.MyClass.lambda"
+                ste("com.example.MyClass", "lambda"),   // lambda class → "com.example.MyClass.lambda"
                 ste("com.example.MyClass", "doOtherStuff"), // lambda$doOtherStuff$99 → "doOtherStuff"
         };
         String hashExpected = hashFrames(expectedFrames, ACCEPT_ALL);

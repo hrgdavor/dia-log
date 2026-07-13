@@ -287,8 +287,8 @@ public class JsonLogWriter extends ContextAwareBase {
         if(value == null) return;
 
         gen.writeFieldName(key);
-        if (value instanceof String) {
-            gen.writeStringField(key, (String) value);
+        if (value instanceof String s) {
+            gen.writeString(s);
         } else {
             gen.writePOJO(value);
         }

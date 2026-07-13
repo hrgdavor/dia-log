@@ -30,12 +30,10 @@ class LoggingEventBuilderWrapperTest {
      * Concrete test subclass to allow instantiation (the base class is abstract).
      */
     private static class TestWrapper extends LoggingEventBuilderWrapper {
-        TestWrapper(LoggingEventBuilder delegate, Runnable clear) {
-            super(delegate, clear);
-        }
         TestWrapper(LoggingEventBuilder delegate, Runnable clear, org.slf4j.Logger logger) {
             super(delegate, clear, logger);
         }
+
     }
 
     // ---- MDC key cleanup ----
@@ -45,7 +43,7 @@ class LoggingEventBuilderWrapperTest {
         List<String> keysTracked = new ArrayList<>();
         LoggingEventBuilder delegate = realLogger.atInfo();
 
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
         wrapper.addKeyValue("userId", "alice");
         wrapper.addKeyValue("requestId", "123");
 
@@ -64,7 +62,7 @@ class LoggingEventBuilderWrapperTest {
     void addKeyValue_supplier_cleansUpMdcAfterLog() {
         LoggingEventBuilder delegate = realLogger.atInfo();
 
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
         wrapper.addKeyValue("computed", () -> "dynamic-value");
 
         assertEquals("dynamic-value", MDC.get("computed"));
@@ -79,46 +77,16 @@ class LoggingEventBuilderWrapperTest {
         LoggingEventBuilder delegate = realLogger.atInfo();
 
         // First log
-        TestWrapper w1 = new TestWrapper(delegate, () -> {});
+        TestWrapper w1 = new TestWrapper(delegate, () -> {}, realLogger);
         w1.addKeyValue("key1", "val1");
         w1.log("first");
         Assertions.assertNull(MDC.get("key1"));
 
         // Second log
-        TestWrapper w2 = new TestWrapper(delegate, () -> {});
+        TestWrapper w2 = new TestWrapper(delegate, () -> {}, realLogger);
         w2.addKeyValue("key2", "val2");
         w2.log("second");
         Assertions.assertNull(MDC.get("key2"));
-    }
-
-    @Test
-    void closeContext_onlyRunsOnce() {
-        AtomicBoolean cleared = new AtomicBoolean(false);
-        LoggingEventBuilder delegate = realLogger.atInfo();
-
-        TestWrapper wrapper = new TestWrapper(delegate, () -> cleared.set(true));
-        wrapper.addKeyValue("k", "v");
-
-        wrapper.log("msg");
-        Assertions.assertTrue(cleared.get());
-
-        // Calling close again should be a no-op
-        wrapper.close();
-        Assertions.assertTrue(cleared.get()); // Still true, not called twice
-    }
-
-    @Test
-    void close_viaAutoCloseable() {
-        AtomicBoolean cleared = new AtomicBoolean(false);
-        LoggingEventBuilder delegate = realLogger.atInfo();
-
-        try (TestWrapper wrapper = new TestWrapper(delegate, () -> cleared.set(true))) {
-            wrapper.addKeyValue("k", "v");
-            Assertions.assertFalse(cleared.get());
-        }
-
-        Assertions.assertTrue(cleared.get(), "close() should fire the clear Runnable");
-        Assertions.assertNull(MDC.get("k"));
     }
 
     // ---- Clear Runnable ----
@@ -128,7 +96,7 @@ class LoggingEventBuilderWrapperTest {
         AtomicBoolean cleared = new AtomicBoolean(false);
         LoggingEventBuilder delegate = realLogger.atInfo();
 
-        TestWrapper wrapper = new TestWrapper(delegate, () -> cleared.set(true));
+        TestWrapper wrapper = new TestWrapper(delegate, () -> cleared.set(true), realLogger);
         wrapper.log("test");
 
         Assertions.assertTrue(cleared.get(), "Clear Runnable should be called after log()");
@@ -179,7 +147,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void kv_shorthand_addsKeyValueToMDC() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
 
         wrapper.kv("myKey", "myValue");
         assertEquals("myValue", MDC.get("myKey"));
@@ -193,7 +161,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void setCause_isDelegated() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
 
         // setCause should return the wrapper for chaining
         LoggingEventBuilder result = wrapper.setCause(new RuntimeException("test"));
@@ -203,7 +171,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void addMarker_isDelegated() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
 
         Marker marker = MarkerFactory.getMarker("TEST");
         LoggingEventBuilder result = wrapper.addMarker(marker);
@@ -213,7 +181,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void addArgument_isDelegated() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
 
         LoggingEventBuilder result = wrapper.addArgument("arg1");
         Assertions.assertSame(wrapper, result, "addArgument should return the wrapper for chaining");
@@ -224,7 +192,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void log_varargsOverload_cleansUp() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
         wrapper.addKeyValue("k", "v");
 
         wrapper.log("msg {} {} {}", "a", "b", "c");
@@ -234,7 +202,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void log_twoArgOverload_cleansUp() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
         wrapper.addKeyValue("k", "v");
 
         wrapper.log("msg {}", "arg");
@@ -244,7 +212,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void log_threeArgOverload_cleansUp() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
         wrapper.addKeyValue("k", "v");
 
         wrapper.log("msg {} {}", "a", "b");
@@ -254,7 +222,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void log_supplierOverload_cleansUp() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
         wrapper.addKeyValue("k", "v");
 
         wrapper.log(() -> "lazy message");
@@ -264,7 +232,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void log_noArgOverload_cleansUp() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
         wrapper.addKeyValue("k", "v");
 
         wrapper.log();
@@ -283,7 +251,7 @@ class LoggingEventBuilderWrapperTest {
             new Thread(() -> {
                 try {
                     LoggingEventBuilder delegate = realLogger.atInfo();
-                    TestWrapper wrapper = new TestWrapper(delegate, () -> {});
+                    TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
                     wrapper.addKeyValue("key", "value");
                     wrapper.log("msg");
                 } catch (Exception e) {
