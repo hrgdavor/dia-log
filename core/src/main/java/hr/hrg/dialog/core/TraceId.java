@@ -37,7 +37,7 @@ public class TraceId {
     public static String generateTraceId() {
         long timestampMs = System.currentTimeMillis();
         long randomPart = ThreadLocalRandom.current().nextLong();
-        return String.format("%016x%016x", timestampMs, randomPart);
+        return padHex(timestampMs) + padHex(randomPart);
     }
 
     public static String generateSpanId() {
@@ -47,7 +47,13 @@ public class TraceId {
         while (random == 0) {
             random = ThreadLocalRandom.current().nextLong();
         }
-        return String.format("%016x", random);
+        return padHex(random);
+    }
+
+    private static String padHex(long value) {
+        String hex = Long.toHexString(value);
+        if (hex.length() >= 16) return hex;
+        return "0".repeat(16 - hex.length()) + hex;
     }
 
     public byte[] getBytes() {

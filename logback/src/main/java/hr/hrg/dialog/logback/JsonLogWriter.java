@@ -295,6 +295,7 @@ public class JsonLogWriter extends ContextAwareBase {
     }
 
     // ========== Helper ==========
+    // TODO(dia-log): Remove writeTraceString() — dead code, intentionally kept for now.
     public static void writeTraceString(JsonGenerator gen, StackTraceElement[] frames) throws IOException {
 // 1. Manually open the JSON string quote
         gen.writeRaw(':');

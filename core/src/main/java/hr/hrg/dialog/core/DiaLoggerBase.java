@@ -38,7 +38,7 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	}
 
 
-	public synchronized void addPrefix(String prefix){
+	public synchronized void prependPrefix(String prefix){
 		if(this.prefix == null)
 			this.prefix = prefix;
 		else

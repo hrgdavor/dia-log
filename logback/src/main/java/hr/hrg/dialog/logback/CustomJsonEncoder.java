@@ -11,6 +11,7 @@ import ch.qos.logback.core.encoder.EncoderBase;
  * Custom Logback Encoder that outputs logging events as structured JSON lines.
  * This can be used cleanly inside both ConsoleAppender and RollingFileAppender.
  */
+// TODO(dia-log): Dead code — intentionally kept for now, remove in future cleanup.
 public class CustomJsonEncoder extends EncoderBase<ILoggingEvent> {
 
     private final JsonLogWriter jsonWriter = new JsonLogWriter();

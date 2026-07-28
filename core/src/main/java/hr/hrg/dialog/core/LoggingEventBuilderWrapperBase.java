@@ -211,6 +211,8 @@ public class LoggingEventBuilderWrapperBase implements LoggingEventBuilder {
             return;
         }
         closed = true;
+        // TODO(dia-log): Replace System.out with SLF4J logging and narrow catch to Exception.
+        // Skipped in initial pass — left as-is intentionally.
         try{
             clear.run();
         }catch (Throwable e){

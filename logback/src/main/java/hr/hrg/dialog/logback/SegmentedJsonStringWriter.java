@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import java.io.IOException;
 import java.io.Writer;
 
+// TODO(dia-log): Dead code — intentionally kept for now, remove in future cleanup.
 class SegmentedJsonStringWriter extends Writer {
     private final JsonGenerator gen;
     private final char[] buffer = new char[1024]; // Reusable segment buffer

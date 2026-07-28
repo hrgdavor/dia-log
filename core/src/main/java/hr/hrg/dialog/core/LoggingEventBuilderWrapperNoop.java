@@ -18,7 +18,7 @@ public final class LoggingEventBuilderWrapperNoop extends LoggingEventBuilderWra
 
     // ---- Fluent configuration ----
 
-    public LoggingEventBuilderWrapperBase stackWhenTraceEnabled() { return INSTANCE;}
+    public LoggingEventBuilderWrapperNoop stackWhenTraceEnabled() { return INSTANCE;}
 
     public LoggingEventBuilderWrapperNoop kv(String key, Object value) {
         return INSTANCE;
