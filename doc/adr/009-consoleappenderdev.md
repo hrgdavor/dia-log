@@ -1,6 +1,6 @@
 # 009: ConsoleAppenderDev for development
 
-* **Status:** Accepted
+* **Status:** Superseded (removed 2026-07-30)
 * **Date:** 2026-07-26
 
 ## Context
@@ -15,14 +15,9 @@ Standard Logback `PatternLayout` cannot:
 - Detect and report missing keys at runtime
 - Produce the exact format developers expect from traditional logging frameworks
 
-## Options Considered
-
-1. **Use standard Logback PatternLayout:** Familiar format, but no placeholder expansion from key-value pairs and no missing key detection.
-2. **Custom development appender with placeholder expansion:** Provides readable output and catches missing keys during development.
-
 ## Decision
 
-Create [`ConsoleAppenderDev`](../logback/src/main/java/hr/hrg/dialog/logback/ConsoleAppenderDev.java) as a development-only console appender that:
+Create `ConsoleAppenderDev` as a development-only console appender that:
 
 ### Placeholder expansion
 - Parses `{name}` placeholders in the formatted message
@@ -45,12 +40,12 @@ HH:mm:ss.SSS [thread] LEVEL  logger.name - Expanded message here
 - `expandPlaceholders` (default: `true`) — enable/disable placeholder expansion
 - `warnOnMissingKeys` (default: `false`) — enable missing key warnings with stack trace
 
-## Consequences
+## Removal
 
-* **Positive:** Developers get readable console output during development without changing log statements; missing key detection catches bugs early (typos in placeholder names); zero impact on production: use `ConsoleAppenderJson` for production, `ConsoleAppenderDev` for development; the appender is self-contained — no external configuration needed beyond `logback.xml`.
-* **Negative:** Placeholder expansion adds CPU overhead (string parsing and lookup); the missing key stack trace can be verbose in development output; only works with `{name}` style placeholders, not SLF4J's `{}` positional arguments (by design).
+The custom appender approach (`ConsoleAppenderDev`, `ConsoleAppenderJson`, `RollingFileAppenderJson`) was removed in favor of the standard Logback pattern: built-in appenders configured with [`CustomJsonEncoder`](../logback/src/main/java/hr/hrg/dialog/logback/CustomJsonEncoder.java). The project was in early stage and maintaining both approaches had no benefit.
 
 ## References
 
-- [`ConsoleAppenderDev.java`](../logback/src/main/java/hr/hrg/dialog/logback/ConsoleAppenderDev.java)
+- [`CustomJsonEncoder.java`](../logback/src/main/java/hr/hrg/dialog/logback/CustomJsonEncoder.java) (replacement)
+- [`JsonLogWriter.java`](../logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java)
 - [`cookbook/missing-keys-warn.md`](../cookbook/missing-keys-warn.md)

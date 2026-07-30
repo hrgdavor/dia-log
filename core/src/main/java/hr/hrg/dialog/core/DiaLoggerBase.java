@@ -12,8 +12,6 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		this.delegate = delegate;
 	}
 
-	protected abstract void contextStart(L builder);
-
 	/**
 	 * 	example: return new LoggingEventBuilderWrapper(builder, delegate);
 	 * @param builder
@@ -25,13 +23,12 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	protected String prefix;
 
 	/**
-	 * Wrap the builder in {@link LoggingEventBuilderWrapper} and apply context.
+	 * Wrap the builder in {@link LoggingEventBuilderWrapper}.
 	 * MDC handling is left entirely to SLF4J — we do not manage MDC keys here.
 	 */
 	protected L _contextStart(LoggingEventBuilder builder) {
 		L wrapper = initBuilder(builder);
 		if(prefix != null && !prefix.isEmpty()) wrapper.addKeyValue("prefix", prefix);
-		contextStart(wrapper);
 		return wrapper;
 	}
 
@@ -52,8 +49,13 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		return builder;
 	}
 
+	private L fill(L builder, LogFiller filler){
+		filler.fill(builder);
+		return builder;
+	}
+
 	// ---- atXxx() returning wrapped builder ----
-	// When level is disabled, contextStart is skipped (no-op wrapper).
+	// When level is disabled, no-op wrapper is returned.
 	// When level is enabled, _contextStart wraps the builder.
 
 	/**
@@ -66,8 +68,9 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		return _contextStart(delegate.atDebug());
 	}
 
-	public L atDebug(Object ...keyVal) {
-		return addKeyValues(atDebug(), keyVal);
+	public L atDebug(LogFiller filler) {
+		if(!isDebugEnabled()) return noOpWrapper();
+		return fill(atDebug(),filler);
 	}
 
 	public L atError() {
@@ -75,8 +78,9 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		return _contextStart(delegate.atError());
 	}
 
-	public L atError(Object ...keyVal) {
-		return addKeyValues(atError(), keyVal);
+	public L atError(LogFiller filler) {
+		if(!isErrorEnabled()) return noOpWrapper();
+		return fill(atError(),filler);
 	}
 
 	public L atInfo() {
@@ -84,8 +88,9 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		return _contextStart(delegate.atInfo());
 	}
 
-	public L atInfo(Object ...keyVal) {
-		return addKeyValues(atInfo(), keyVal);
+	public L atInfo(LogFiller filler) {
+		if(!isInfoEnabled()) return noOpWrapper();
+		return fill(atInfo(),filler);
 	}
 
 	public L atLevel(Level level) {
@@ -93,8 +98,9 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		return _contextStart(delegate.atLevel(level));
 	}
 
-	public L atLevel(Level level, Object ...keyVal) {
-		return addKeyValues(atLevel(level), keyVal);
+	public L atLevel(Level level,LogFiller filler) {
+		if(!delegate.isEnabledForLevel(level)) return noOpWrapper();
+		return fill(atLevel(level),filler);
 	}
 
 	public L atTrace() {
@@ -102,8 +108,9 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		return _contextStart(delegate.atTrace());
 	}
 
-	public L atTrace(Object ...keyVal) {
-		return addKeyValues(atTrace(), keyVal);
+	public L atTrace(LogFiller filler) {
+		if(!isTraceEnabled()) return noOpWrapper();
+		return fill(atTrace(),filler);
 	}
 
 	public L atWarn() {
@@ -111,11 +118,12 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		return _contextStart(delegate.atWarn());
 	}
 
-	public L atWarn(Object ...keyVal) {
-		return addKeyValues(atWarn(), keyVal);
+	public L atWarn(LogFiller filler) {
+		if(!isWarnEnabled()) return noOpWrapper();
+		return fill(atWarn(),filler);
 	}
 
-	// ---- void debug() overloads (no manual contextEnd) ----
+	// ---- void debug() overloads ----
 
 	public void debug(Marker arg0, String arg1, Object arg2, Object arg3) {
 		_contextStart(delegate.atDebug()).addMarker(arg0).log(arg1, arg2, arg3);

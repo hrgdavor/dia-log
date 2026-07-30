@@ -44,12 +44,12 @@ This is a very common and highly recommended pattern for production environments
 
 Since compression applies only to the archived files (not the active one), you can search them directly on Linux without decompressing first using `zgrep`. For the text-based log, finding all ERROR entries across all archived files is as simple as `zgrep "ERROR" logs/archived/errors-*.log.gz`. For the JSON log, you can search within specific fields using `zgrep` combined with JSON-aware tools: `zgrep '"level":"ERROR"' logs/archived/errors-*.json.gz` finds all error-level JSON lines across the full archive, or pipe through `jq` for more targeted queries like `zcat logs/archived/errors-2026-05-31.0.json.gz | jq 'select(.kv.orderId != null) | {msg, kv}'` to extract only messages that contain a specific structured key. This makes it practical to keep months of compressed history online and still answer operational questions in seconds.
 
-The same pattern works with `RollingFileAppenderJson` from this library, giving you structured JSON in both the main log and the error-only file. Instead of a text encoder, you configure the JSON writer properties (`includeMDC`, `includeKeys`, etc.) on both appenders, and the error log still uses a `ThresholdFilter` to accept only `ERROR` and above. This way your full-detail JSON log and your error-only JSON log share the identical schema—every field (`ts`, `level`, `logger`, `msg`, `kv`, `ctx`, `err`) is present—so you can feed the error log into Elasticsearch, Loki, or any log aggregator with the same parsing rules, while the main log retains all lower-severity events for deeper forensic analysis.
+The same pattern works with `CustomJsonEncoder` from this library, giving you structured JSON in both the main log and the error-only file. You configure the encoder properties (`includeMDC`, `includeKeys`, etc.) on both appenders, and the error log still uses a `ThresholdFilter` to accept only `ERROR` and above. This way your full-detail JSON log and your error-only JSON log share the identical schema—every field (`ts`, `level`, `logger`, `msg`, `kv`, `ctx`, `err`) is present—so you can feed the error log into Elasticsearch, Loki, or any log aggregator with the same parsing rules, while the main log retains all lower-severity events for deeper forensic analysis.
 
 ```xml
 <configuration>
 
-    <appender name="MAIN_LOG" class="hr.hrg.dialog.logback.RollingFileAppenderJson">
+    <appender name="MAIN_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/application.json</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>logs/archived/application-%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
@@ -57,11 +57,13 @@ The same pattern works with `RollingFileAppenderJson` from this library, giving 
             <maxHistory>30</maxHistory>
             <totalSizeCap>2GB</totalSizeCap>
         </rollingPolicy>
-        <includeMDC>true</includeMDC>
-        <includeKeys>true</includeKeys>
+        <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
+            <includeMDC>true</includeMDC>
+            <includeKeys>true</includeKeys>
+        </encoder>
     </appender>
 
-    <appender name="ERROR_LOG" class="hr.hrg.dialog.logback.RollingFileAppenderJson">
+    <appender name="ERROR_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/errors.json</file>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>ERROR</level>
@@ -72,9 +74,11 @@ The same pattern works with `RollingFileAppenderJson` from this library, giving 
             <maxHistory>60</maxHistory>
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
-        <includeMDC>true</includeMDC>
-        <includeKeys>true</includeKeys>
-        <customFields>{"logType":"error-only"}</customFields>
+        <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
+            <includeMDC>true</includeMDC>
+            <includeKeys>true</includeKeys>
+            <customFields>{"logType":"error-only"}</customFields>
+        </encoder>
     </appender>
 
     <root level="INFO">

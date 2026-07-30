@@ -23,8 +23,7 @@ import hr.hrg.dialog.core.JavaStackSanitizer;
 import hr.hrg.dialog.core.Wyhash64;
 
 /**
- * Reusable JSON log event writer that can be used by any appender
- * ({@link ConsoleAppenderJson}, {@link RollingFileAppenderJson}, etc.).
+ * Reusable JSON log event writer used internally by {@link CustomJsonEncoder}.
  * <p>
  * Holds all JSON-related configuration (includeMDC, includeKeys, prettyPrint, etc.)
  * and provides a single {@link #writeJsonEvent(ILoggingEvent, OutputStream)} method.
@@ -202,12 +201,19 @@ public class JsonLogWriter extends ContextAwareBase {
             }
             if (includeMDC) {
                 // Add MDC keys, but only if not already in kv
-                Map<String, String> mdcMap = event.getMDCPropertyMap();
+                // Note: event.getMDCPropertyMap() may throw if MDC is not initialized
+                // (e.g. when used with a manually constructed LoggingEvent in tests)
+                Map<String, String> mdcMap = null;
+                try {
+                    mdcMap = event.getMDCPropertyMap();
+                } catch (Exception e) {
+                    // MDC not available — skip MDC fields gracefully
+                }
                 if (mdcMap != null && !mdcMap.isEmpty()) {
                     for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
                         if (entry.getKey() != null) {
                             // Only add MDC key if it's not already in kv (kv takes priority)
-                            if (!allKeys.contains(entry.getKey())) {
+                            if (!isReserved(entry.getKey()) && !allKeys.contains(entry.getKey())) {
                                 gen.writeStringField(entry.getKey(), entry.getValue());
                             }
                         }
@@ -281,6 +287,13 @@ public class JsonLogWriter extends ContextAwareBase {
         } finally {
             gen.close();
         }
+    }
+
+    private boolean isReserved(String key) {
+        return switch (key) {
+            case "ts", "level", "logger", "thread","msg" -> true;
+            default -> false;
+        };
     }
 
     protected void addKey(JsonGenerator gen, String key, Object value) throws IOException {

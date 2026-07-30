@@ -18,15 +18,19 @@ public final class LoggingEventBuilderWrapperNoop extends LoggingEventBuilderWra
 
     // ---- Fluent configuration ----
 
+    @Override
     public LoggingEventBuilderWrapperNoop stackWhenTraceEnabled() { return INSTANCE;}
 
+    @Override
     public LoggingEventBuilderWrapperNoop kv(String key, Object value) {
         return INSTANCE;
     }
 
     // ---- LoggingEventBuilder delegation ----
 
+    @Override
     public LoggingEventBuilderWrapperNoop with(LogFiller filler) { return INSTANCE;}
+    @Override
     public LoggingEventBuilderWrapperNoop with(LogFiller filler1, LogFiller filler2) { return INSTANCE;}
 
     @Override
@@ -73,7 +77,4 @@ public final class LoggingEventBuilderWrapperNoop extends LoggingEventBuilderWra
 
     // ---- internal ----
 
-    private void maybeAttachTraceCause() {}
-
-    protected void closeContext() {}
 }

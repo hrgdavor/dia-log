@@ -7,7 +7,7 @@ A diagnostic logging library built on SLF4J 2.0 for Java 21. Provides structured
 | Module | Artifact | Description |
 |--------|----------|-------------|
 | [`core`](core/) | `dia-log-core` | `DiaLogger`, `LoggingEventBuilderWrapper`, `JavaStackSanitizer`, `Wyhash64` |
-| [`logback`](logback/) | `dia-log-logback` | `ConsoleAppenderJson`, `RollingFileAppenderJson`, `ConsoleAppenderDev`, `JsonLogWriter` |
+| [`logback`](logback/) | `dia-log-logback` | `CustomJsonEncoder`, `JsonLogWriter` |
 | [`example`](example/) | `dia-log-example` | Runnable demo with `logback.xml` |
 
 ## Quick Start
@@ -16,21 +16,16 @@ Add to your `logback.xml`:
 
 ```xml
 <configuration scan="true">
-    <!-- JSON console output for production -->
-    <appender name="JSON" class="hr.hrg.dialog.logback.ConsoleAppenderJson">
-        <includeMDC>true</includeMDC>
-        <includeKeys>true</includeKeys>
-    </appender>
-
-    <!-- Dev console with placeholder expansion -->
-    <appender name="DEV" class="hr.hrg.dialog.logback.ConsoleAppenderDev">
-        <expandPlaceholders>true</expandPlaceholders>
-        <warnOnMissingKeys>true</warnOnMissingKeys>
+    <!-- JSON console output with CustomJsonEncoder -->
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
+            <includeMDC>true</includeMDC>
+            <includeKeys>true</includeKeys>
+        </encoder>
     </appender>
 
     <root level="DEBUG">
         <appender-ref ref="JSON" />
-        <appender-ref ref="DEV" />
     </root>
 </configuration>
 ```
@@ -54,8 +49,7 @@ JSON output:
 ## Features
 
 - **Structured key-value logging** — `kv()` shorthand with automatic MDC cleanup
-- **JSON console/file appenders** — production-ready JSON Lines output
-- **Dev console appender** — `{name}` placeholder expansion with missing-key detection
+- **JSON encoder** — `CustomJsonEncoder` for use with standard Logback appenders (`ConsoleAppender`, `RollingFileAppender`)
 - **`stackWhenTrace()`** — conditional call-stack visibility (clean message normally, throwable when TRACE enabled)
 - **Deterministic stack traces** — `JavaStackSanitizer` normalizes frames for deduplication
 - **Hash-based dedup** — Wyhash64 fingerprint in `err.hash` for fast grouping in Elasticsearch/Loki

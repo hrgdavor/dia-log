@@ -1,6 +1,13 @@
-# Detecting Missing Log Keys at Runtime
+# Detecting Missing Log Keys at Runtime (Legacy)
 
-When using named placeholders like `{user}` in log messages with structured `kv` pairs, it's easy for a key to be missing — a typo in the key name, a refactoring that forgot to add it, or a code path that never set it. In production, the JSON appender keeps the literal `{user}` in the message and you might not notice until a downstream tool fails to parse it. The dev appender has a built-in safety net for this.
+> **Note:** The [`ConsoleAppenderDev`](../logback/src/main/java/hr/hrg/dialog/logback/ConsoleAppenderDev.java) appender
+> that implemented this feature has been **removed** in favor of the encoder-based approach
+> ([`CustomJsonEncoder`](../logback/src/main/java/hr/hrg/dialog/logback/CustomJsonEncoder.java)).
+> This document is kept for historical reference. The encoder does not support placeholder
+> expansion or missing-key detection — `{name}` placeholders are output as literal text in
+> the `msg` field with structured values in the `kv` object for downstream processing.
+
+When using named placeholders like `{user}` in log messages with structured `kv` pairs, it's easy for a key to be missing — a typo in the key name, a refactoring that forgot to add it, or a code path that never set it. In production, the JSON encoder keeps the literal `{user}` in the message and you might not notice until a downstream tool fails to parse it. The dev appender had a built-in safety net for this.
 
 ## The Problem
 
@@ -20,7 +27,7 @@ The `{ip}` placeholder is silently left in the message. In the dev console it ju
 
 ## The Solution
 
-Enable `warnOnMissingKeys` on the `ConsoleAppenderDev` appender. When a `{name}` placeholder has no matching key-value pair, the appender:
+Enable `warnOnMissingKeys` on the `ConsoleAppenderDev` appender (removed). When a `{name}` placeholder has no matching key-value pair, the appender:
 
 1. Appends `⚠ MISSING KEYS: ip` to the log line
 2. Writes a `Throwable` stack trace showing exactly where the log was called from

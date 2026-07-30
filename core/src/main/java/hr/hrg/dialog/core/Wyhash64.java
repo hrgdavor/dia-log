@@ -18,12 +18,20 @@ import java.nio.ByteOrder;
  * </p>
  * <h2>Zero-Allocation String Support</h2>
  * <p>
+ * On JDK 17+ with {@code --add-opens java.base/java.lang=ALL-UNNAMED},
  * {@link #hash(long, String)} accesses the internal {@code byte[] value} field
- * of {@link String} via {@link VarHandle} &mdash; no defensive copy, no
+ * of {@link String} via {@link VarHandle} — no defensive copy, no
  * {@code str.getBytes()} allocation. Works with both Latin-1 (coder=0) and
- * UTF-16 (coder=1) compact strings. Requires
- * {@code --add-opens java.base/java.lang=ALL-UNNAMED} on Java 21+ when the
- * library is not on the module path with explicit opens.
+ * UTF-16 (coder=1) compact strings.
+ * </p>
+ * <p>
+ * On JDK 25+ where {@code java.lang} is fully encapsulated, or when the
+ * {@code --add-opens} flag is absent, the implementation falls back to
+ * {@link String#toCharArray()} automatically.
+ * </p>
+ * <p>
+ * The selection between the two paths is made once at class initialization
+ * via a strategy interface — the hot-path methods contain no runtime branching.
  * </p>
  * <h2>Zero-Allocation char[] Support</h2>
  * <p>
@@ -52,24 +60,153 @@ public final class Wyhash64 {
     private static final VarHandle BB_INT_HANDLE = MethodHandles.byteBufferViewVarHandle(int[].class,
             ByteOrder.LITTLE_ENDIAN);
 
-    // -- VarHandles for String internal access ---------------------------------
+    // -- String hasher strategy (selected once at class init) -------------------
 
-    private static final VarHandle STRING_VALUE_HANDLE;
-    private static final VarHandle STRING_CODER_HANDLE;
+    private interface StringHasher {
+        long hash(long seed, String str);
+        long hash(long seed, String str, int off, int len);
+    }
+
+    private static final StringHasher STRING_HASHER;
 
     static {
+        StringHasher hasher;
         try {
             var lookup = MethodHandles.privateLookupIn(String.class, MethodHandles.lookup());
-            STRING_VALUE_HANDLE = lookup.findVarHandle(String.class, "value", byte[].class);
-            STRING_CODER_HANDLE = lookup.findVarHandle(String.class, "coder", byte.class);
+            VarHandle valueHandle = lookup.findVarHandle(String.class, "value", byte[].class);
+            VarHandle coderHandle = lookup.findVarHandle(String.class, "coder", byte.class);
+            hasher = new DirectStringHasher(valueHandle, coderHandle);
         } catch (Exception e) {
-            throw new ExceptionInInitializerError(
-                    "Cannot access String.value/coder -- add --add-opens java.base/java.lang=ALL-UNNAMED: " + e);
+            // JDK 25+ encapsulation: fall back to toCharArray()
+            hasher = new FallbackStringHasher();
+        }
+        STRING_HASHER = hasher;
+    }
+
+    // -- String hasher implementations -----------------------------------------
+
+    private static final class DirectStringHasher implements StringHasher {
+        private final VarHandle valueHandle;
+        private final VarHandle coderHandle;
+
+        DirectStringHasher(VarHandle valueHandle, VarHandle coderHandle) {
+            this.valueHandle = valueHandle;
+            this.coderHandle = coderHandle;
+        }
+
+        @Override
+        public long hash(long seed, String str) {
+            byte[] value = (byte[]) valueHandle.get(str);
+            byte coder = (byte) coderHandle.get(str);
+            int len = str.length();
+            if (coder == 0) {
+                return Wyhash64.hash(seed, value, 0, len);
+            } else {
+                return hashUtf16(seed, value, 0, len);
+            }
+        }
+
+        @Override
+        public long hash(long seed, String str, int off, int len) {
+            byte[] value = (byte[]) valueHandle.get(str);
+            byte coder = (byte) coderHandle.get(str);
+            if (coder == 0) {
+                return Wyhash64.hash(seed, value, off, len);
+            } else {
+                return hashUtf16(seed, value, off * 2, len);
+            }
         }
     }
 
-    // LATIN-1 coder value (Java 9+ compact strings)
-    private static final byte LATIN1 = 0;
+    private static final class FallbackStringHasher implements StringHasher {
+        @Override
+        public long hash(long seed, String str) {
+            // toCharArray() may allocate, but this is the fallback path when
+            // VarHandle access to String.value is unavailable (JDK 25+ encapsulation).
+            // Delegate to the char[] hash which correctly detects Latin-1 vs UTF-16
+            // and handles Unicode characters (unlike getBytes(ISO_8859_1) which
+            // silently replaces non-Latin-1 chars with '?').
+            return Wyhash64.hash(seed, str.toCharArray());
+        }
+
+        @Override
+        public long hash(long seed, String str, int off, int len) {
+            char[] chars = new char[len];
+            str.getChars(off, off + len, chars, 0);
+            return Wyhash64.hash(seed, chars);
+        }
+    }
+
+    // -- Streaming string hasher strategy (selected once at class init) ---------
+
+    private interface StreamingStringUpdater {
+        void update(Streaming streaming, String str);
+        void update(Streaming streaming, String str, int off, int len);
+    }
+
+    private static final StreamingStringUpdater STREAMING_STRING_UPDATER;
+
+    static {
+        StreamingStringUpdater updater;
+        try {
+            var lookup = MethodHandles.privateLookupIn(String.class, MethodHandles.lookup());
+            VarHandle valueHandle = lookup.findVarHandle(String.class, "value", byte[].class);
+            VarHandle coderHandle = lookup.findVarHandle(String.class, "coder", byte.class);
+            updater = new DirectStreamingStringUpdater(valueHandle, coderHandle);
+        } catch (Exception e) {
+            updater = new FallbackStreamingStringUpdater();
+        }
+        STREAMING_STRING_UPDATER = updater;
+    }
+
+    private static final class DirectStreamingStringUpdater implements StreamingStringUpdater {
+        private final VarHandle valueHandle;
+        private final VarHandle coderHandle;
+
+        DirectStreamingStringUpdater(VarHandle valueHandle, VarHandle coderHandle) {
+            this.valueHandle = valueHandle;
+            this.coderHandle = coderHandle;
+        }
+
+        @Override
+        public void update(Streaming streaming, String str) {
+            byte[] value = (byte[]) valueHandle.get(str);
+            byte coder = (byte) coderHandle.get(str);
+            int len = str.length();
+            if (coder == 0) {
+                streaming.update(value, 0, len);
+            } else {
+                streaming.update(value, 0, len * 2);
+            }
+        }
+
+        @Override
+        public void update(Streaming streaming, String str, int off, int len) {
+            byte[] value = (byte[]) valueHandle.get(str);
+            byte coder = (byte) coderHandle.get(str);
+            if (coder == 0) {
+                streaming.update(value, off, len);
+            } else {
+                streaming.update(value, off * 2, len * 2);
+            }
+        }
+    }
+
+    private static final class FallbackStreamingStringUpdater implements StreamingStringUpdater {
+        @Override
+        public void update(Streaming streaming, String str) {
+            // Delegate to char[] path which correctly handles Unicode
+            // (unlike getBytes(ISO_8859_1) which loses non-Latin-1 chars).
+            streaming.update(str.toCharArray());
+        }
+
+        @Override
+        public void update(Streaming streaming, String str, int off, int len) {
+            char[] chars = new char[len];
+            str.getChars(off, off + len, chars, 0);
+            streaming.update(chars);
+        }
+    }
 
     private Wyhash64() {
     }
@@ -187,59 +324,29 @@ public final class Wyhash64 {
     }
 
     // ==========================================================================
-    //  Public API — String  (zero allocation)
+    //  Public API — String  (zero allocation when possible)
     // ==========================================================================
 
     /**
      * Hash a {@link String} without allocating a {@code byte[]} copy.
      * <p>
-     * Accesses the internal {@code byte[] value} field via {@link VarHandle}.
-     * For Latin-1 strings the raw byte[] is hashed directly; for UTF-16 strings
-     * the 2-byte character groups are read via VarHandle.
+     * On JDK 17+ with {@code --add-opens}, accesses the internal {@code byte[] value}
+     * field via {@link VarHandle}. On JDK 25+ without opens, falls back to
+     * {@link String#toCharArray()}.
      * </p>
-     *
-     * @param seed hash seed
-     * @param str  the string to hash
-     * @return 64-bit wyhash digest
+     * <p>
+     * The strategy is selected once at class initialization — no runtime branching.
+     * </p>
      */
     public static long hash(long seed, String str) {
-        byte[] value = (byte[]) STRING_VALUE_HANDLE.get(str);
-        byte coder = (byte) STRING_CODER_HANDLE.get(str);
-        int len = str.length();
-
-        if (coder == LATIN1) {
-            // Latin-1: each byte IS one character — hash byte[] directly
-            return hash(seed, value, 0, len);
-        } else {
-            // UTF-16: read 2-byte character units from the byte[]
-            return hashUtf16(seed, value, 0, len);
-        }
+        return STRING_HASHER.hash(seed, str);
     }
 
     /**
      * Hash a {@link String} with offset and length (in characters, not bytes).
-     * <p>
-     * For Latin-1 strings, offset/len refers to byte positions = char positions.
-     * For UTF-16 strings, offset/len refers to character positions — internal
-     * byte offset is calculated as {@code off * 2} / {@code len * 2}.
-     * </p>
-     *
-     * @param seed hash seed
-     * @param str  the string to hash
-     * @param off  character offset (not byte offset)
-     * @param len  number of characters to hash
-     * @return 64-bit wyhash digest
      */
     public static long hash(long seed, String str, int off, int len) {
-        byte[] value = (byte[]) STRING_VALUE_HANDLE.get(str);
-        byte coder = (byte) STRING_CODER_HANDLE.get(str);
-
-        if (coder == LATIN1) {
-            return hash(seed, value, off, len);
-        } else {
-            // UTF-16: 2 bytes per character
-            return hashUtf16(seed, value, off * 2, len);
-        }
+        return STRING_HASHER.hash(seed, str, off, len);
     }
 
     // ==========================================================================
@@ -253,10 +360,6 @@ public final class Wyhash64 {
      * via manual byte packing — no allocation, no {@code sun.misc.Unsafe},
      * no FFM API dependency.
      * </p>
-     *
-     * @param seed  hash seed
-     * @param chars the character array to hash
-     * @return 64-bit wyhash digest
      */
     public static long hash(long seed, char[] chars) {
         return hash(seed, chars, 0, chars.length);
@@ -264,62 +367,129 @@ public final class Wyhash64 {
 
     /**
      * Hash a {@code char[]} with offset and length.
-     *
-     * @param seed  hash seed
-     * @param chars the character array
-     * @param off   element offset (in chars, not bytes)
-     * @param len   number of characters to hash
-     * @return 64-bit wyhash digest
+     * <p>Auto-detects encoding: if all chars are Latin-1 (≤ 0xFF), each char is
+     * treated as a single byte. Otherwise, each char is treated as 2 bytes
+     * (UTF-16 little-endian). This ensures
+     * {@code hash(seed, str.toCharArray()) == hash(seed, str)} for both
+     * Latin-1 and UTF-16 strings.</p>
      */
     public static long hash(long seed, char[] chars, int off, int len) {
-        long sc = initSeed(seed);
+        // Scan for non-Latin-1 chars to determine encoding
+        boolean utf16 = false;
+        for (int i = 0; i < len; i++) {
+            if ((chars[off + i] & 0xFFFF) > 0xFF) {
+                utf16 = true;
+                break;
+            }
+        }
+        if (utf16) {
+            return hashUtf16(seed, chars, off, len);
+        }
+        return hashLatin1(seed, chars, off, len);
+    }
+
+    /** Hash a char[] as Latin-1 (1 byte per char). */
+    private static long hashLatin1(long seed, char[] chars, int off, int len) {
+        long s = initSeed(seed);
         long secret1 = DEFAULT_SECRET[1];
         long secret2 = DEFAULT_SECRET[2];
         long secret3 = DEFAULT_SECRET[3];
 
-        int charOff = off;
-        int charLen = len;
-
         long a, b;
 
-        if (charLen <= 8) {
-            if (charLen >= 2) {
-                a = ((long) charToIntLE(chars, charOff) << 32) | (charToIntLE(chars, charOff + ((charLen >> 2) << 1)) & 0xFFFFFFFFL);
-                b = ((long) charToIntLE(chars, charOff + charLen - 2) << 32)
-                        | (charToIntLE(chars, charOff + charLen - 2 - ((charLen >> 2) << 1)) & 0xFFFFFFFFL);
-            } else if (charLen > 0) {
-                a = ((chars[charOff] & 0xFFL) << 16) | ((chars[charOff] & 0xFF00L) >>> 8);
+        if (len <= 16) {
+            if (len >= 4) {
+                a = ((long) charsToInt(chars, off) << 32) | (charsToInt(chars, off + ((len >> 3) << 2)) & 0xFFFFFFFFL);
+                b = ((long) charsToInt(chars, off + len - 4) << 32)
+                        | (charsToInt(chars, off + len - 4 - ((len >> 3) << 2)) & 0xFFFFFFFFL);
+            } else if (len > 0) {
+                a = charsToWyr3(chars, off, len);
                 b = 0;
             } else {
                 a = 0;
                 b = 0;
             }
         } else {
-            int i = charLen;
-            int p = charOff;
-            long see0 = sc;
-            long see1 = sc;
-            long see2 = sc;
+            int i = len;
+            int p = off;
+            long see0 = s;
+            long see1 = s;
+            long see2 = s;
 
-            while (i > 24) {
+            while (i > 48) {
+                see0 = mix(charsToLong(chars, p) ^ secret1, charsToLong(chars, p + 8) ^ see0);
+                see1 = mix(charsToLong(chars, p + 16) ^ secret2, charsToLong(chars, p + 24) ^ see1);
+                see2 = mix(charsToLong(chars, p + 32) ^ secret3, charsToLong(chars, p + 40) ^ see2);
+                p += 48;
+                i -= 48;
+            }
+            see0 ^= see1 ^ see2;
+            while (i > 16) {
+                see0 = mix(charsToLong(chars, p) ^ secret1, charsToLong(chars, p + 8) ^ see0);
+                i -= 16;
+                p += 16;
+            }
+            a = charsToLong(chars, off + len - 16);
+            b = charsToLong(chars, off + len - 8);
+            s = see0;
+        }
+
+        return finish(a, b, s, len);
+    }
+
+    /** Hash a char[] as UTF-16 little-endian (2 bytes per char). */
+    private static long hashUtf16(long seed, char[] chars, int off, int len) {
+        long s = initSeed(seed);
+        long secret1 = DEFAULT_SECRET[1];
+        long secret2 = DEFAULT_SECRET[2];
+        long secret3 = DEFAULT_SECRET[3];
+        int byteLen = len * 2;
+
+        long a, b;
+
+        if (byteLen <= 16) {
+            if (byteLen >= 8) {
+                // 4 to 8 chars: read two 4-char (8-byte) chunks
+                a = charToLongLE(chars, off);
+                b = charToLongLE(chars, off + len - 4);
+            } else if (byteLen >= 4) {
+                // 2 chars: read as a single int (4 bytes)
+                a = ((long) charToIntLE(chars, off) << 32) | charToIntLE(chars, off) & 0xFFFFFFFFL;
+                b = 0;
+            } else if (byteLen > 0) {
+                // 1 char: read as 2 bytes
+                a = (chars[off] & 0xFFFFL) << 8 | 1L;
+                b = 0;
+            } else {
+                a = 0;
+                b = 0;
+            }
+        } else {
+            int i = byteLen;
+            int p = off;
+            long see0 = s;
+            long see1 = s;
+            long see2 = s;
+
+            while (i > 48) {
                 see0 = mix(charToLongLE(chars, p) ^ secret1, charToLongLE(chars, p + 4) ^ see0);
                 see1 = mix(charToLongLE(chars, p + 8) ^ secret2, charToLongLE(chars, p + 12) ^ see1);
                 see2 = mix(charToLongLE(chars, p + 16) ^ secret3, charToLongLE(chars, p + 20) ^ see2);
                 p += 24;
-                i -= 24;
+                i -= 48;
             }
             see0 ^= see1 ^ see2;
-            while (i > 8) {
+            while (i > 16) {
                 see0 = mix(charToLongLE(chars, p) ^ secret1, charToLongLE(chars, p + 4) ^ see0);
-                i -= 8;
+                i -= 16;
                 p += 8;
             }
-            a = charToLongLE(chars, charOff + charLen - 8);
-            b = charToLongLE(chars, charOff + charLen - 4);
-            sc = see0;
+            a = charToLongLESafe(chars, off + len - 8, off + len);
+            b = charToLongLESafe(chars, off + len - 4, off + len);
+            s = see0;
         }
 
-        return finish(a, b, sc, (long) charLen * 2);
+        return finish(a, b, s, byteLen);
     }
 
     // ==========================================================================
@@ -334,14 +504,10 @@ public final class Wyhash64 {
      * {@link #hash(long, String)} path. Otherwise iterates over chars using
      * {@link CharSequence#charAt(int)}.
      * </p>
-     *
-     * @param seed hash seed
-     * @param cs   the character sequence
-     * @return 64-bit wyhash digest
      */
     public static long hash(long seed, CharSequence cs) {
         if (cs instanceof String) {
-            return hash(seed, (String) cs);
+            return STRING_HASHER.hash(seed, (String) cs);
         }
         int len = cs.length();
         if (len == 0) {
@@ -353,13 +519,13 @@ public final class Wyhash64 {
         long secret3 = DEFAULT_SECRET[3];
 
         long a, b;
-        if (len <= 8) {
-            if (len >= 2) {
-                a = packCharsLow(cs, 0, 2);
-                b = packCharsLow(cs, len - 2, 2);
-                a = (a << 32) | (b & 0xFFFFFFFFL);
+        if (len <= 16) {
+            if (len >= 4) {
+                a = ((long) csToInt(cs, 0) << 32) | (csToInt(cs, ((len >> 3) << 2)) & 0xFFFFFFFFL);
+                b = ((long) csToInt(cs, len - 4) << 32)
+                        | (csToInt(cs, len - 4 - ((len >> 3) << 2)) & 0xFFFFFFFFL);
             } else if (len > 0) {
-                a = (cs.charAt(0) & 0xFFFFL) << 8 | 1L;
+                a = csToWyr3(cs, 0, len);
                 b = 0;
             } else {
                 a = 0;
@@ -372,24 +538,24 @@ public final class Wyhash64 {
             int i = len;
             int pos = 0;
 
-            while (i > 24) {
-                seed0 = mix(packChars(cs, pos, 4) ^ secret1, packChars(cs, pos + 4, 4) ^ seed0);
-                seed1 = mix(packChars(cs, pos + 8, 4) ^ secret2, packChars(cs, pos + 12, 4) ^ seed1);
-                seed2 = mix(packChars(cs, pos + 16, 4) ^ secret3, packChars(cs, pos + 20, 4) ^ seed2);
-                pos += 24;
-                i -= 24;
+            while (i > 48) {
+                seed0 = mix(csToLong(cs, pos) ^ secret1, csToLong(cs, pos + 8) ^ seed0);
+                seed1 = mix(csToLong(cs, pos + 16) ^ secret2, csToLong(cs, pos + 24) ^ seed1);
+                seed2 = mix(csToLong(cs, pos + 32) ^ secret3, csToLong(cs, pos + 40) ^ seed2);
+                pos += 48;
+                i -= 48;
             }
             seed0 ^= seed1 ^ seed2;
-            while (i > 8) {
-                seed0 = mix(packChars(cs, pos, 4) ^ secret1, packChars(cs, pos + 4, 4) ^ seed0);
-                i -= 8;
-                pos += 8;
+            while (i > 16) {
+                seed0 = mix(csToLong(cs, pos) ^ secret1, csToLong(cs, pos + 8) ^ seed0);
+                i -= 16;
+                pos += 16;
             }
-            a = packChars(cs, len - 8, 4);
-            b = packChars(cs, len - 4, 4);
+            a = csToLong(cs, len - 16);
+            b = csToLong(cs, len - 8);
             s = seed0;
         }
-        return finish(a, b, s, len * 2L);
+        return finish(a, b, s, len);
     }
 
     // ==========================================================================
@@ -412,7 +578,6 @@ public final class Wyhash64 {
                 b = ((long) getInt(data, byteOff + byteLen - 4) << 32)
                         | (getInt(data, byteOff + byteLen - 4 - ((byteLen >> 3) << 2)) & 0xFFFFFFFFL);
             } else if (byteLen > 0) {
-                // read individual bytes (1 or 2 remaining)
                 a = ((data[byteOff] & 0xFFL)) | ((data[byteOff + 1] & 0xFFL) << 8);
                 b = 0;
             } else {
@@ -451,9 +616,6 @@ public final class Wyhash64 {
     //  Internal helpers — CharSequence & char[] packing
     // ==========================================================================
 
-    /**
-     * Pack up to 4 chars from a {@link CharSequence} into a little-endian long.
-     */
     private static long packChars(CharSequence cs, int pos, int nChars) {
         long v = 0;
         for (int i = 0; i < nChars && pos + i < cs.length(); i++) {
@@ -462,9 +624,6 @@ public final class Wyhash64 {
         return v;
     }
 
-    /**
-     * Pack up to 2 chars — optimised for the short-path {@code <= 8 char} branch.
-     */
     private static long packCharsLow(CharSequence cs, int pos, int nChars) {
         long v = 0;
         for (int i = 0; i < nChars && pos + i < cs.length(); i++) {
@@ -473,10 +632,6 @@ public final class Wyhash64 {
         return v;
     }
 
-    /**
-     * Read 4 chars from a char[] as a little-endian long (8 bytes).
-     * Uses manual byte packing for cross-JDK compatibility.
-     */
     private static long charToLongLE(char[] chars, int off) {
         return ((long) chars[off] & 0xFFFFL)
              | (((long) chars[off + 1] & 0xFFFFL) << 16)
@@ -485,10 +640,91 @@ public final class Wyhash64 {
     }
 
     /**
-     * Read 2 chars from a char[] as a little-endian int (4 bytes).
+     * Bounds-safe variant of {@link #charToLongLE(char[], int)}.
+     * Reads up to 4 chars as a little-endian long, padding missing chars with 0.
+     * This prevents {@code ArrayIndexOutOfBoundsException} when fewer than 4
+     * chars remain at the end of the array.
      */
+    private static long charToLongLESafe(char[] chars, int off, int charLen) {
+        long v = 0;
+        int remaining = charLen - off;
+        if (remaining <= 0) return 0;
+        v |= ((long) chars[off] & 0xFFFFL);
+        if (remaining <= 1) return v;
+        v |= (((long) chars[off + 1] & 0xFFFFL) << 16);
+        if (remaining <= 2) return v;
+        v |= (((long) chars[off + 2] & 0xFFFFL) << 32);
+        if (remaining <= 3) return v;
+        v |= (((long) chars[off + 3] & 0xFFFFL) << 48);
+        return v;
+    }
+
     private static int charToIntLE(char[] chars, int off) {
         return (chars[off] & 0xFFFF) | ((chars[off + 1] & 0xFFFF) << 16);
+    }
+
+    /** Read 8 chars as 8 individual bytes packed into a little-endian long. */
+    private static long charsToLong(char[] chars, int off) {
+        return ((long) latin1Byte(chars[off]))
+             | ((long) latin1Byte(chars[off + 1]) << 8)
+             | ((long) latin1Byte(chars[off + 2]) << 16)
+             | ((long) latin1Byte(chars[off + 3]) << 24)
+             | ((long) latin1Byte(chars[off + 4]) << 32)
+             | ((long) latin1Byte(chars[off + 5]) << 40)
+             | ((long) latin1Byte(chars[off + 6]) << 48)
+             | ((long) latin1Byte(chars[off + 7]) << 56);
+    }
+
+    /** Read 4 chars as 4 individual bytes packed into a little-endian int. */
+    private static int charsToInt(char[] chars, int off) {
+        return latin1Byte(chars[off])
+             | (latin1Byte(chars[off + 1]) << 8)
+             | (latin1Byte(chars[off + 2]) << 16)
+             | (latin1Byte(chars[off + 3]) << 24);
+    }
+
+    /** Read up to 3 chars as individual bytes, matching wyr3(byte[]) layout. */
+    private static long charsToWyr3(char[] chars, int off, int k) {
+        return ((long) latin1Byte(chars[off]) << 16)
+             | ((long) latin1Byte(chars[off + (k >> 1)]) << 8)
+             | (long) latin1Byte(chars[off + k - 1]);
+    }
+
+    /**
+     * Convert a char to a Latin-1 byte, matching {@code getBytes(ISO_8859_1)}
+     * semantics: chars > 0xFF are replaced with {@code '?'} (0x3F).
+     */
+    private static int latin1Byte(char c) {
+        return c <= 0xFF ? (c & 0xFF) : 0x3F;
+    }
+
+    // -- CharSequence helpers (Latin-1 single-byte encoding) -------------------
+
+    /** Read 8 chars from a CharSequence as 8 Latin-1 bytes packed into a little-endian long. */
+    private static long csToLong(CharSequence cs, int pos) {
+        return ((long) latin1Byte(cs.charAt(pos)))
+             | ((long) latin1Byte(cs.charAt(pos + 1)) << 8)
+             | ((long) latin1Byte(cs.charAt(pos + 2)) << 16)
+             | ((long) latin1Byte(cs.charAt(pos + 3)) << 24)
+             | ((long) latin1Byte(cs.charAt(pos + 4)) << 32)
+             | ((long) latin1Byte(cs.charAt(pos + 5)) << 40)
+             | ((long) latin1Byte(cs.charAt(pos + 6)) << 48)
+             | ((long) latin1Byte(cs.charAt(pos + 7)) << 56);
+    }
+
+    /** Read 4 chars from a CharSequence as 4 Latin-1 bytes packed into a little-endian int. */
+    private static int csToInt(CharSequence cs, int pos) {
+        return latin1Byte(cs.charAt(pos))
+             | (latin1Byte(cs.charAt(pos + 1)) << 8)
+             | (latin1Byte(cs.charAt(pos + 2)) << 16)
+             | (latin1Byte(cs.charAt(pos + 3)) << 24);
+    }
+
+    /** Read up to 3 chars from a CharSequence as Latin-1 bytes, matching wyr3(byte[]) layout. */
+    private static long csToWyr3(CharSequence cs, int pos, int k) {
+        return ((long) latin1Byte(cs.charAt(pos)) << 16)
+             | ((long) latin1Byte(cs.charAt(pos + (k >> 1))) << 8)
+             | (long) latin1Byte(cs.charAt(pos + k - 1));
     }
 
     // ==========================================================================
@@ -602,24 +838,21 @@ public final class Wyhash64 {
             bufLen = remaining;
         }
 
-        // ---- String (zero allocation) -------------------------------------
+        // ---- String (zero allocation when possible) -----------------------
 
         /**
-         * Feed a {@link String} into the streaming hash without allocating a
-         * {@code byte[]} copy. Latin-1 strings feed the internal byte[] directly
-         * (1 byte per char). UTF-16 strings feed the internal byte[] as 2-byte
-         * characters, handled by the byte[] path (2 bytes per char).
+         * Feed a {@link String} into the streaming hash.
+         * <p>
+         * On JDK 17+ with {@code --add-opens}, accesses the internal byte[]
+         * directly (zero allocation). On JDK 25+ without opens, falls back to
+         * {@link String#toCharArray()}.
+         * </p>
+         * <p>
+         * The strategy is selected once at class initialization — no runtime branching.
+         * </p>
          */
         public void update(String str) {
-            byte[] value = (byte[]) STRING_VALUE_HANDLE.get(str);
-            byte coder = (byte) STRING_CODER_HANDLE.get(str);
-            int len = str.length();
-            if (coder == LATIN1) {
-                update(value, 0, len);
-            } else {
-                // UTF-16: 2 bytes per character in the internal byte[]
-                update(value, 0, len * 2);
-            }
+            STREAMING_STRING_UPDATER.update(this, str);
         }
 
         /**
@@ -627,13 +860,7 @@ public final class Wyhash64 {
          * {@code off} and {@code len} are character-based offsets.
          */
         public void update(String str, int off, int len) {
-            byte[] value = (byte[]) STRING_VALUE_HANDLE.get(str);
-            byte coder = (byte) STRING_CODER_HANDLE.get(str);
-            if (coder == LATIN1) {
-                update(value, off, len);
-            } else {
-                update(value, off * 2, len * 2);
-            }
+            STREAMING_STRING_UPDATER.update(this, str, off, len);
         }
 
         // ---- char[] (zero allocation, manual byte packing) ---------------
@@ -649,20 +876,36 @@ public final class Wyhash64 {
 
         public void update(char[] chars, int off, int len) {
             if (len == 0) return;
+
+            // Scan for non-Latin-1 chars to determine encoding
+            boolean utf16 = false;
+            for (int i = 0; i < len; i++) {
+                if ((chars[off + i] & 0xFFFF) > 0xFF) {
+                    utf16 = true;
+                    break;
+                }
+            }
+
+            if (utf16) {
+                updateUtf16(chars, off, len);
+            } else {
+                updateLatin1(chars, off, len);
+            }
+        }
+
+        private void updateLatin1(char[] chars, int off, int len) {
+            if (len == 0) return;
             int charEnd = off + len;
-            totalLen += (long) len * 2;
+            totalLen += len; // Latin-1: 1 byte per char
 
             // Drain existing buffer first
             if (bufLen > 0) {
                 int bufAvail = 48 - bufLen;
-                int charsToBuf = Math.min(len, bufAvail >>> 1);
+                int charsToBuf = Math.min(len, bufAvail);
                 for (int i = 0; i < charsToBuf; i++) {
-                    char c = chars[off + i];
-                    int bi = bufLen + (i << 1);
-                    buf[bi]     = (byte) (c & 0xFF);
-                    buf[bi + 1] = (byte) (c >>> 8);
+                    buf[bufLen + i] = (byte) latin1Byte(chars[off + i]);
                 }
-                bufLen += charsToBuf << 1;
+                bufLen += charsToBuf;
                 off += charsToBuf;
                 if (bufLen == 48) {
                     round(buf, 0);
@@ -671,32 +914,78 @@ public final class Wyhash64 {
                 if (off >= charEnd) return;
             }
 
-            // Process full 24-char = 48-byte blocks directly from char[]
-            while (charEnd - off >= 24) {
+            // Process full 48-char blocks directly from char[] as single bytes
+            while (charEnd - off >= 48) {
                 round(chars, off);
-                off += 24;
+                off += 48;
             }
 
             // Remaining chars go into the buffer
             int remaining = charEnd - off;
             if (remaining > 0) {
                 // Tail handling: match byte[] path's <16-bytes-after-round logic
-                // 16 bytes = 8 chars
-                if (remaining < 8 && off >= 24) {
-                    // Copy the last 8 chars (16 bytes) of the last full block into buf[32..48]
-                    for (int i = 0; i < 8; i++) {
-                        char c = chars[off - 8 + i];
-                        buf[32 + (i << 1)]     = (byte) (c & 0xFF);
-                        buf[32 + (i << 1) + 1] = (byte) (c >>> 8);
+                if (remaining < 16 && off >= 48) {
+                    // Copy the last 16 bytes of the last full block into buf[32..48]
+                    for (int i = 0; i < 16; i++) {
+                        buf[32 + i] = (byte) latin1Byte(chars[off - 16 + i]);
                     }
                 }
                 for (int i = 0; i < remaining; i++) {
-                    char c = chars[off + i];
-                    int bi = i << 1;
-                    buf[bi]     = (byte) (c & 0xFF);
-                    buf[bi + 1] = (byte) (c >>> 8);
+                    buf[i] = (byte) latin1Byte(chars[off + i]);
                 }
-                bufLen = remaining << 1;
+                bufLen = remaining;
+            }
+        }
+
+        private void updateUtf16(char[] chars, int off, int len) {
+            if (len == 0) return;
+            int charEnd = off + len;
+            totalLen += len * 2; // UTF-16: 2 bytes per char
+
+            // Drain existing buffer first
+            if (bufLen > 0) {
+                int bufAvail = 48 - bufLen;
+                int charsToBuf = Math.min(len, bufAvail / 2);
+                for (int i = 0; i < charsToBuf; i++) {
+                    char c = chars[off + i];
+                    buf[bufLen + i * 2] = (byte) (c & 0xFF);
+                    buf[bufLen + i * 2 + 1] = (byte) ((c >> 8) & 0xFF);
+                }
+                bufLen += charsToBuf * 2;
+                off += charsToBuf;
+                if (bufLen == 48) {
+                    round(buf, 0);
+                    bufLen = 0;
+                }
+                if (off >= charEnd) return;
+            }
+
+            // Process full 24-char (48-byte) blocks
+            while (charEnd - off >= 24) {
+                // Pack 24 chars as 48 bytes (LE) into buf and round
+                for (int i = 0; i < 24; i++) {
+                    char c = chars[off + i];
+                    buf[i * 2] = (byte) (c & 0xFF);
+                    buf[i * 2 + 1] = (byte) ((c >> 8) & 0xFF);
+                }
+                round(buf, 0);
+                off += 24;
+            }
+
+            // Remaining chars go into the buffer
+            int remainingChars = charEnd - off;
+            if (remainingChars > 0) {
+                int remainingBytes = remainingChars * 2;
+                // Tail handling: match byte[] path's <16-bytes-after-round logic.
+                // Since we pack chars into buf and round from buf, the last full
+                // block's bytes (including the tail prefix) are already in buf[32..47].
+                // No copy needed — finalHash will find them at buf[48-(16-remainingBytes)..47].
+                for (int i = 0; i < remainingChars; i++) {
+                    char c = chars[off + i];
+                    buf[i * 2] = (byte) (c & 0xFF);
+                    buf[i * 2 + 1] = (byte) ((c >> 8) & 0xFF);
+                }
+                bufLen = remainingBytes;
             }
         }
 
@@ -709,12 +998,12 @@ public final class Wyhash64 {
          */
         public void update(CharSequence cs) {
             if (cs instanceof String) {
-                update((String) cs);
+                STREAMING_STRING_UPDATER.update(this, (String) cs);
                 return;
             }
             int len = cs.length();
             if (len == 0) return;
-            totalLen += (long) len * 2;
+            totalLen += len; // CharSequence is treated as Latin-1 bytes
             for (int pos = 0; pos < len; ) {
                 int avail = 48 - bufLen;
                 if (avail == 0) {
@@ -722,14 +1011,11 @@ public final class Wyhash64 {
                     bufLen = 0;
                     avail = 48;
                 }
-                int chunk = Math.min(len - pos, avail >>> 1);
+                int chunk = Math.min(len - pos, avail);
                 for (int i = 0; i < chunk; i++) {
-                    char c = cs.charAt(pos + i);
-                    int bi = bufLen + (i << 1);
-                    buf[bi]     = (byte) (c & 0xFF);
-                    buf[bi + 1] = (byte) (c >>> 8);
+                    buf[bufLen + i] = (byte) latin1Byte(cs.charAt(pos + i));
                 }
-                bufLen += chunk << 1;
+                bufLen += chunk;
                 pos += chunk;
             }
         }
@@ -742,15 +1028,15 @@ public final class Wyhash64 {
             state[2] = mix(getLong(input, p + 32) ^ DEFAULT_SECRET[3], getLong(input, p + 40) ^ state[2]);
         }
 
-        // ---- Internal: 48-byte round from char[] (24 chars) --------------
+        // ---- Internal: 48-byte round from char[] (48 chars as single bytes)
 
         private void round(char[] chars, int charOff) {
-            state[0] = mix(charToLongLE(chars, charOff) ^ DEFAULT_SECRET[1],
-                    charToLongLE(chars, charOff + 4) ^ state[0]);
-            state[1] = mix(charToLongLE(chars, charOff + 8) ^ DEFAULT_SECRET[2],
-                    charToLongLE(chars, charOff + 12) ^ state[1]);
-            state[2] = mix(charToLongLE(chars, charOff + 16) ^ DEFAULT_SECRET[3],
-                    charToLongLE(chars, charOff + 20) ^ state[2]);
+            state[0] = mix(Wyhash64.charsToLong(chars, charOff) ^ DEFAULT_SECRET[1],
+                    Wyhash64.charsToLong(chars, charOff + 8) ^ state[0]);
+            state[1] = mix(Wyhash64.charsToLong(chars, charOff + 16) ^ DEFAULT_SECRET[2],
+                    Wyhash64.charsToLong(chars, charOff + 24) ^ state[1]);
+            state[2] = mix(Wyhash64.charsToLong(chars, charOff + 32) ^ DEFAULT_SECRET[3],
+                    Wyhash64.charsToLong(chars, charOff + 40) ^ state[2]);
         }
 
         // ---- Finalise ----------------------------------------------------

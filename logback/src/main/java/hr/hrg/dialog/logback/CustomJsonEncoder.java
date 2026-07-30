@@ -8,10 +8,23 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.encoder.EncoderBase;
 
 /**
- * Custom Logback Encoder that outputs logging events as structured JSON lines.
- * This can be used cleanly inside both ConsoleAppender and RollingFileAppender.
+ * Custom Logback {@link ch.qos.logback.core.encoder.Encoder Encoder} that outputs
+ * logging events as structured JSON lines.
+ * <p>
+ * Use this encoder with standard Logback appenders ({@link ch.qos.logback.core.ConsoleAppender ConsoleAppender},
+ * {@link ch.qos.logback.core.rolling.RollingFileAppender RollingFileAppender}):
+ * </p>
+ *
+ * <pre>{@code
+ * <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+ *     <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
+ *         <includeMDC>true</includeMDC>
+ *         <includeKeys>true</includeKeys>
+ *         <customFields>{"env":"prod","version":"1.0"}</customFields>
+ *     </encoder>
+ * </appender>
+ * }</pre>
  */
-// TODO(dia-log): Dead code — intentionally kept for now, remove in future cleanup.
 public class CustomJsonEncoder extends EncoderBase<ILoggingEvent> {
 
     private final JsonLogWriter jsonWriter = new JsonLogWriter();

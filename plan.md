@@ -7,7 +7,7 @@ Multi-module Maven library (`hr.hrg.dialog:dia-log-root`) targeting Java 21, bui
 | Module    | Artifact          | Contents                                                                                                    |
 | --------- | ----------------- | ----------------------------------------------------------------------------------------------------------- |
 | `core`    | `dia-log-core`    | `DiaLogger.java`, `LoggingEventBuilderWrapper.java`, `JavaStackSanitizer.java`, `Wyhash64.java`             |
-| `logback` | `dia-log-logback` | `ConsoleAppenderJson.java`, `RollingFileAppenderJson.java`, `ConsoleAppenderDev.java`, `JsonLogWriter.java` |
+| `logback` | `dia-log-logback` | `CustomJsonEncoder.java`, `JsonLogWriter.java` |
 | `example` | `dia-log-example` | `Main.java` with `logback.xml` demonstrating all appenders                                                  |
 
 **What exists today:** Full SLF4J `Logger` delegation via `DiaLogger` (abstract, generic), `LoggingEventBuilderWrapper` (abstract, generic with `self()` for fluent chaining), JSON console/file/dev appenders with sanitized stack traces and hash-based dedup, cookbook docs.
@@ -23,14 +23,11 @@ Multi-module Maven library (`hr.hrg.dialog:dia-log-root`) targeting Java 21, bui
 - [ ] **1.1 Concrete DiaLogger subclass** — e.g. `DefaultDiaLogger<L>` implementing `contextStart()`/`contextEnd()`/`initBuilder()`/`noOpWrapper()` for common use cases (MDC propagation, prefix scoping).
 - [x] **1.2 Unit tests for core** — `LoggingEventBuilderWrapperTest` (MDC cleanup, stackWhenTrace, kv shorthand, delegation, thread safety), `JavaStackSanitizerTest` (frame filtering, lambda normalization, native methods, maxFrames), `Wyhash64Test` (determinism, seed sensitivity, offset/length, ByteBuffer, streaming, edge cases), plus WyhashTestVectors, WyhashStandaloneTest, Wyhash64StreamingTest.
 
-## Phase 2 — Logback Appenders
+## Phase 2 — Logback Integration
 
-- [x] **ConsoleAppenderJson** — JSON console appender delegating to `JsonLogWriter`. Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`.
-- [x] **RollingFileAppenderJson** — Rolling file JSON appender delegating to `JsonLogWriter`. Same config as console.
-- [x] **ConsoleAppenderDev** — Dev console appender with `{name}` placeholder expansion from `kv` pairs. Features: `expandPlaceholders` (default true), `warnOnMissingKeys` (opt-in, appends error + stack trace for missing keys).
+- [x] **CustomJsonEncoder** — Logback encoder that outputs JSON via `JsonLogWriter`. Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`, `maxStackFrames`. Use with standard `ConsoleAppender` or `RollingFileAppender`.
 - [x] **JsonLogWriter** — Shared JSON serializer. Output schema: `ts` (epoch millis), `level`, `logger`, `thread`, `msg`, `kv`, `ctx`, `source`, `err` (with sanitized `stack`, `hash`, `cause`), `msgTpl`, custom fields. Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`, `maxStackFrames`.
-- [ ] **2.1 maxStackFrames delegation** — Expose `maxStackFrames` on `ConsoleAppenderJson` and `RollingFileAppenderJson` (currently only on `JsonLogWriter`).
-- [ ] **2.2 Unit tests for appenders** — Cover: JSON structure for all log levels, key-value inclusion/exclusion, MDC inclusion/exclusion, exception serialization (sanitized frames + hash), special character escaping, placeholder expansion, missing-key detection, configuration via logback.xml.
+- [ ] **2.1 Unit tests** — Cover: JSON structure for all log levels, key-value inclusion/exclusion, MDC inclusion/exclusion, exception serialization, special character escaping, encoder lifecycle.
 
 ## Phase 3 — Documentation
 
@@ -100,7 +97,7 @@ This allows subclasses to extend both DiaLogger and LoggingEventBuilderWrapper w
 ```
 dia-log-root (pom.xml)
 ├── core/         (dia-log-core)       — DiaLogger, LoggingEventBuilderWrapper, JavaStackSanitizer, Wyhash64
-├── logback/      (dia-log-logback)    — ConsoleAppenderJson, RollingFileAppenderJson, ConsoleAppenderDev, JsonLogWriter
+├── logback/      (dia-log-logback)    — CustomJsonEncoder, JsonLogWriter
 ├── example/      (dia-log-example)    — Main.java with logback.xml
 ├── cookbook/      (docs)               — additional.error-only.log.md, stackWhenTrace.md, missing-keys-warn.md
 └── .gitignore

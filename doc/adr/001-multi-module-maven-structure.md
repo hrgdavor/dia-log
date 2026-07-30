@@ -32,7 +32,7 @@ dia-log-root (pom)
 ```
 
 - **core**: Contains `DiaLogger`, `LoggingEventBuilderWrapper`, `JavaStackSanitizer`, `Wyhash64`, and `TraceId`. Has no logging-framework-specific dependencies beyond SLF4J API.
-- **logback**: Contains `ConsoleAppenderJson`, `RollingFileAppenderJson`, `ConsoleAppenderDev`, and `JsonLogWriter`. Depends on `core` and Logback.
+- **logback**: Contains `CustomJsonEncoder` and `JsonLogWriter`. Depends on `core` and Logback.
 - **example**: Runnable demo with `logback.xml`. Depends on both `core` and `logback`.
 
 ## Consequences

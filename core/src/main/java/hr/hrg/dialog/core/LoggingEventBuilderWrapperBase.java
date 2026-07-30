@@ -139,37 +139,37 @@ public class LoggingEventBuilderWrapperBase implements LoggingEventBuilder {
 
     @Override
     public void log() {
-        maybeAttachTraceCause();
+        beforeLog();
         delegate.log();
     }
 
     @Override
     public void log(String msg) {
-        maybeAttachTraceCause();
+        beforeLog();
         delegate.log(msg);
     }
 
     @Override
     public void log(String format, Object arg) {
-        maybeAttachTraceCause();
+        beforeLog();
         delegate.log(format, arg);
     }
 
     @Override
     public void log(String format, Object arg1, Object arg2) {
-        maybeAttachTraceCause();
+        beforeLog();
         delegate.log(format, arg1, arg2);
     }
 
     @Override
     public void log(String format, Object... args) {
-        maybeAttachTraceCause();
+        beforeLog();
         delegate.log(format, args);
     }
 
     @Override
     public void log(Supplier<String> messageSupplier) {
-        maybeAttachTraceCause();
+        beforeLog();
         delegate.log(messageSupplier);
     }
 
@@ -180,9 +180,10 @@ public class LoggingEventBuilderWrapperBase implements LoggingEventBuilder {
      * {@link Throwable} as the cause so the output shows the call stack that
      * triggered this log. Only attaches if no cause was already set.
      */
-    private void maybeAttachTraceCause() {
+    protected void beforeLog() {
         if (stackWhenTraceEnabled && logger != null && logger.isTraceEnabled()) {
             delegate.setCause(new Throwable("stackWhenTraceEnabled"));
         }
+
     }
 }

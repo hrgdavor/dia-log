@@ -10,9 +10,6 @@ public class DiaLogger extends DiaLoggerBase<LoggingEventBuilderWrapperBase>{
     }
 
     @Override
-    protected void contextStart(LoggingEventBuilderWrapperBase builder) {}
-
-    @Override
     protected LoggingEventBuilderWrapperBase initBuilder(LoggingEventBuilder builder) {
         return new LoggingEventBuilderWrapper(builder, delegate);
     }

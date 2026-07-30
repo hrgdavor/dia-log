@@ -14,6 +14,6 @@ This directory contains Architecture Decision Records (ADRs) for the Dia-Log pro
 | [006](006-javastacksanitizer.md)                   | JavaStackSanitizer for deterministic stack traces | Accepted |
 | [007](007-stackwhentraceenabled.md)                | stackWhenTraceEnabled() conditional stack trace   | Accepted |
 | [008](008-jsonlogwriter-reusable-serialization.md) | JsonLogWriter as reusable serialization component | Accepted |
-| [009](009-consoleappenderdev.md)                   | ConsoleAppenderDev for development                | Accepted |
+| [009](009-consoleappenderdev.md)                   | ConsoleAppenderDev for development                | Superseded |
 | [010](010-traceid-generation.md)                   | TraceId generation with timestamp                 | Accepted |
 | [011](011-noop-wrapper-pattern.md)                 | No-op wrapper pattern for disabled levels         | Accepted |
