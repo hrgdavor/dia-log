@@ -1,22 +1,14 @@
 package hr.hrg.dialog.logback;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import hr.hrg.dialog.core.LoggingEventBuilderWrapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.slf4j.MDC;
 import org.slf4j.Marker;
 import org.slf4j.MarkerFactory;
 import org.slf4j.spi.LoggingEventBuilder;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit tests for {@link LoggingEventBuilderWrapper}.
@@ -30,87 +22,19 @@ class LoggingEventBuilderWrapperTest {
      * Concrete test subclass to allow instantiation (the base class is abstract).
      */
     private static class TestWrapper extends LoggingEventBuilderWrapper {
-        TestWrapper(LoggingEventBuilder delegate, Runnable clear, org.slf4j.Logger logger) {
-            super(delegate, clear, logger);
+        TestWrapper(LoggingEventBuilder delegate, org.slf4j.Logger logger) {
+            super(delegate, logger);
         }
-
-    }
-
-    // ---- MDC key cleanup ----
-
-    @Test
-    void addKeyValue_cleansUpMdcAfterLog() {
-        List<String> keysTracked = new ArrayList<>();
-        LoggingEventBuilder delegate = realLogger.atInfo();
-
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-        wrapper.addKeyValue("userId", "alice");
-        wrapper.addKeyValue("requestId", "123");
-
-        // Keys should be in MDC during building
-        assertEquals("alice", MDC.get("userId"));
-        assertEquals("123", MDC.get("requestId"));
-
-        wrapper.log("test message");
-
-        // After log(), keys should be cleaned up
-        Assertions.assertNull(MDC.get("userId"), "userId should be removed from MDC after log()");
-        Assertions.assertNull(MDC.get("requestId"), "requestId should be removed from MDC after log()");
-    }
-
-    @Test
-    void addKeyValue_supplier_cleansUpMdcAfterLog() {
-        LoggingEventBuilder delegate = realLogger.atInfo();
-
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-        wrapper.addKeyValue("computed", () -> "dynamic-value");
-
-        assertEquals("dynamic-value", MDC.get("computed"));
-
-        wrapper.log("test");
-
-        Assertions.assertNull(MDC.get("computed"), "Supplier key should be removed from MDC after log()");
-    }
-
-    @Test
-    void multipleLogCalls_eachCleansUpKeys() {
-        LoggingEventBuilder delegate = realLogger.atInfo();
-
-        // First log
-        TestWrapper w1 = new TestWrapper(delegate, () -> {}, realLogger);
-        w1.addKeyValue("key1", "val1");
-        w1.log("first");
-        Assertions.assertNull(MDC.get("key1"));
-
-        // Second log
-        TestWrapper w2 = new TestWrapper(delegate, () -> {}, realLogger);
-        w2.addKeyValue("key2", "val2");
-        w2.log("second");
-        Assertions.assertNull(MDC.get("key2"));
-    }
-
-    // ---- Clear Runnable ----
-
-    @Test
-    void clearRunnable_isCalledAfterLog() {
-        AtomicBoolean cleared = new AtomicBoolean(false);
-        LoggingEventBuilder delegate = realLogger.atInfo();
-
-        TestWrapper wrapper = new TestWrapper(delegate, () -> cleared.set(true), realLogger);
-        wrapper.log("test");
-
-        Assertions.assertTrue(cleared.get(), "Clear Runnable should be called after log()");
     }
 
     // ---- stackWhenTraceEnabled ----
 
     @Test
     void stackWhenTraceEnabled_attachesThrowableWhenTraceEnabled() {
-        // Enable TRACE on the test logger
         realLogger.setLevel(ch.qos.logback.classic.Level.TRACE);
 
         LoggingEventBuilder delegate = realLogger.atDebug();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
         wrapper.stackWhenTraceEnabled();
         wrapper.log("debug message");
 
@@ -122,8 +46,7 @@ class LoggingEventBuilderWrapperTest {
         realLogger.setLevel(ch.qos.logback.classic.Level.INFO); // TRACE disabled
 
         LoggingEventBuilder delegate = realLogger.atInfo();
-        // No-op wrapper since INFO is enabled but TRACE is not
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
         wrapper.stackWhenTraceEnabled();
         wrapper.log("info message");
 
@@ -135,25 +58,11 @@ class LoggingEventBuilderWrapperTest {
         realLogger.setLevel(ch.qos.logback.classic.Level.ERROR); // DEBUG+TRACE disabled
 
         LoggingEventBuilder delegate = realLogger.atDebug(); // no-op builder
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-		wrapper.stackWhenTraceEnabled();
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
+        wrapper.stackWhenTraceEnabled();
         wrapper.kv("key", "value").log("debug message");
 
         // Should not throw — no-op builder ignores everything
-    }
-
-    // ---- kv() shorthand ----
-
-    @Test
-    void kv_shorthand_addsKeyValueToMDC() {
-        LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-
-        wrapper.kv("myKey", "myValue");
-        assertEquals("myValue", MDC.get("myKey"));
-
-        wrapper.log("test");
-        Assertions.assertNull(MDC.get("myKey"));
     }
 
     // ---- delegation ----
@@ -161,9 +70,8 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void setCause_isDelegated() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
 
-        // setCause should return the wrapper for chaining
         LoggingEventBuilder result = wrapper.setCause(new RuntimeException("test"));
         Assertions.assertSame(wrapper, result, "setCause should return the wrapper for chaining");
     }
@@ -171,7 +79,7 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void addMarker_isDelegated() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
 
         Marker marker = MarkerFactory.getMarker("TEST");
         LoggingEventBuilder result = wrapper.addMarker(marker);
@@ -181,89 +89,94 @@ class LoggingEventBuilderWrapperTest {
     @Test
     void addArgument_isDelegated() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
 
         LoggingEventBuilder result = wrapper.addArgument("arg1");
         Assertions.assertSame(wrapper, result, "addArgument should return the wrapper for chaining");
     }
 
+    @Test
+    void addKeyValue_isDelegated() {
+        LoggingEventBuilder delegate = realLogger.atInfo();
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
+
+        LoggingEventBuilder result = wrapper.addKeyValue("key", "value");
+        Assertions.assertSame(wrapper, result, "addKeyValue should return the wrapper for chaining");
+    }
+
+    @Test
+    void kv_shorthand_isDelegated() {
+        LoggingEventBuilder delegate = realLogger.atInfo();
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
+
+        LoggingEventBuilder result = wrapper.kv("key", "value");
+        Assertions.assertSame(wrapper, result, "kv should return the wrapper for chaining");
+    }
+
     // ---- log() overloads ----
 
     @Test
-    void log_varargsOverload_cleansUp() {
+    void log_varargsOverload() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-        wrapper.addKeyValue("k", "v");
-
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
         wrapper.log("msg {} {} {}", "a", "b", "c");
-        Assertions.assertNull(MDC.get("k"));
     }
 
     @Test
-    void log_twoArgOverload_cleansUp() {
+    void log_twoArgOverload() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-        wrapper.addKeyValue("k", "v");
-
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
         wrapper.log("msg {}", "arg");
-        Assertions.assertNull(MDC.get("k"));
     }
 
     @Test
-    void log_threeArgOverload_cleansUp() {
+    void log_threeArgOverload() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-        wrapper.addKeyValue("k", "v");
-
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
         wrapper.log("msg {} {}", "a", "b");
-        Assertions.assertNull(MDC.get("k"));
     }
 
     @Test
-    void log_supplierOverload_cleansUp() {
+    void log_supplierOverload() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-        wrapper.addKeyValue("k", "v");
-
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
         wrapper.log(() -> "lazy message");
-        Assertions.assertNull(MDC.get("k"));
     }
 
     @Test
-    void log_noArgOverload_cleansUp() {
+    void log_noArgOverload() {
         LoggingEventBuilder delegate = realLogger.atInfo();
-        TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-        wrapper.addKeyValue("k", "v");
-
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
         wrapper.log();
-        Assertions.assertNull(MDC.get("k"));
     }
 
-    // ---- thread safety ----
+    @Test
+    void log_withCause() {
+        LoggingEventBuilder delegate = realLogger.atInfo();
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
+        wrapper.setCause(new RuntimeException("test cause")).log("error occurred");
+    }
 
     @Test
-    void closeContext_isThreadSafe() throws InterruptedException {
-        int threadCount = 10;
-        CountDownLatch latch = new CountDownLatch(threadCount);
-        AtomicBoolean anyFailed = new AtomicBoolean(false);
+    void log_withMarker() {
+        LoggingEventBuilder delegate = realLogger.atInfo();
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
+        wrapper.addMarker(MarkerFactory.getMarker("TEST")).log("marked message");
+    }
 
-        for (int i = 0; i < threadCount; i++) {
-            new Thread(() -> {
-                try {
-                    LoggingEventBuilder delegate = realLogger.atInfo();
-                    TestWrapper wrapper = new TestWrapper(delegate, () -> {}, realLogger);
-                    wrapper.addKeyValue("key", "value");
-                    wrapper.log("msg");
-                } catch (Exception e) {
-                    anyFailed.set(true);
-                } finally {
-                    latch.countDown();
-                }
-            }).start();
-        }
+    @Test
+    void log_withKeyValue() {
+        LoggingEventBuilder delegate = realLogger.atInfo();
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
+        wrapper.addKeyValue("userId", "alice").log("user processed");
+    }
 
-        latch.await();
-        Assertions.assertFalse(anyFailed.get(), "Concurrent access should not throw");
-        Assertions.assertNull(MDC.get("key"));
+    @Test
+    void log_withMultipleKeyValues() {
+        LoggingEventBuilder delegate = realLogger.atInfo();
+        TestWrapper wrapper = new TestWrapper(delegate, realLogger);
+        wrapper.addKeyValue("userId", "alice")
+               .addKeyValue("requestId", "123")
+               .log("request completed");
     }
 }

@@ -9,7 +9,7 @@ public final class LoggingEventBuilderWrapperNoop extends LoggingEventBuilderWra
     private static final LoggingEventBuilderWrapperNoop INSTANCE = new LoggingEventBuilderWrapperNoop();
 
     private LoggingEventBuilderWrapperNoop() {
-        super(NOPLoggingEventBuilder.singleton(), null, null);
+        super(NOPLoggingEventBuilder.singleton(), null);
     }
 
     public static LoggingEventBuilderWrapperNoop singleton() {

@@ -13,10 +13,9 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	}
 
 	protected abstract void contextStart(L builder);
-	protected abstract void contextEnd();
 
 	/**
-	 * 	example: return new LoggingEventBuilderWrapper(builder, this::contextEnd, delegate);
+	 * 	example: return new LoggingEventBuilderWrapper(builder, delegate);
 	 * @param builder
 	 * @return
 	 */
@@ -27,8 +26,7 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 
 	/**
 	 * Wrap the builder in {@link LoggingEventBuilderWrapper} and apply context.
-	 * The wrapper ensures {@link LoggingEventBuilderWrapper#closeContext()} is
-	 * called automatically after any {@code log()} method, so no manual
+	 * MDC handling is left entirely to SLF4J — we do not manage MDC keys here.
 	 */
 	protected L _contextStart(LoggingEventBuilder builder) {
 		L wrapper = initBuilder(builder);
@@ -55,15 +53,12 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	}
 
 	// ---- atXxx() returning wrapped builder ----
-	// When level is disabled, contextStart/contextEnd are both skipped (no-op wrapper).
-	// When level is enabled, _contextStart wraps the builder and the wrapper's
-	// log() or close() method triggers contextEnd() via closeContext().
-
-	private static final Runnable NOOP = () -> {};
+	// When level is disabled, contextStart is skipped (no-op wrapper).
+	// When level is enabled, _contextStart wraps the builder.
 
 	/**
 	 * When the original level is disabled, we still create a wrapper with the Logger
-	 * reference so that {@link LoggingEventBuilderWrapper#stackWhenTraceEnabled()} can still
+	 * reference so that {@link LoggingEventBuilderWrapperBase#stackWhenTraceEnabled()} can still
 	 * emit a TRACE-level log even when the original level (e.g. DEBUG) is disabled.
 	 */
 	public L atDebug() {

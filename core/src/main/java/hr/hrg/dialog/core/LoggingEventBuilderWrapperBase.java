@@ -1,22 +1,21 @@
 package hr.hrg.dialog.core;
 
 import org.slf4j.Logger;
-import org.slf4j.MDC;
 import org.slf4j.Marker;
 import org.slf4j.spi.LoggingEventBuilder;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * A delegating wrapper around {@link LoggingEventBuilder} that automatically
- * closes (removes from MDC) any context keys added via {@link #addKeyValue}
- * after a {@code log()} method completes.
+ * A delegating wrapper around {@link LoggingEventBuilder} that provides
+ * convenience methods like {@link #kv(String, Object)} and
+ * {@link #stackWhenTraceEnabled()}.
  * <p>
- * This prevents diagnostic context from leaking across log statements when
- * key-value pairs are added and should only apply to a single event.
+ * MDC handling is left entirely to SLF4J — we do not manage MDC keys here.
+ * Key-value pairs added via {@link #addKeyValue(String, Object)} are delegated
+ * directly to the underlying SLF4J builder, which handles MDC propagation
+ * as configured by the logging implementation (e.g. logback).
  * <p>
  * The wrapper also implements {@link AutoCloseable} so it can be used with
  * try-with-resources for explicit scope control:
@@ -35,27 +34,21 @@ import java.util.function.Supplier;
  *     .kv("state", state)
  *     .log("Change state to {state}");
  * }</pre>
- *
  */
 public class LoggingEventBuilderWrapperBase implements LoggingEventBuilder {
 
     protected final LoggingEventBuilder delegate;
-    protected final Runnable clear;
     protected final Logger logger; // nullable — used for stackWhenTraceEnabled isTraceEnabled check
-    protected final List<String> contextKeys = new ArrayList<>();
     protected boolean stackWhenTraceEnabled;
-    protected boolean closed;
 
     /**
      * Creates a new wrapper with a Logger reference (needed for {@link #stackWhenTraceEnabled()}).
      *
      * @param delegate the builder to delegate to; must not be null
-     * @param clear    optional runnable to execute on context close
      * @param logger   the underlying Logger — used to check isTraceEnabled()
      */
-    protected LoggingEventBuilderWrapperBase(LoggingEventBuilder delegate, Runnable clear, Logger logger) {
+    protected LoggingEventBuilderWrapperBase(LoggingEventBuilder delegate, Logger logger) {
         this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
-        this.clear = clear;
         this.logger = logger;
     }
 
@@ -109,19 +102,12 @@ public class LoggingEventBuilderWrapperBase implements LoggingEventBuilder {
     @Override
     public LoggingEventBuilderWrapperBase addKeyValue(String key, Object value) {
         delegate.addKeyValue(key, value);
-        contextKeys.add(key);
-        MDC.put(String.valueOf(key), String.valueOf(value));
         return this;
     }
 
     @Override
     public LoggingEventBuilderWrapperBase addKeyValue(String key, Supplier<Object> valueSupplier) {
         delegate.addKeyValue(key, valueSupplier);
-        contextKeys.add(key);
-        Object value = valueSupplier.get();
-        if (value != null) {
-            MDC.put(key, String.valueOf(value));
-        }
         return this;
     }
 
@@ -149,48 +135,42 @@ public class LoggingEventBuilderWrapperBase implements LoggingEventBuilder {
         return this;
     }
 
-    // ---- log() overloads with automatic context close and optional trace cause ----
+    // ---- log() overloads with optional trace cause ----
 
     @Override
     public void log() {
         maybeAttachTraceCause();
         delegate.log();
-        closeContext();
     }
 
     @Override
     public void log(String msg) {
         maybeAttachTraceCause();
         delegate.log(msg);
-        closeContext();
     }
 
     @Override
     public void log(String format, Object arg) {
         maybeAttachTraceCause();
         delegate.log(format, arg);
-        closeContext();
     }
 
     @Override
     public void log(String format, Object arg1, Object arg2) {
         maybeAttachTraceCause();
         delegate.log(format, arg1, arg2);
-        closeContext();
     }
 
     @Override
     public void log(String format, Object... args) {
         maybeAttachTraceCause();
         delegate.log(format, args);
-        closeContext();
     }
 
     @Override
     public void log(Supplier<String> messageSupplier) {
         maybeAttachTraceCause();
         delegate.log(messageSupplier);
-        closeContext();
     }
 
     // ---- internal ----
@@ -204,23 +184,5 @@ public class LoggingEventBuilderWrapperBase implements LoggingEventBuilder {
         if (stackWhenTraceEnabled && logger != null && logger.isTraceEnabled()) {
             delegate.setCause(new Throwable("stackWhenTraceEnabled"));
         }
-    }
-
-    protected void closeContext() {
-        if (closed) {
-            return;
-        }
-        closed = true;
-        // TODO(dia-log): Replace System.out with SLF4J logging and narrow catch to Exception.
-        // Skipped in initial pass — left as-is intentionally.
-        try{
-            clear.run();
-        }catch (Throwable e){
-            e.printStackTrace(System.out);
-        }
-        for (String key : contextKeys) {
-            MDC.remove(key);
-        }
-        contextKeys.clear();
     }
 }
