@@ -2,193 +2,90 @@ package hr.hrg.dialog.logback;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.event.KeyValuePair;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.ObjectWriteContext;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.ObjectMapper;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
-import ch.qos.logback.classic.spi.StackTraceElementProxy;
-import ch.qos.logback.classic.spi.ThrowableProxy;
 import ch.qos.logback.core.spi.ContextAwareBase;
-import hr.hrg.dialog.core.JavaStackSanitizer;
-import hr.hrg.dialog.core.Wyhash64;
 
 /**
  * Reusable JSON log event writer used internally by {@link CustomJsonEncoder}.
- * <p>
- * Holds all JSON-related configuration (includeMDC, includeKeys, prettyPrint, etc.)
- * and provides a single {@link #writeJsonEvent(ILoggingEvent, OutputStream)} method.
- * </p>
- *
- * <pre>{@code
- * JsonLogWriter writer = new JsonLogWriter();
- * writer.setIncludeMDC(true);
- * writer.setIncludeKeys(true);
- * writer.start();
- *
- * writer.writeJsonEvent(event, outputStream);
- * }</pre>
  */
 public class JsonLogWriter extends ContextAwareBase {
 
-    /** Newline bytes (UTF-8). */
-    public static final byte[] NL = System.lineSeparator().getBytes(StandardCharsets.UTF_8);
+    /** Newline bytes (UTF-8) - strictly Unix LF (\n). */
+    public static final byte[] NL = new byte[]{ 0x0A };
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final JsonFactory JSON_FACTORY = new JsonFactory();
+    private static final JsonFactory JSON_FACTORY = JsonFactory.builder().build();
 
     // --- Configuration properties ---
-
     private boolean includeMDC = true;
     private boolean includeKeys = true;
     private boolean includeSource = false;
-    private boolean prettyPrint = false;
-    private String customFieldsJson = null;
-    private ObjectNode parsedCustomFields = null;
 
-    /** Maximum number of stack frames to include in sanitized traces. */
     private int maxStackFrames = 255;
-
     private volatile boolean started = false;
+    private final ObjectWriteContext writeCtxt = ObjectWriteContext.empty();
 
-    public JsonLogWriter() {
-    }
+    public JsonLogWriter() {}
 
     // ========== Configuration setters ==========
 
-    public void setIncludeMDC(boolean includeMDC) {
-        this.includeMDC = includeMDC;
-    }
+    public void setIncludeMDC(boolean includeMDC) { this.includeMDC = includeMDC; }
+    public boolean isIncludeMDC() { return includeMDC; }
 
-    public boolean isIncludeMDC() {
-        return includeMDC;
-    }
+    public void setIncludeKeys(boolean includeKeys) { this.includeKeys = includeKeys; }
+    public boolean isIncludeKeys() { return includeKeys; }
 
-    public void setIncludeKeys(boolean includeKeys) {
-        this.includeKeys = includeKeys;
-    }
+    public void setIncludeSource(boolean includeSource) { this.includeSource = includeSource; }
+    public boolean isIncludeSource() { return includeSource; }
 
-    public boolean isIncludeKeys() {
-        return includeKeys;
-    }
-
-    public void setIncludeSource(boolean includeSource) {
-        this.includeSource = includeSource;
-    }
-
-    public boolean isIncludeSource() {
-        return includeSource;
-    }
-
-    public void setPrettyPrint(boolean prettyPrint) {
-        this.prettyPrint = prettyPrint;
-    }
-
-    public boolean isPrettyPrint() {
-        return prettyPrint;
-    }
-
-    /**
-     * Set custom static JSON fields to include in every event.
-     * Expected format: a JSON object string like {@code {"env":"prod","version":"1.0"}}.
-     * Parsed once and merged into every output line. Set to {@code null} or empty to disable.
-     */
-    public void setCustomFields(String customFieldsJson) {
-        this.customFieldsJson = customFieldsJson;
-        if (customFieldsJson != null && !customFieldsJson.isBlank()) {
-            try {
-                this.parsedCustomFields = (ObjectNode) MAPPER.readTree(customFieldsJson);
-            } catch (Exception e) {
-                addError("Failed to parse customFields JSON: " + customFieldsJson, e);
-                this.parsedCustomFields = null;
-            }
-        } else {
-            this.parsedCustomFields = null;
-        }
-    }
-
-    public String getCustomFields() {
-        return customFieldsJson;
-    }
-
-    public void setMaxStackFrames(int maxStackFrames) {
-        this.maxStackFrames = maxStackFrames;
-    }
-
-    public int getMaxStackFrames() {
-        return maxStackFrames;
-    }
+    public void setMaxStackFrames(int maxStackFrames) { this.maxStackFrames = maxStackFrames; }
+    public int getMaxStackFrames() { return maxStackFrames; }
 
     // ========== Lifecycle ==========
 
-    /**
-     * Initialize this writer. Must be called before first use.
-     */
-    public void start() {
-        started = true;
-    }
-
-    /**
-     * Stop this writer and release resources.
-     */
-    public void stop() {
-        started = false;
-    }
-
-    public boolean isStarted() {
-        return started;
-    }
+    public void start() { started = true; }
+    public void stop() { started = false; }
+    public boolean isStarted() { return started; }
 
     // ========== JSON Serialization ==========
 
-    /**
-     * Serializes a single {@link ILoggingEvent} as a JSON object to the given output stream.
-     * This method can be called by any appender — console, rolling file, etc.
-     *
-     * @param event the logging event
-     * @param out   the output stream to write to
-     * @throws IOException if writing fails
-     */
     public void writeJsonEvent(ILoggingEvent event, OutputStream out) throws IOException {
-        JsonGenerator gen = JSON_FACTORY.createGenerator(out);
-        if (prettyPrint) {
-            gen.setPrettyPrinter(new DefaultPrettyPrinter());
-        }
-
-        try {
+        try (JsonGenerator gen = JSON_FACTORY.createGenerator(writeCtxt, out)) {
             gen.writeStartObject();
 
-            // Timestamp (epoch millis)
-            gen.writeNumberField("ts", event.getTimeStamp());
 
-            // Level
-            gen.writeStringField("level", event.getLevel().toString());
+            gen.writeName("ts"); // Timestamp
+            gen.writeNumber(event.getTimeStamp());
 
-            // Logger name
-            gen.writeStringField("logger", event.getLoggerName());
+            gen.writeName("level");
+            gen.writeString(event.getLevel().toString());
 
-            // Thread name
-            gen.writeStringField("thread", event.getThreadName());
+            gen.writeName("logger");// Logger name
+            gen.writeString(event.getLoggerName());
 
-            // Formatted message
-            gen.writeStringField("msg", event.getFormattedMessage());
+            gen.writeName("thread");
+            gen.writeString(event.getThreadName());
 
-            java.util.Set<String> allKeys = new java.util.HashSet<>();
+            gen.writeName("msg");
+            gen.writeString(event.getFormattedMessage());
 
-            // Structured key-value pairs and MDC context with kv priority over MDC for overlapping keys
+            Set<String> allKeys = new HashSet<>();
+
+            // Structured key-value pairs
             if (includeKeys) {
-                // Collect all unique key names from both sources, prioritizing kv keys
-
-                // Add kv keys first
                 List<KeyValuePair> pairs = event.getKeyValuePairs();
                 if (pairs != null && !pairs.isEmpty()) {
                     for (KeyValuePair kvPair : pairs) {
@@ -199,23 +96,21 @@ public class JsonLogWriter extends ContextAwareBase {
                     }
                 }
             }
+
+            // MDC context
             if (includeMDC) {
-                // Add MDC keys, but only if not already in kv
-                // Note: event.getMDCPropertyMap() may throw if MDC is not initialized
-                // (e.g. when used with a manually constructed LoggingEvent in tests)
                 Map<String, String> mdcMap = null;
                 try {
                     mdcMap = event.getMDCPropertyMap();
-                } catch (Exception e) {
-                    // MDC not available — skip MDC fields gracefully
-                }
+                } catch (Exception ignored) {}
+
                 if (mdcMap != null && !mdcMap.isEmpty()) {
                     for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
-                        if (entry.getKey() != null) {
-                            // Only add MDC key if it's not already in kv (kv takes priority)
-                            if (!isReserved(entry.getKey()) && !allKeys.contains(entry.getKey())) {
-                                gen.writeStringField(entry.getKey(), entry.getValue());
-                            }
+                        if (entry.getKey() != null
+                                && !isReserved(entry.getKey())
+                                && !allKeys.contains(entry.getKey())) {
+                            gen.writeName(entry.getKey());
+                            gen.writeString(entry.getValue());
                         }
                     }
                 }
@@ -224,123 +119,83 @@ public class JsonLogWriter extends ContextAwareBase {
             // Exception info
             IThrowableProxy tp = event.getThrowableProxy();
             if (tp != null) {
-                gen.writeObjectFieldStart("err");
-                gen.writeStringField("class", tp.getClassName());
-                gen.writeStringField("msg", tp.getMessage());
+                gen.writeName("err");
+                gen.writeStartObject();
 
-                // Sanitized stack trace — deterministic frames for deduplication
-//                List<String> sanitizedFrames = getSanitizedFrames(tp);
-//                gen.writeArrayFieldStart("stack");
-//                for (String frame : sanitizedFrames) {
-//                    gen.writeString(frame);
-//                }
-//                gen.writeEndArray();
+                gen.writeName("class");
+                gen.writeString(tp.getClassName());
 
-                // Hash of the sanitized trace for fast deduplication
-                gen.writeStringField("hash", JavaStackSanitizerLogback.fingerprint(tp,elem->true));
+                gen.writeName("msg");
+                gen.writeString(tp.getMessage());
 
-                // Cause chain
+                gen.writeName("stack");
+                gen.writeString("");
+
                 IThrowableProxy cause = tp.getCause();
                 if (cause != null) {
-                    gen.writeObjectFieldStart("cause");
-                    gen.writeStringField("class", cause.getClassName());
-                    gen.writeStringField("msg", cause.getMessage());
+                    gen.writeName("cause");
+                    gen.writeStartObject();
+
+                    gen.writeName("class");
+                    gen.writeString(cause.getClassName());
+
+                    gen.writeName("msg");
+                    gen.writeString(cause.getMessage());
+
                     gen.writeEndObject();
                 }
 
                 gen.writeEndObject();
 
-                // Also include the raw message template for structured error analysis
-                gen.writeStringField("msgTpl", event.getMessage());
-            }else if (includeSource) {
+                gen.writeName("msgTpl");
+                gen.writeString(event.getMessage());
+            } else if (includeSource) {
                 StackTraceElement[] callerData = event.getCallerData();
                 if (callerData != null && callerData.length > 0) {
                     StackTraceElement caller = callerData[0];
-                    gen.writeObjectFieldStart("source");
-                    gen.writeStringField("class", caller.getClassName());
-                    gen.writeStringField("method", caller.getMethodName());
-                    gen.writeNumberField("line", caller.getLineNumber());
+                    gen.writeName("source");
+                    gen.writeStartObject();
+
+                    gen.writeName("class");
+                    gen.writeString(caller.getClassName());
+
+                    gen.writeName("method");
+                    gen.writeString(caller.getMethodName());
+
+                    gen.writeName("line");
+                    gen.writeNumber(caller.getLineNumber());
+
                     gen.writeEndObject();
-                }
-            }
-
-
-            // Custom static fields
-            if (parsedCustomFields != null) {
-                var fields = parsedCustomFields.fields();
-                while (fields.hasNext()) {
-                    var field = fields.next();
-                    gen.writeFieldName(field.getKey());
-                    gen.writeTree(field.getValue());
                 }
             }
 
             gen.writeEndObject();
         } catch (IOException e) {
             addError("Failed to write JSON log event for logger: " + event.getLoggerName(), e);
-            // Fallback: write a minimal JSON with the error
-            try {
-                gen.writeEndObject();
-            } catch (Exception ignored) {
-                // If we can't close cleanly, that's okay — we tried our best
-            }
-        } finally {
-            gen.close();
+            throw e;
         }
     }
 
     private boolean isReserved(String key) {
         return switch (key) {
-            case "ts", "level", "logger", "thread","msg" -> true;
+            case "ts", "level", "logger", "thread", "msg", "err", "source", "msgTpl", "hash" -> true;
             default -> false;
         };
     }
 
     protected void addKey(JsonGenerator gen, String key, Object value) throws IOException {
-        if(value == null) return;
+        if (value == null) return;
 
-        gen.writeFieldName(key);
-        if (value instanceof String s) {
-            gen.writeString(s);
-        } else {
-            gen.writePOJO(value);
+        gen.writeName(key);
+
+        switch (value) {
+            case String s -> gen.writeString(s);
+            case Long l -> gen.writeNumber(l);
+            case Integer i -> gen.writeNumber(i);
+            case Double d -> gen.writeNumber(d);
+            case Number n -> gen.writeNumber(n.toString());
+            case Boolean b -> gen.writeBoolean(b);
+            default -> MAPPER.writeValue(gen, value);
         }
     }
-
-    // ========== Helper ==========
-    // TODO(dia-log): Remove writeTraceString() — dead code, intentionally kept for now.
-    public static void writeTraceString(JsonGenerator gen, StackTraceElement[] frames) throws IOException {
-// 1. Manually open the JSON string quote
-        gen.writeRaw(':');
-        gen.writeRaw('"');
-
-        // 2. Stream frames directly to Jackson's buffer
-        for (StackTraceElement frame : frames) {
-//            if (isSpringOrJdk(frame)) {
-//                continue; // Your fingerprint filtering logic
-//            }
-
-            // Stream components directly to avoid ANY string concatenation
-            gen.writeRaw("\tat ");
-            gen.writeRaw(frame.getClassName());
-            gen.writeRaw('.');
-            gen.writeRaw(frame.getMethodName());
-            gen.writeRaw('(');
-            if (frame.getFileName() != null) {
-                gen.writeRaw(frame.getFileName());
-                if (frame.getLineNumber() >= 0) {
-                    gen.writeRaw(':');
-                    gen.writeRaw(String.valueOf(frame.getLineNumber())); // Minimal allocation (cached integers)
-                }
-            } else {
-                gen.writeRaw("Unknown Source");
-            }
-            gen.writeRaw("\\n"); // Escaped newline literal for JSON string compliance
-        }
-
-        // 3. Manually close the JSON string quote
-        gen.writeRaw('"');
-    }
-
-
 }

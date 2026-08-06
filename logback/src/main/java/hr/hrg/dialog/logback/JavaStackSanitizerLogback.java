@@ -30,23 +30,41 @@ public class JavaStackSanitizerLogback {
      * @param rootCause
      * @return
      */
-    public static String fingerprint(IThrowableProxy rootCause, Predicate<String> filter) {
+    public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filter) {
         Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
 
         // 1. Exception type
-        byte[] exBytes = rootCause.getClass().getName().getBytes(StandardCharsets.UTF_8);
-        stream.update(exBytes, 0, exBytes.length);
-        stream.update(JavaStackSanitizer.NEWLINE, 0, 1);
+        stream.update(rootCause.getClass().getName());
 
-        StackTraceElementProxy[] traceProxy = rootCause.getStackTraceElementProxyArray();
-        StackTraceElement[] trace = new StackTraceElement[traceProxy.length];
-        for(int i=0; i<traceProxy.length; i++){
-            trace[i] = traceProxy[i].getStackTraceElement();
+        StackTraceElementProxy[] trace = rootCause.getStackTraceElementProxyArray();
+        boolean isFirstFrame = true;
+
+        for (StackTraceElementProxy elp : trace) {
+            StackTraceElement el = elp.getStackTraceElement();
+            String className = el.getClassName();
+            if (!filter.test(className)) continue;
+
+            isFirstFrame = false;
+            stream.update(JavaStackSanitizer.NEWLINE_BYTES, 0, 1);
+            String methodName = el.getMethodName();
+
+            JavaStackSanitizer.addFromTraceElement(stream, className, methodName);
         }
-        JavaStackSanitizer.addFromTrace(trace, filter, stream);
 
-        long hash = stream.finalHash();
-        return HexFormat.of().toHexDigits(hash);
+        // Fallback: if all frames were skipped, hash top 3 (cleaned)
+        if (isFirstFrame) {printTracesFallback(trace, stream);}
+
+        return stream.finalHash();
     }
 
+    private static void printTracesFallback(StackTraceElementProxy[] trace, Wyhash64.Streaming stream) {
+        int limit = Math.min(3, trace.length);
+        for (int i = 0; i < limit; i++) {
+            stream.update(JavaStackSanitizer.NEWLINE_BYTES, 0, 1);
+            StackTraceElement el = trace[i].getStackTraceElement();
+            stream.update(el.getClassName());
+            stream.update(JavaStackSanitizer.DOT_BYTES, 0, 1);
+            stream.update(el.getMethodName());
+        }
+    }
 }

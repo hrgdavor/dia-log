@@ -99,7 +99,7 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	}
 
 	public L atLevel(Level level,LogFiller filler) {
-		if(!delegate.isEnabledForLevel(level)) return noOpWrapper();
+		if(!isEnabledForLevel(level)) return noOpWrapper();
 		return fill(atLevel(level),filler);
 	}
 

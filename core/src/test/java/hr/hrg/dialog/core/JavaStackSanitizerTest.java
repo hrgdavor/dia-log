@@ -18,11 +18,29 @@ class JavaStackSanitizerTest {
 
     // ---- helpers ----
 
-    /** Hash the given frames with the given filter and return the hex string. */
+    /** Hash the given frames with the given filter using the streaming approach and return the hex string. */
     private static String hashFrames(StackTraceElement[] trace, Predicate<String> filter) {
         Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
         JavaStackSanitizer.addFromTrace(trace, filter, stream);
         return HexFormat.of().toHexDigits(stream.finalHash());
+    }
+
+    /** Build the sanitized string with {@link JavaStackSanitizer#addFromTraceToStringBuffer} and hash it. */
+    private static String hashFromString(StackTraceElement[] trace, Predicate<String> filter) {
+        StringBuffer sb = new StringBuffer();
+        JavaStackSanitizer.addFromTraceToStringBuffer(trace, filter, sb);
+        return HexFormat.of().toHexDigits(Wyhash64.hash(0, sb.toString()));
+    }
+
+    /** Build the sanitized string using {@link JavaStackSanitizer#addFromTraceToOutputStream} and return it. */
+    private static String stringFromOutputStream(StackTraceElement[] trace, Predicate<String> filter) {
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        try {
+            JavaStackSanitizer.addFromTraceToOutputStream(trace, filter, baos);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        }
+        return baos.toString(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /** Create a simple stack-frame element without a file/line number. */
@@ -382,9 +400,9 @@ class JavaStackSanitizerTest {
 
     @Test
     void constants_areNotEmpty() {
-        assertTrue(JavaStackSanitizer.DOT.length > 0);
-        assertTrue(JavaStackSanitizer.NEWLINE.length > 0);
-        assertTrue(JavaStackSanitizer.LAMBDA_METHOD.length > 0);
+        assertTrue(JavaStackSanitizer.DOT_BYTES.length > 0);
+        assertTrue(JavaStackSanitizer.NEWLINE_BYTES.length > 0);
+        assertTrue(JavaStackSanitizer.LAMBDA_METHOD_BYTES.length > 0);
     }
 
     // ---- filter examples (as typically used) ----
@@ -411,5 +429,134 @@ class JavaStackSanitizerTest {
                 },
                 ACCEPT_ALL);
         assertEquals(hashExpected, hash);
+    }
+
+    // ---- compare streaming hash with string-based hash ----
+
+    @Test
+    void addFromTrace_streamingHash_matchesStringHash() {
+        StackTraceElement[] frames = {
+                ste("com.example.MyClass", "doStuff"),
+                ste("jdk.internal.reflect.NativeMethodAccessorImpl", "invoke0"),
+                ste("sun.reflect.Reflection", "getCallerClass"),
+                ste("com.example.MyClass", "handle"),
+        };
+        Predicate<String> prodFilter = cls ->
+                !cls.startsWith("jdk.internal.") && !cls.startsWith("sun.reflect.");
+
+        String streamingHash = hashFrames(frames, prodFilter);
+        String stringHash = hashFromString(frames, prodFilter);
+        assertEquals(streamingHash, stringHash,
+                "streaming hash should match hash of string from addFromTraceToStringBuffer");
+    }
+
+    @Test
+    void addFromTrace_stringHash_matchesStreamingHash_withLambdaNormalisation() {
+        StackTraceElement[] frames = {
+                ste("com.example.MyClass", "doStuff"),
+                ste("com.example.MyClass$$Lambda$42/0xdeadbeef", "run"),
+                ste("com.example.MyClass", "lambda$doOtherStuff$99"),
+        };
+
+        String streamingHash = hashFrames(frames, ACCEPT_ALL);
+        String stringHash = hashFromString(frames, ACCEPT_ALL);
+
+        assertEquals(streamingHash, stringHash,
+                "streaming hash should match string-based hash (with lambda normalisation)");
+    }
+
+    @Test
+    void addFromTrace_stringHash_matchesStreamingHash_emptyTrace() {
+        StackTraceElement[] frames = new StackTraceElement[0];
+
+        String streamingHash = hashFrames(frames, ACCEPT_ALL);
+        String stringHash = hashFromString(frames, ACCEPT_ALL);
+
+        assertEquals(streamingHash, stringHash,
+                "streaming hash should match string-based hash (empty trace)");
+    }
+
+    @Test
+    void addFromTrace_stringHash_matchesStreamingHash_fallbackWhenAllFiltered() {
+        StackTraceElement[] frames = {
+                ste("jdk.internal.reflect.NativeMethodAccessorImpl", "invoke0"),
+                ste("jdk.internal.misc.Unsafe", "getInt"),
+                ste("sun.reflect.Reflection", "getCallerClass"),
+        };
+        Predicate<String> rejectAll = cls -> false;
+
+        String streamingHash = hashFrames(frames, rejectAll);
+        String stringHash = hashFromString(frames, rejectAll);
+
+        assertEquals(streamingHash, stringHash,
+                "streaming hash should match string-based hash (fallback path)");
+    }
+
+    @Test
+    void addFromTraceToOutputStream_producesIdenticalStringAsStringBuffer() {
+        StackTraceElement[] frames = {
+                ste("com.example.MyClass", "doStuff"),
+                ste("jdk.internal.reflect.NativeMethodAccessorImpl", "invoke0"),
+                ste("sun.reflect.Reflection", "getCallerClass"),
+                ste("com.example.MyClass", "handle"),
+        };
+        Predicate<String> prodFilter = cls ->
+                !cls.startsWith("jdk.internal.") && !cls.startsWith("sun.reflect.");
+
+        String outputStreamString = stringFromOutputStream(frames, prodFilter);
+        StringBuffer sb = new StringBuffer();
+        JavaStackSanitizer.addFromTraceToStringBuffer(frames, prodFilter, sb);
+        String stringBufferString = sb.toString();
+
+        assertEquals(stringBufferString, outputStreamString,
+                "addFromTraceToOutputStream should produce identical string as addFromTraceToStringBuffer");
+    }
+
+    @Test
+    void addFromTraceToOutputStream_producesIdenticalStringAsStringBuffer_withLambdaNormalisation() {
+        StackTraceElement[] frames = {
+                ste("com.example.MyClass", "doStuff"),
+                ste("com.example.MyClass$$Lambda$42/0xdeadbeef", "run"),
+                ste("com.example.MyClass", "lambda$doOtherStuff$99"),
+        };
+
+        String outputStreamString = stringFromOutputStream(frames, ACCEPT_ALL);
+        StringBuffer sb = new StringBuffer();
+        JavaStackSanitizer.addFromTraceToStringBuffer(frames, ACCEPT_ALL, sb);
+        String stringBufferString = sb.toString();
+
+        assertEquals(stringBufferString, outputStreamString,
+                "addFromTraceToOutputStream should produce identical string as addFromTraceToStringBuffer (with lambda normalisation)");
+    }
+
+    @Test
+    void addFromTraceToOutputStream_producesIdenticalStringAsStringBuffer_emptyTrace() {
+        StackTraceElement[] frames = new StackTraceElement[0];
+
+        String outputStreamString = stringFromOutputStream(frames, ACCEPT_ALL);
+        StringBuffer sb = new StringBuffer();
+        JavaStackSanitizer.addFromTraceToStringBuffer(frames, ACCEPT_ALL, sb);
+        String stringBufferString = sb.toString();
+
+        assertEquals(stringBufferString, outputStreamString,
+                "addFromTraceToOutputStream should produce identical string as addFromTraceToStringBuffer (empty trace)");
+    }
+
+    @Test
+    void addFromTraceToOutputStream_producesIdenticalStringAsStringBuffer_fallbackWhenAllFiltered() {
+        StackTraceElement[] frames = {
+                ste("jdk.internal.reflect.NativeMethodAccessorImpl", "invoke0"),
+                ste("jdk.internal.misc.Unsafe", "getInt"),
+                ste("sun.reflect.Reflection", "getCallerClass"),
+        };
+        Predicate<String> rejectAll = cls -> false;
+
+        String outputStreamString = stringFromOutputStream(frames, rejectAll);
+        StringBuffer sb = new StringBuffer();
+        JavaStackSanitizer.addFromTraceToStringBuffer(frames, rejectAll, sb);
+        String stringBufferString = sb.toString();
+
+        assertEquals(stringBufferString, outputStreamString,
+                "addFromTraceToOutputStream should produce identical string as addFromTraceToStringBuffer (fallback path)");
     }
 }

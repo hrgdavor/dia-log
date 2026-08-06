@@ -3,25 +3,12 @@ package hr.hrg.dialog.core;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
 import java.util.function.Predicate;
 
 /**
- * Sanitizes stack traces to produce deterministic, hashable frame strings.
- * Provides fingerpritn method, but also methods to write identical string into stringBuffer, into OuputStream,
- * and also into OutputStream for raw JSON string content.
- * <p>
- * Cleaning rules:
- * <ul>
- * <li>Drops {@code jdk.internal.*} and {@code sun.reflect.*} boilerplate frames</li>
- * <li>Normalizes JVM lambda identifiers ({@code $$Lambda$123/0x...} → {@code $$Lambda})</li>
- * <li>Strips line numbers for deterministic output across builds</li>
- * <li>Standardizes native method calls</li>
- * </ul>
- * The resulting frames are suitable for deduplication, grouping, and hashing
- * by both the JSON log writer and external tools (Elasticsearch, Loki, etc.).
+ * Copy of JavaStackSanitizer without filter
  */
-public class JavaStackSanitizer {
+public class JavaStackTraceWriter {
 
     public static final byte[] DOT_BYTES = {'.'};
     public static final byte[] NEWLINE_BYTES = {'\n'};
@@ -30,7 +17,6 @@ public class JavaStackSanitizer {
     public static final StringByteExtractor.ByteWriter stringWriteStrategy = StringByteExtractor.getStrategy();
     public static final String LAMBDA_SUFFIX_FOR_CLASS = "$$Lambda$";
     public static final String LAMBDA_PREFIX_FOR_METHOD = "lambda$";
-
     /**
      * Create method fingerprinting stack traces. If not app frames are found, fallback
      * by taking the top 3 frames from the raw stack trace (regardless of whether they are system/framework).
@@ -45,44 +31,45 @@ public class JavaStackSanitizer {
         byte[] exBytes = rootCause.getClass().getName().getBytes(StandardCharsets.UTF_8);
         stream.update(exBytes, 0, exBytes.length);
 
-        addFromTrace(rootCause.getStackTrace(), filter, stream);
+        addFromTrace(rootCause.getStackTrace()/*, filter*/, stream);
 
         return stream.finalHash();
     }
 
     public static void addFromTrace(
             StackTraceElement[] trace,
-            Predicate<String> filter,
+            //Predicate<String> filter,
             Wyhash64.Streaming stream) {
-        boolean isFirstFrame = true;
+        // boolean isFirstFrame = true;
 
         for (StackTraceElement el : trace) {
             String className = el.getClassName();
-            if (!filter.test(className)) continue;
+            //if (!filter.test(className)) continue;
 
-            isFirstFrame = false;
+            // isFirstFrame = false;
             stream.update(NEWLINE_BYTES, 0, 1);
+
             String methodName = el.getMethodName();
 
             addFromTraceElement(stream, className, methodName);
         }
 
         // Fallback: if all frames were skipped, hash top 3 (cleaned)
-        if (isFirstFrame) {printTracesFallback(trace, stream);}
+        /*if (isFirstFrame) {
+            int limit = Math.min(3, trace.length);
+            for (int i = 0; i < limit; i++) {
+                if (i > 0) stream.update(NEWLINE_BYTES, 0, 1);
+                StackTraceElement el = trace[i];
+                byte[] classBytes = el.getClassName().getBytes(StandardCharsets.UTF_8);
+                stream.update(classBytes, 0, classBytes.length);
+                stream.update(DOT_BYTES, 0, 1);
+                byte[] methodBytes = el.getMethodName().getBytes(StandardCharsets.UTF_8);
+                stream.update(methodBytes, 0, methodBytes.length);
+            }
+        }*/
     }
 
-    private static void printTracesFallback(StackTraceElement[] trace, Wyhash64.Streaming stream) {
-        int limit = Math.min(3, trace.length);
-        for (int i = 0; i < limit; i++) {
-            stream.update(NEWLINE_BYTES, 0, 1);
-            StackTraceElement el = trace[i];
-            stream.update(el.getClassName());
-            stream.update(DOT_BYTES, 0, 1);
-            stream.update(el.getMethodName());
-        }
-    }
-
-    public static void addFromTraceElement(Wyhash64.Streaming stream, String className, String methodName) {
+    private static void addFromTraceElement(Wyhash64.Streaming stream, String className, String methodName) {
         // -------- Class name (strip $$Lambda$ suffix) --------
         int lambdaClassIdx = className.indexOf(LAMBDA_SUFFIX_FOR_CLASS);
         int classEnd = (lambdaClassIdx != -1) ? lambdaClassIdx : className.length();
@@ -118,7 +105,7 @@ public class JavaStackSanitizer {
 
     public static void addFromTraceToStringBuffer(
             StackTraceElement[] trace,
-            Predicate<String> filter,
+            //Predicate<String> filter,
             StringBuffer sb) {
 
         // Constants used in the original hashing method (as strings)
@@ -126,19 +113,19 @@ public class JavaStackSanitizer {
         final String DOT = ".";
         final String LAMBDA_METHOD = "lambda";
 
-        boolean isFirstFrame = true;
+        // boolean isFirstFrame = true;
 
         for (StackTraceElement el : trace) {
             String className = el.getClassName();
 
             // Apply filter; skip frames that don't match
-            if (!filter.test(className)) {
-                continue;
-            }
+            //if (!filter.test(className)) {
+            //    continue;
+            //}
 
             // Delimiter before each frame (matches streaming hash behaviour)
             sb.append(NEWLINE);
-            isFirstFrame = false;
+            // isFirstFrame = false;
 
             String methodName = el.getMethodName();
 
@@ -174,51 +161,53 @@ public class JavaStackSanitizer {
         }
 
         // Fallback: if all frames were skipped, hash top 3 (cleaned)
-        if (isFirstFrame) {
+        /*if (isFirstFrame) {
             int limit = Math.min(3, trace.length);
             for (int i = 0; i < limit; i++) {
-                sb.append(NEWLINE);
+                if (i > 0) {
+                    sb.append(NEWLINE);
+                }
                 StackTraceElement el = trace[i];
                 sb.append(el.getClassName())
                         .append(DOT)
                         .append(el.getMethodName());
             }
-        }
+        }*/
     }
 
     public static void addFromTraceToOutputStream(
             StackTraceElement[] trace,
-            Predicate<String> filter,
+            //Predicate<String> filter,
             OutputStream out) throws IOException {
-        addFromTraceToOutputStreamWithNewline(trace, filter,out, NEWLINE_BYTES);
+        addFromTraceToOutputStreamWithNewline(trace/*, filter*/,out, NEWLINE_BYTES);
     }
 
     public static void addFromTraceToOutputStreamJson(
             StackTraceElement[] trace,
-            Predicate<String> filter,
+//            Predicate<String> filter,
             OutputStream out) throws IOException {
-        addFromTraceToOutputStreamWithNewline(trace, filter,out, NEWLINE_JSON_BYTES);
+        addFromTraceToOutputStreamWithNewline(trace/*, filter*/,out, NEWLINE_JSON_BYTES);
     }
 
     public static void addFromTraceToOutputStreamWithNewline(
             StackTraceElement[] trace,
-            Predicate<String> filter,
+            //Predicate<String> filter,
             OutputStream out,
             byte[] newlineBytes) throws IOException {
 
-        boolean isFirstFrame = true;
+        // boolean isFirstFrame = true;
 
         for (StackTraceElement el : trace) {
             String className = el.getClassName();
 
             // Apply filter; skip frames that don't match
-            if (!filter.test(className)) {
+            /*if (!filter.test(className)) {
                 continue;
-            }
+            }*/
 
             // Delimiter before each frame (matches streaming hash behaviour)
             out.write(newlineBytes);
-            isFirstFrame = false;
+            // isFirstFrame = false;
 
             String methodName = el.getMethodName();
 
@@ -255,15 +244,18 @@ public class JavaStackSanitizer {
         }
 
         // Fallback: if all frames were skipped, write top 3 (cleaned)
-        if (isFirstFrame) {
+        /*if (isFirstFrame) {
             int limit = Math.min(3, trace.length);
             for (int i = 0; i < limit; i++) {
-                out.write(newlineBytes);
+                if (i > 0) {
+                    out.write(newlineBytes);
+                }
                 StackTraceElement el = trace[i];
+                String full = el.getClassName() + "." + el.getMethodName();
                 stringWriteStrategy.write(out,el.getClassName());
                 out.write(DOT_BYTES);
                 stringWriteStrategy.write(out,el.getMethodName());
             }
-        }
+        }*/
     }
 }
