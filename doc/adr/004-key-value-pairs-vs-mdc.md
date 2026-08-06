@@ -14,7 +14,7 @@ The project needed a clear strategy for when to use each mechanism, as they have
 ## Options Considered
 
 1. **Use only MDC for all context:** Simple, but MDC is thread-local and requires manual cleanup; limited to `String → String`.
-2. **Use only key-value pairs for all context:** Automatic cleanup and typed values, but global identifiers (traceId, userId) would need to be repeated on every log statement.
+2. **Use only key-value pairs for all context:** Statement-scoped values and typed values, but global identifiers (traceId, userId) would need to be repeated on every log statement.
 3. **Dual-context model with clear separation:** MDC for global thread-local context, KVP for local statement-wide context.
 
 ## Decision
@@ -31,7 +31,7 @@ Adopt a dual-context model with clear separation of concerns:
 ### Key-value pairs — Local, statement-wide context
 - Used for data relevant only to the specific log event
 - Examples: `statusCode`, `durationMs`, `cartSize`, `orderId`
-- Automatically cleaned up after the log statement (see [ADR-003](003-automatic-mdc-cleanup.md))
+- Scoped to the specific log statement by SLF4J's `LoggingEventBuilder`
 - Supports `String → Object` with typed values (integers, booleans, etc.)
 - Does not leak to subsequent log statements
 
@@ -40,7 +40,7 @@ When both MDC and key-value pairs contain the same key, key-value pairs take pre
 
 ## Consequences
 
-* **Positive:** Clear mental model: MDC for "who/where", KVP for "what happened"; automatic cleanup of KVP prevents accidental context leakage; typed values in KVP enable proper JSON serialization (numbers stay numbers); priority rule prevents ambiguity when the same key exists in both contexts.
+* **Positive:** Clear mental model: MDC for "who/where", KVP for "what happened"; KVP is naturally scoped to the log statement; typed values in KVP enable proper JSON serialization (numbers stay numbers); priority rule prevents ambiguity when the same key exists in both contexts.
 * **Negative:** Developers must understand when to use MDC vs KVP; MDC requires manual cleanup (though frameworks like Spring can automate this); the priority rule may surprise developers who expect MDC to override KVP.
 
 ## References

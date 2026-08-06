@@ -65,7 +65,7 @@ try (var log = new LoggingEventBuilderWrapper(logger.atDebug())) {
 
 But the class does not implement `AutoCloseable`. The `close()` method is missing. This means the try-with-resources example in the documentation would not compile.
 
-**Fix:** Remove the `AutoCloseable` try-with-resources example from the Javadoc. The class is a lightweight wrapper — it doesn't hold resources that need closing. MDC cleanup is handled by SLF4J automatically after `log()` returns.
+**Fix:** Remove the `AutoCloseable` try-with-resources example from the Javadoc. The class is a lightweight wrapper — it doesn't hold resources that need closing.
 
 
 ---

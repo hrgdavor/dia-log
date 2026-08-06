@@ -1,6 +1,6 @@
 # Dia-Log
 
-A diagnostic logging library built on SLF4J 2.0 for Java 21. Provides structured JSON logging, contextual key-value pairs, automatic MDC cleanup, and deterministic stack trace deduplication.
+A diagnostic logging library built on SLF4J 2.0 for Java 21. Provides structured JSON logging, contextual key-value pairs, and deterministic stack trace deduplication.
 
 ## Modules
 
@@ -48,7 +48,7 @@ JSON output:
 
 ## Features
 
-- **Structured key-value logging** — `kv()` shorthand with automatic MDC cleanup
+- **Structured key-value logging** — `kv()` shorthand for statement-scoped key-value pairs
 - **JSON encoder** — `CustomJsonEncoder` for use with standard Logback appenders (`ConsoleAppender`, `RollingFileAppender`)
 - **`stackWhenTrace()`** — conditional call-stack visibility (clean message normally, throwable when TRACE enabled)
 - **Deterministic stack traces** — `JavaStackSanitizer` normalizes frames for deduplication

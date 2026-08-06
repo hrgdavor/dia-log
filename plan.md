@@ -17,11 +17,11 @@ Multi-module Maven library (`hr.hrg.dialog:dia-log-root`) targeting Java 21, bui
 ## Phase 1 — Core API Completion
 
 - [x] **DiaLogger** — Abstract generic class `DiaLogger<L extends LoggingEventBuilderWrapper>` implementing full `Logger` interface. All methods delegate through the wrapper. Supports `contextStart(L)`/`contextEnd()` lifecycle, `prependPrefix()`, `addKeyValues()`. Subclasses implement `initBuilder()` (creates wrapped builder) and `noOpWrapper()` (returns no-op for disabled levels).
-- [x] **LoggingEventBuilderWrapper** — Abstract generic class `LoggingEventBuilderWrapper<L extends LoggingEventBuilderWrapper<L>>`. Wraps SLF4J `LoggingEventBuilder`, auto-cleans MDC keys after `log()`, supports `AutoCloseable`. Features: `stackWhenTrace()`, `kv()` shorthand, `Logger` reference. All fluent methods return `self()` for correct subclass chaining.
+- [x] **LoggingEventBuilderWrapper** — Abstract generic class `LoggingEventBuilderWrapper<L extends LoggingEventBuilderWrapper<L>>`. Wraps SLF4J `LoggingEventBuilder` with delegation. Features: `stackWhenTrace()`, `kv()` shorthand, `Logger` reference. All fluent methods return `self()` for correct subclass chaining.
 - [x] **JavaStackSanitizer** — Sanitizes stack frames for deterministic output: drops `jdk.internal.*`/`sun.reflect.*`, normalizes `$$Lambda` identifiers, strips line numbers, standardizes native calls. Provides `getSanitizedFrames()` (individual frames) and `getFingerprint()` (pipe-delimited).
 - [x] **Wyhash64** — Fast 64-bit hash for stack trace deduplication. Includes `Streaming` inner class for incremental hashing.
-- [ ] **1.1 Concrete DiaLogger subclass** — e.g. `DefaultDiaLogger<L>` implementing `contextStart()`/`contextEnd()`/`initBuilder()`/`noOpWrapper()` for common use cases (MDC propagation, prefix scoping).
-- [x] **1.2 Unit tests for core** — `LoggingEventBuilderWrapperTest` (MDC cleanup, stackWhenTrace, kv shorthand, delegation, thread safety), `JavaStackSanitizerTest` (frame filtering, lambda normalization, native methods, maxFrames), `Wyhash64Test` (determinism, seed sensitivity, offset/length, ByteBuffer, streaming, edge cases), plus WyhashTestVectors, WyhashStandaloneTest, Wyhash64StreamingTest.
+- [ ] **1.1 Concrete DiaLogger subclass** — e.g. `DefaultDiaLogger<L>` implementing `initBuilder()`/`noOpWrapper()` for common use cases (prefix scoping).
+- [x] **1.2 Unit tests for core** — `LoggingEventBuilderWrapperTest` (stackWhenTrace, kv shorthand, delegation, thread safety), `JavaStackSanitizerTest` (frame filtering, lambda normalization, native methods, maxFrames), `Wyhash64Test` (determinism, seed sensitivity, offset/length, ByteBuffer, streaming, edge cases), plus WyhashTestVectors, WyhashStandaloneTest, Wyhash64StreamingTest.
 
 ## Phase 2 — Logback Integration
 

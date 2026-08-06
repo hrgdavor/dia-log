@@ -1,6 +1,6 @@
 # 003: Automatic MDC cleanup via wrapper
 
-* **Status:** Accepted
+* **Status:** Not accepted
 * **Date:** 2026-07-26
 
 ## Context
@@ -19,25 +19,25 @@ This is especially problematic in:
 
 ## Decision
 
-The `LoggingEventBuilderWrapperBase` automatically manages MDC lifecycle:
+**Not accepted.** The automatic MDC cleanup feature described below was considered but **not implemented**. MDC handling is left entirely to SLF4J — Dia-Log does not manage MDC keys.
+
+The proposed (but not implemented) design was:
 
 1. When `addKeyValue(key, value)` is called, the key is added to both the SLF4J event builder AND the thread-local MDC via `MDC.put(key, String.valueOf(value))`.
 2. The key is tracked in a `contextKeys` list.
-3. After every `log()` call, `closeContext()` is invoked, which:
-   - Calls the `clear` runnable (typically `contextEnd()` from `DiaLoggerBase`)
-   - Removes all tracked keys from MDC via `MDC.remove(key)`
-   - Clears the `contextKeys` list
-   - Sets `closed = true` to prevent double-close
+3. After every `log()` call, `closeContext()` is invoked, which removes all tracked keys from MDC via `MDC.remove(key)`.
 
-This ensures that key-value pairs added to a single log statement are automatically cleaned up after the log is emitted, preventing cross-contamination.
+## Why Not Accepted
+
+The feature was not implemented. Key-value pairs added via `addKeyValue()` in `LoggingEventBuilderWrapperBase` are delegated directly to the underlying SLF4J builder, which handles them as statement-scoped key-value pairs (not MDC entries). MDC remains a separate thread-local mechanism managed by the application code.
 
 ## Consequences
 
-* **Positive:** Eliminates a common source of logging bugs (forgotten MDC cleanup); developers can use `kv()` without worrying about manual cleanup; works seamlessly with try-with-resources for explicit scope control; the `clear` runnable allows `DiaLoggerBase` to execute `contextEnd()` after each log.
-* **Negative:** Slight performance overhead from MDC put/remove operations; if a developer manually calls `MDC.remove()` before `log()`, the wrapper's cleanup is still attempted (harmless but redundant); the `closed` flag prevents reuse of the wrapper after `log()` is called.
+* **Positive:** No performance overhead from MDC put/remove operations; MDC is managed by the application as SLF4J intended.
+* **Negative:** Developers must manage MDC lifecycle manually via `MDC.put()`/`MDC.remove()`/`MDC.clear()` when using thread-local context.
 
 ## References
 
-- [`LoggingEventBuilderWrapperBase.closeContext()`](../core/src/main/java/hr/hrg/dialog/core/LoggingEventBuilderWrapperBase.java#L209)
-- [`DiaLoggerBase._contextStart()`](../core/src/main/java/hr/hrg/dialog/core/DiaLoggerBase.java#L33)
+- [`LoggingEventBuilderWrapperBase`](../core/src/main/java/hr/hrg/dialog/core/LoggingEventBuilderWrapperBase.java) — delegates `addKeyValue()` to SLF4J without MDC interaction
+- [`DiaLoggerBase._contextStart()`](../core/src/main/java/hr/hrg/dialog/core/DiaLoggerBase.java#L29)
 - [`doc/mdc.vs.key-value.md`](../doc/mdc.vs.key-value.md)

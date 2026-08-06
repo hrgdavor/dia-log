@@ -28,15 +28,6 @@ This plan breaks down the recommended improvements into actionable, ordered step
 
 ---
 
-### 1.2 Replace `System.out` in `LoggingEventBuilderWrapperBase.closeContext()` — SKIPPED
-
-**File:** `core/src/main/java/hr/hrg/dialog/core/LoggingEventBuilderWrapperBase.java`
-
-**Status:** Skipped — left as-is for now. A code comment has been added to mark this as intentional/known.
-
-**Reason:** The `System.out` print in `closeContext()` is a known issue but was not addressed in this pass. Future work should replace it with SLF4J logging and narrow the catch to `Exception`.
-
----
 
 ### 1.3 Remove Dead Code — SKIPPED
 
@@ -356,7 +347,6 @@ Each phase should be completed, reviewed, and committed before starting the next
 | Change | Risk | Mitigation |
 |--------|------|------------|
 | `prependPrefix()` rename | Low — method rename only, behavior unchanged | Update references in docs |
-| `closeContext()` logging change | Low — internal behavior | Add test for warning log |
 | Dead code removal | Low — if references confirmed | Search entire codebase + check git history |
 | Return type fix in Noop | Low — internal | Add test verifying fluent chaining |
 | Placeholder expansion rewrite | Medium — subtle behavior changes | Comprehensive tests before/after |
