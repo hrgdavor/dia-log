@@ -33,6 +33,8 @@ public class JsonLogWriter extends ContextAwareBase {
     private boolean includeMDC = true;
     private boolean includeKeys = true;
     private boolean includeSource = false;
+    private boolean prettyPrint = false;
+    private String customFields = null;
 
     private int maxStackFrames = 255;
     private volatile boolean started = false;
@@ -50,6 +52,12 @@ public class JsonLogWriter extends ContextAwareBase {
 
     public void setIncludeSource(boolean includeSource) { this.includeSource = includeSource; }
     public boolean isIncludeSource() { return includeSource; }
+
+    public void setPrettyPrint(boolean prettyPrint) { this.prettyPrint = prettyPrint; }
+    public boolean isPrettyPrint() { return prettyPrint; }
+
+    public void setCustomFields(String customFields) { this.customFields = customFields; }
+    public String getCustomFields() { return customFields; }
 
     public void setMaxStackFrames(int maxStackFrames) { this.maxStackFrames = maxStackFrames; }
     public int getMaxStackFrames() { return maxStackFrames; }
