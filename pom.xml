@@ -23,13 +23,15 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <slf4j.version>2.0.17</slf4j.version>
-        <surefire.version>3.5.2</surefire.version>
+        <slf4j.version>2.0.18</slf4j.version>
+        <surefire.version>3.5.5</surefire.version>
         <junit-version>6.1.2</junit-version>
         <jmh.version>1.37</jmh.version>
-        <logback.version>1.5.18</logback.version>
+        <logback.version>1.5.38</logback.version>
         <jackson.version>3.2.1</jackson.version>
         <maven.compiler.release>25</maven.compiler.release>
+        <maven.compiler.plugin.version>3.14.1</maven.compiler.plugin.version>
+        <maven.jar.plugin.version>3.5.1</maven.jar.plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -70,6 +72,15 @@
     </dependencyManagement>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven.jar.plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -79,7 +90,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.1</version>
+                <version>${maven.compiler.plugin.version}</version>
                 <configuration>
                     <release>${maven.compiler.release}</release>
                 </configuration>
