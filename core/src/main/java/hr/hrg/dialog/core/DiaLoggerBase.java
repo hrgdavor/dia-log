@@ -126,84 +126,104 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	// ---- void debug() overloads ----
 
 	public void debug(Marker arg0, String arg1, Object arg2, Object arg3) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).addMarker(arg0).log(arg1, arg2, arg3);
 	}
 
 	public void debug(Marker arg0, String arg1, Object... arg2) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void debug(Marker arg0, String arg1, Object arg2) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void debug(Marker arg0, String arg1, Throwable arg2) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).addMarker(arg0).setCause(arg2).log(arg1);
 	}
 
 	public void debug(Marker arg0, String arg1) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).addMarker(arg0).log(arg1);
 	}
 
 	public void debug(String arg0, Object arg1, Object arg2) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).log(arg0, arg1, arg2);
 	}
 
 	public void debug(String arg0, Object... arg1) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).log(arg0, arg1);
 	}
 
 	public void debug(String arg0, Object arg1) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).log(arg0, arg1);
 	}
 
 	public void debug(String arg0, Throwable arg1) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).setCause(arg1).log(arg0);
 	}
 
 	public void debug(String arg0) {
+		if(!isDebugEnabled()) return;
 		_contextStart(delegate.atDebug()).log(arg0);
 	}
 
 	// ---- void error() overloads ----
 
 	public void error(Marker arg0, String arg1, Object arg2, Object arg3) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).addMarker(arg0).log(arg1, arg2, arg3);
 	}
 
 	public void error(Marker arg0, String arg1, Object... arg2) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void error(Marker arg0, String arg1, Object arg2) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void error(Marker arg0, String arg1, Throwable arg2) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).addMarker(arg0).setCause(arg2).log(arg1);
 	}
 
 	public void error(Marker arg0, String arg1) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).addMarker(arg0).log(arg1);
 	}
 
 	public void error(String arg0, Object arg1, Object arg2) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).log(arg0, arg1, arg2);
 	}
 
 	public void error(String arg0, Object... arg1) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).log(arg0, arg1);
 	}
 
 	public void error(String arg0, Object arg1) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).log(arg0, arg1);
 	}
 
 	public void error(String arg0, Throwable arg1) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).setCause(arg1).log(arg0);
 	}
 
 	public void error(String arg0) {
+		if(!isErrorEnabled()) return;
 		_contextStart(delegate.atError()).log(arg0);
 	}
 
@@ -214,42 +234,52 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	// ---- void info() overloads ----
 
 	public void info(Marker arg0, String arg1, Object arg2, Object arg3) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).addMarker(arg0).log(arg1, arg2, arg3);
 	}
 
 	public void info(Marker arg0, String arg1, Object... arg2) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void info(Marker arg0, String arg1, Object arg2) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void info(Marker arg0, String arg1, Throwable arg2) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).addMarker(arg0).setCause(arg2).log(arg1);
 	}
 
 	public void info(Marker arg0, String arg1) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).addMarker(arg0).log(arg1);
 	}
 
 	public void info(String arg0, Object arg1, Object arg2) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).log(arg0, arg1, arg2);
 	}
 
 	public void info(String arg0, Object... arg1) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).log(arg0, arg1);
 	}
 
 	public void info(String arg0, Object arg1) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).log(arg0, arg1);
 	}
 
 	public void info(String arg0, Throwable arg1) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).setCause(arg1).log(arg0);
 	}
 
 	public void info(String arg0) {
+		if(!isInfoEnabled()) return;
 		_contextStart(delegate.atInfo()).log(arg0);
 	}
 
@@ -304,84 +334,104 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	// ---- void trace() overloads ----
 
 	public void trace(Marker arg0, String arg1, Object arg2, Object arg3) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).addMarker(arg0).log(arg1, arg2, arg3);
 	}
 
 	public void trace(Marker arg0, String arg1, Object... arg2) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void trace(Marker arg0, String arg1, Object arg2) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void trace(Marker arg0, String arg1, Throwable arg2) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).addMarker(arg0).setCause(arg2).log(arg1);
 	}
 
 	public void trace(Marker arg0, String arg1) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).addMarker(arg0).log(arg1);
 	}
 
 	public void trace(String arg0, Object arg1, Object arg2) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).log(arg0, arg1, arg2);
 	}
 
 	public void trace(String arg0, Object... arg1) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).log(arg0, arg1);
 	}
 
 	public void trace(String arg0, Object arg1) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).log(arg0, arg1);
 	}
 
 	public void trace(String arg0, Throwable arg1) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).setCause(arg1).log(arg0);
 	}
 
 	public void trace(String arg0) {
+		if(!isTraceEnabled()) return;
 		_contextStart(delegate.atTrace()).log(arg0);
 	}
 
 	// ---- void warn() overloads ----
 
 	public void warn(Marker arg0, String arg1, Object arg2, Object arg3) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).addMarker(arg0).log(arg1, arg2, arg3);
 	}
 
 	public void warn(Marker arg0, String arg1, Object... arg2) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void warn(Marker arg0, String arg1, Object arg2) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).addMarker(arg0).log(arg1, arg2);
 	}
 
 	public void warn(Marker arg0, String arg1, Throwable arg2) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).addMarker(arg0).setCause(arg2).log(arg1);
 	}
 
 	public void warn(Marker arg0, String arg1) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).addMarker(arg0).log(arg1);
 	}
 
 	public void warn(String arg0, Object arg1, Object arg2) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).log(arg0, arg1, arg2);
 	}
 
 	public void warn(String arg0, Object... arg1) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).log(arg0, arg1);
 	}
 
 	public void warn(String arg0, Object arg1) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).log(arg0, arg1);
 	}
 
 	public void warn(String arg0, Throwable arg1) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).setCause(arg1).log(arg0);
 	}
 
 	public void warn(String arg0) {
+		if(!isWarnEnabled()) return;
 		_contextStart(delegate.atWarn()).log(arg0);
 	}
 }
