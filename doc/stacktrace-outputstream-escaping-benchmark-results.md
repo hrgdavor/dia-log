@@ -1,58 +1,41 @@
-# StacktraceOutputStreamEscapingBenchmark Results
+# Stacktrace OutputStream Escaping Benchmark Results (Latest State)
 
-This document summarizes benchmark results for [logback/src/test/java/hr/hrg/dialog/logback/StacktraceOutputStreamEscapingBenchmark.java](logback/src/test/java/hr/hrg/dialog/logback/StacktraceOutputStreamEscapingBenchmark.java).
+This document reports only the latest benchmark state for:
 
-The goal is to compare stacktrace JSON-string emission into an OutputStream using:
+- [logback/src/test/java/hr/hrg/dialog/logback/StacktraceOutputStreamEscapingBenchmark.java](logback/src/test/java/hr/hrg/dialog/logback/StacktraceOutputStreamEscapingBenchmark.java)
 
-- optimized writer path with JSON-escaped newlines
-- printStackTrace string capture followed by optimized JSON string escaping
+Historical timeline is tracked in:
 
-## Compared methods
+- [doc/benchmark-optimization-history.md](doc/benchmark-optimization-history.md)
 
-- optimizedOutputStreamEscapedNewlines
-  - Uses [core/src/main/java/hr/hrg/dialog/core/JavaStackTraceWriter.java](core/src/main/java/hr/hrg/dialog/core/JavaStackTraceWriter.java) `addFromTraceToOutputStreamJson(...)`.
-  - Writes directly into an in-memory OutputStream with escaped newline bytes.
-- printStackTraceThenEscapedJsonStringWriter
-  - Uses `Throwable.printStackTrace(PrintWriter(StringWriter))` to build stacktrace text.
-  - Then uses [core/src/main/java/hr/hrg/dialog/core/EscapedJsonStringWriter.java](core/src/main/java/hr/hrg/dialog/core/EscapedJsonStringWriter.java) `writeJsonStringOrNull(...)` to emit JSON-safe text.
+## Latest run
 
-## Run details
-
-- JDK: `25.0.3`
-- JMH: `1.37`
+- JDK: 25.0.3
+- JMH: 1.37
 - Modes: throughput and average-time
-- Warmup: `3 x 1s`
-- Measurement: `5 x 1s`
-- Forks: `1`
-- GC profiler: `-prof gc`
+- Warmup: 3 x 1s
+- Measurement: 5 x 1s
+- Forks: 1
+- Profiler: -prof gc
 
 Artifacts:
 
-- Raw output: [bench-stacktrace-outputstream-escaping-output.txt](bench-stacktrace-outputstream-escaping-output.txt)
-- JSON report: [bench-stacktrace-outputstream-escaping.json](bench-stacktrace-outputstream-escaping.json)
+- [bench-stacktrace-outputstream-escaping-latest-output.txt](bench-stacktrace-outputstream-escaping-latest-output.txt)
+- [bench-stacktrace-outputstream-escaping-latest.json](bench-stacktrace-outputstream-escaping-latest.json)
 
-## Measured results
+## Latest results
 
-| Benchmark method                             | Avg time      | Throughput     | Alloc norm        | GC count | GC time |
-| -------------------------------------------- | ------------- | -------------- | ----------------- | -------- | ------- |
-| `optimizedOutputStreamEscapedNewlines`       | `0.441 us/op` | `1.068 ops/us` | `88.003 B/op`     | `1`      | `2 ms`  |
-| `printStackTraceThenEscapedJsonStringWriter` | `6.941 us/op` | `0.161 ops/us` | `18832.048 B/op`  | `21`     | `24 ms` |
+| Benchmark method                           | Avg time    | Throughput   | Alloc norm     |
+| ------------------------------------------ | ----------- | ------------ | -------------- |
+| optimizedOutputStreamEscapedNewlines       | 0.372 us/op | 2.528 ops/us | 88.003 B/op    |
+| printStackTraceThenEscapedJsonStringWriter | 3.893 us/op | 0.240 ops/us | 18832.027 B/op |
 
-## Interpretation
+## Current interpretation
 
-1. The optimized OutputStream path is substantially faster.
-- Average-time: about `15.7x` faster (`6.941 / 0.441`).
-- Throughput: about `6.6x` higher (`1.068 / 0.161`).
+1. Direct OutputStream path remains clearly faster.
+2. Direct OutputStream path remains dramatically lower-allocation.
+3. printStackTrace string capture plus escaping remains unsuitable for low-GC hot paths.
 
-2. The printStackTrace + escaped-string path allocates dramatically more memory.
-- `18832 B/op` vs `88 B/op`.
-- About `214x` higher allocation per operation.
+## Current recommendation
 
-3. GC pressure is much higher in the printStackTrace path.
-- GC count and total GC time are both significantly elevated in the measurement window.
-
-4. For JSON logging workloads, direct stacktrace emission with escaped newlines is the clear winner for both latency and allocation behavior.
-
-## Practical takeaway
-
-If the goal is to emit stacktrace content into JSON output streams with minimal CPU and GC overhead, prefer the optimized direct writer path (`addFromTraceToOutputStreamJson`) over the printStackTrace-to-string pipeline.
+For JSON stack output in performance-sensitive paths, keep using direct escaped-newline emission rather than printStackTrace string pipelines.
