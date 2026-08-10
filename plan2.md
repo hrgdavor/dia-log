@@ -3,8 +3,6 @@
 ### CRITICAL (5 issues)
 1. **JSON schema completely mismatched** — `err.hash` is never emitted, `err.stack` is an empty string instead of an array, `msgTpl` contains formatted message not template, `ctx` nested object doesn't exist, `kv` nested object doesn't exist
 2. **ADR-003 describes non-existent feature** — RESOLVED: ADR-003 has been marked **Not accepted**. All documentation referencing automatic MDC cleanup via `closeContext()` and `MDC.put/remove` has been removed/updated. MDC handling is left entirely to SLF4J.
-3. **`LoggingEventBuilderWrapperBase` Javadoc shows non-compiling try-with-resources** — Class doesn't implement `AutoCloseable`
-4. **`ZeroCopyDirectAppender.setOutputStream()` has a bug** — Uses `targetOutputStream` before assigning it
 5. **`JsonLogWriter` never writes `err.hash`** — The entire deduplication strategy depends on this field
 
 ### HIGH (4 issues)

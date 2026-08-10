@@ -1,4 +1,4 @@
-# span id
+# traceId and spanId
 
 In distributed tracing with OpenTelemetry and the W3C Trace Context standard, **TraceId** and **SpanId** are the fundamental identifiers used to track a request as it moves through your Java applications and microservices.
 

@@ -93,14 +93,14 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 		return fill(atInfo(),filler);
 	}
 
-	public L atLevel(Level level) {
+	public L at(Level level) {
 		if(!isEnabledForLevel(level)) return noOpWrapper();
 		return _contextStart(delegate.atLevel(level));
 	}
 
-	public L atLevel(Level level,LogFiller filler) {
+	public L at(Level level,LogFiller filler) {
 		if(!isEnabledForLevel(level)) return noOpWrapper();
-		return fill(atLevel(level),filler);
+		return fill(at(level),filler);
 	}
 
 	public L atTrace() {

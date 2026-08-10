@@ -69,6 +69,38 @@ Practical guides for common logging patterns:
 mvn clean install
 ```
 
+# Using optimized JSON appenders
+
+To have access to underlying OuputStream and circumvent jackson for optimized stack trace writing, Appenders had to be made,
+because encoders generate byte arrays, and that is not in-line with goal of lowering number of allocations.
+
+```xml
+<configuration>
+
+    <!-- Console Appender -->
+    <appender name="CONSOLE" class="hr.hrg.dialog.logback.DirectJsonAppender$Console">
+        <target>System.out</target>
+    </appender>
+
+    <!-- Rolling File Appender -->
+    <appender name="ROLLING" class="hr.hrg.dialog.logback.DirectJsonAppender$Rolling">
+        <file>logs/app.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/app-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>14</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ROLLING" />
+    </root>
+</configuration>
+```
+
 ## Requirements
 
 - Java 21+

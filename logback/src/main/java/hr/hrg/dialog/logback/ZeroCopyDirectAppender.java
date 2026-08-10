@@ -2,13 +2,14 @@ package hr.hrg.dialog.logback;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
+import ch.qos.logback.core.OutputStreamAppender;
 import tools.jackson.core.ObjectWriteContext;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.JsonGenerator;
 
 import java.io.OutputStream;
 
-public class ZeroCopyDirectAppender extends AppenderBase<ILoggingEvent> {
+public class ZeroCopyDirectAppender extends OutputStreamAppender<ILoggingEvent> {
 
     private final JsonFactory jsonFactory = new JsonFactory();
     private OutputStream targetOutputStream; // e.g. System.out or FileOutputStream
@@ -17,12 +18,12 @@ public class ZeroCopyDirectAppender extends AppenderBase<ILoggingEvent> {
 
     public void setOutputStream(OutputStream os) {
         if(g != null) g.close();
-        this.g = jsonFactory.createGenerator(writeCtxt,targetOutputStream);
         this.targetOutputStream = os;
+        this.g = jsonFactory.createGenerator(writeCtxt,os);
     }
 
     @Override
-    protected void append(ILoggingEvent event) {
+    protected void subAppend(ILoggingEvent event) {
         if (!isStarted() || targetOutputStream == null) return;
         try {
             g.writeStartObject();

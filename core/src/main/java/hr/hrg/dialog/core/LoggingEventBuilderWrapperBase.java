@@ -16,14 +16,7 @@ import java.util.function.Supplier;
  * Key-value pairs added via {@link #addKeyValue(String, Object)} are delegated
  * directly to the underlying SLF4J builder, which handles MDC propagation
  * as configured by the logging implementation (e.g. logback).
- * <p>
- * The wrapper also implements {@link AutoCloseable} so it can be used with
- * try-with-resources for explicit scope control:
- * <pre>{@code
- * try (var log = new LoggingEventBuilderWrapper(logger.atDebug())) {
- *     log.addKeyValue("userId", id).log("Processing user");
- * }
- * }</pre>
+ * 
  * <p>
  * Additionally, {@link #stackWhenTraceEnabled()} optionally attaches the caller's
  * stack trace as a throwable when TRACE is enabled. This produces a single
