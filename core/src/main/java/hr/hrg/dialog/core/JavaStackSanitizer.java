@@ -7,19 +7,29 @@ import java.util.HexFormat;
 import java.util.function.Predicate;
 
 /**
- * Sanitizes stack traces to produce deterministic, hashable frame strings.
- * Provides fingerpritn method, but also methods to write identical string into stringBuffer, into OuputStream,
- * and also into OutputStream for raw JSON string content.
+ * Canonical stack trace sanitization implementation.
  * <p>
- * Cleaning rules:
+ * This class is the source of truth for deterministic frame normalization used
+ * for error grouping and hash generation. Other classes in this project are
+ * derivatives that reuse or mirror this behavior for different input types and
+ * API shapes.
+ * In architecture docs this canonical role is also referred to as JavaStackTraceSanitizer.
+ * <p>
+ * Exposed operations include:
  * <ul>
- * <li>Drops {@code jdk.internal.*} and {@code sun.reflect.*} boilerplate frames</li>
- * <li>Normalizes JVM lambda identifiers ({@code $$Lambda$123/0x...} → {@code $$Lambda})</li>
- * <li>Strips line numbers for deterministic output across builds</li>
- * <li>Standardizes native method calls</li>
+ * <li>Full fingerprint creation from a {@link Throwable}</li>
+ * <li>Streaming frame emission into {@link Wyhash64.Streaming}</li>
+ * <li>Equivalent textual emission to {@link StringBuffer}</li>
+ * <li>Equivalent textual emission to {@link OutputStream}</li>
  * </ul>
- * The resulting frames are suitable for deduplication, grouping, and hashing
- * by both the JSON log writer and external tools (Elasticsearch, Loki, etc.).
+ * <p>
+ * Normalization rules:
+ * <ul>
+ * <li>Caller-provided filter decides which classes are included</li>
+ * <li>Class names are truncated at {@link #LAMBDA_SUFFIX_FOR_CLASS}</li>
+ * <li>Lambda method names are normalized to either {@code lambda} or extracted original method names</li>
+ * <li>Line numbers are ignored by using only class and method names</li>
+ * </ul>
  */
 public class JavaStackSanitizer {
 
@@ -32,11 +42,14 @@ public class JavaStackSanitizer {
     public static final String LAMBDA_PREFIX_FOR_METHOD = "lambda$";
 
     /**
-     * Create method fingerprinting stack traces. If not app frames are found, fallback
-     * by taking the top 3 frames from the raw stack trace (regardless of whether they are system/framework).
+     * Builds a deterministic fingerprint for a throwable.
+     * <p>
+     * The hash input begins with the exception class name and then appends the
+     * sanitized frame sequence produced by {@link #addFromTrace(StackTraceElement[], Predicate, Wyhash64.Streaming)}.
      *
-     * @param rootCause
-     * @return
+     * @param rootCause throwable whose stack trace is fingerprinted
+     * @param filter frame class filter used to include application-relevant frames
+     * @return deterministic 64-bit hash
      */
     public static long fingerprint(Throwable rootCause, Predicate<String> filter) {
         Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
@@ -50,6 +63,16 @@ public class JavaStackSanitizer {
         return stream.finalHash();
     }
 
+    /**
+     * Writes sanitized frame content into a streaming hash sink.
+     * <p>
+     * If all frames are filtered out, falls back to top 3 raw class/method pairs
+     * so hashing remains stable and non-empty.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter
+     * @param stream target hash stream
+     */
     public static void addFromTrace(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -82,6 +105,15 @@ public class JavaStackSanitizer {
         }
     }
 
+    /**
+     * Writes one normalized frame representation into the hash stream.
+     * <p>
+     * Resulting shape is className.methodName with lambda normalization applied.
+     *
+     * @param stream target hash stream
+     * @param className input class name
+     * @param methodName input method name
+     */
     public static void addFromTraceElement(Wyhash64.Streaming stream, String className, String methodName) {
         // -------- Class name (strip $$Lambda$ suffix) --------
         int lambdaClassIdx = className.indexOf(LAMBDA_SUFFIX_FOR_CLASS);
@@ -116,6 +148,14 @@ public class JavaStackSanitizer {
         }
     }
 
+    /**
+     * Writes the same sanitized frame sequence as {@link #addFromTrace(StackTraceElement[], Predicate, Wyhash64.Streaming)}
+     * but into a string buffer.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter
+     * @param sb target buffer
+     */
     public static void addFromTraceToStringBuffer(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -186,6 +226,14 @@ public class JavaStackSanitizer {
         }
     }
 
+    /**
+     * Writes sanitized frames to an output stream with raw newline separators.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter
+     * @param out target stream
+     * @throws IOException if writing fails
+     */
     public static void addFromTraceToOutputStream(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -193,6 +241,14 @@ public class JavaStackSanitizer {
         addFromTraceToOutputStreamWithNewline(trace, filter,out, NEWLINE_BYTES);
     }
 
+    /**
+     * Writes sanitized frames to an output stream using JSON-escaped newline separators.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter
+     * @param out target stream
+     * @throws IOException if writing fails
+     */
     public static void addFromTraceToOutputStreamJson(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -200,6 +256,17 @@ public class JavaStackSanitizer {
         addFromTraceToOutputStreamWithNewline(trace, filter,out, NEWLINE_JSON_BYTES);
     }
 
+    /**
+     * Writes sanitized frames to an output stream using caller-provided newline bytes.
+     * <p>
+     * If all frames are filtered out, writes top 3 raw class/method pairs.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter
+     * @param out target stream
+     * @param newlineBytes delimiter bytes placed before each frame
+     * @throws IOException if writing fails
+     */
     public static void addFromTraceToOutputStreamWithNewline(
             StackTraceElement[] trace,
             Predicate<String> filter,

@@ -63,6 +63,10 @@ Practical guides for common logging patterns:
 - [**Stack When Trace**](cookbook/stackWhenTrace.md) — Conditional call-stack visibility using `stackWhenTrace()`, output examples in JSON and plain text
 - [**Missing Keys Warning**](cookbook/missing-keys-warn.md) — Detect missing log keys at runtime with `warnOnMissingKeys`
 
+## Additional Documentation
+
+- [Stack Trace Sanitizer and Derivatives](doc/java-stack-trace-sanitizer-and-derivatives.md) — Canonical sanitizer behavior and detailed mapping of `JavaStackTraceWriter` (JavaStackWriter), `JavaStackSanitizerLogback`, and `JavaStackWriterLogback`.
+
 ## Build
 
 ```bash

@@ -32,8 +32,7 @@ public class JsonAppender extends OutputStreamAppender<ILoggingEvent> {
 
     @Override
     protected void writeOut(ILoggingEvent event) throws IOException {
-        // Overrides default encoder.encode(event) behavior completely!
-        //DirectJsonAppender.writeJsonEvent(generator, activeStream, event);
+        jsonLogWriter.writeJsonEvent(generator, event, activeStream);
     }
 
     @Override

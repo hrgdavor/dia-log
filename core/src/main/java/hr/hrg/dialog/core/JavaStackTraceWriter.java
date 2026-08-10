@@ -6,7 +6,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.function.Predicate;
 
 /**
- * Copy of JavaStackSanitizer without filter
+ * No-filter derivative of {@link JavaStackSanitizer} for {@link StackTraceElement[]} input.
+ * <p>
+ * This class keeps the same normalization rules as {@link JavaStackSanitizer} but removes
+ * filtering and fallback logic from the public API, making it suitable for direct full-trace
+ * serialization and hashing.
+ * <p>
+ * Conceptually this class can be referred to as JavaStackWriter and acts as the
+ * semantic no-filter base for logback-side writer derivatives.
  */
 public class JavaStackTraceWriter {
 
@@ -18,11 +25,14 @@ public class JavaStackTraceWriter {
     public static final String LAMBDA_SUFFIX_FOR_CLASS = "$$Lambda$";
     public static final String LAMBDA_PREFIX_FOR_METHOD = "lambda$";
     /**
-     * Create method fingerprinting stack traces. If not app frames are found, fallback
-     * by taking the top 3 frames from the raw stack trace (regardless of whether they are system/framework).
+     * Builds a deterministic fingerprint for a throwable using all stack frames.
+     * <p>
+     * Parameter {@code filter} is accepted for API compatibility with sanitizer-derived code paths
+     * and is intentionally ignored.
      *
-     * @param rootCause
-     * @return
+     * @param rootCause throwable whose stack trace is fingerprinted
+     * @param filter ignored
+     * @return deterministic 64-bit hash
      */
     public static long fingerprint(Throwable rootCause, Predicate<String> filter) {
         Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
@@ -36,6 +46,12 @@ public class JavaStackTraceWriter {
         return stream.finalHash();
     }
 
+    /**
+     * Writes normalized frame content for all frames into a streaming hash sink.
+     *
+     * @param trace stack trace elements to process
+     * @param stream target hash stream
+     */
     public static void addFromTrace(
             StackTraceElement[] trace,
             //Predicate<String> filter,
@@ -103,6 +119,12 @@ public class JavaStackTraceWriter {
         }
     }
 
+    /**
+     * Writes normalized frame content for all frames to a string buffer.
+     *
+     * @param trace stack trace elements to process
+     * @param sb target buffer
+     */
     public static void addFromTraceToStringBuffer(
             StackTraceElement[] trace,
             //Predicate<String> filter,
@@ -175,6 +197,13 @@ public class JavaStackTraceWriter {
         }*/
     }
 
+    /**
+     * Writes normalized frame content for all frames to an output stream with raw newline separators.
+     *
+     * @param trace stack trace elements to process
+     * @param out target stream
+     * @throws IOException if writing fails
+     */
     public static void addFromTraceToOutputStream(
             StackTraceElement[] trace,
             //Predicate<String> filter,
@@ -182,6 +211,13 @@ public class JavaStackTraceWriter {
         addFromTraceToOutputStreamWithNewline(trace/*, filter*/,out, NEWLINE_BYTES);
     }
 
+    /**
+     * Writes normalized frame content for all frames to an output stream with JSON-escaped newline separators.
+     *
+     * @param trace stack trace elements to process
+     * @param out target stream
+     * @throws IOException if writing fails
+     */
     public static void addFromTraceToOutputStreamJson(
             StackTraceElement[] trace,
 //            Predicate<String> filter,
@@ -189,6 +225,14 @@ public class JavaStackTraceWriter {
         addFromTraceToOutputStreamWithNewline(trace/*, filter*/,out, NEWLINE_JSON_BYTES);
     }
 
+    /**
+     * Writes normalized frame content for all frames using caller-provided newline bytes.
+     *
+     * @param trace stack trace elements to process
+     * @param out target stream
+     * @param newlineBytes delimiter bytes placed before each frame
+     * @throws IOException if writing fails
+     */
     public static void addFromTraceToOutputStreamWithNewline(
             StackTraceElement[] trace,
             //Predicate<String> filter,

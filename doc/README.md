@@ -22,6 +22,8 @@ Full stack trace is written to log, but fingerprint hash uses sanitized frames. 
 
 [Full document](stack.trace.sanitizer.md)
 
+[Derivatives and API mapping](java-stack-trace-sanitizer-and-derivatives.md)
+
 ---
 
 ## traceid, spanid, traceparent

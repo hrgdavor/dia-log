@@ -1,7 +1,9 @@
 package hr.hrg.dialog.logback;
 
 import ch.qos.logback.classic.spi.IThrowableProxy;
+import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import ch.qos.logback.classic.spi.ThrowableProxy;
+import hr.hrg.dialog.core.JavaStackTraceWriter;
 import org.openjdk.jmh.annotations.*;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.JsonGenerator;
@@ -93,7 +95,19 @@ public class StackTraceBenchmark {
 
         try (JsonGenerator g = jsonFactory.createGenerator(outputStream)) {
             g.writeStartObject();
-            DirectByteStackTraceWriter.writeStackTraceAsString(g, "stackTrace", throwableProxy);
+            g.writeName("stackTrace");
+            g.flush();
+            outputStream.write('"');
+            g.writeString(throwableProxy.getClassName());
+
+            StackTraceElementProxy[] arrProxy = throwableProxy.getStackTraceElementProxyArray();
+            StackTraceElement[] arr = new StackTraceElement[arrProxy.length];
+            for (int i = 0; i < arr.length; i++) {
+                arr[i] = arrProxy[i].getStackTraceElement();
+            }
+            JavaStackTraceWriter.addFromTraceToOutputStreamJson(arr, outputStream);
+
+            outputStream.write('"');
             g.writeEndObject();
             g.flush();
         }
