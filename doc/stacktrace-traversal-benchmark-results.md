@@ -31,13 +31,13 @@ The output was saved to `bench-stackwalker-output.txt`.
 
 This benchmark run was corrected so that `Wyhash64.Streaming` is created once per stack trace and then updated with each frame.
 
-| Benchmark | Avg time | Throughput | Alloc norm | GC count | GC time |
-|---|---|---|---|---|---|
-| `benchmarkThrowableStackTraceArray` | `3.076 us/op` | `0.327 ops/us` | `1496.022 B/op` | `4` | `5 ms` |
-| `benchmarkStackWalkerEAFriendly` | `4.091 us/op` | `0.290 ops/us` | `2640.030 B/op` | `5` | `8 ms` |
-| `benchmarkStackWalkerNonEAFriendly` | `3.456 us/op` | `0.284 ops/us` | `2576.025 B/op` | `6` | `9 ms` |
-| `benchmarkThrowableStackTraceArrayWyhashFallback` | `3.801 us/op` | `0.257 ops/us` | `3032.027 B/op` | `7` | `10 ms` |
-| `benchmarkThrowableStackTraceArrayWyhashZeroAlloc` | `4.059 us/op` | `0.248 ops/us` | `1632.028 B/op` | `3` | `4 ms` |
+| Benchmark                                          | Avg time      | Throughput     | Alloc norm      | GC count | GC time |
+| -------------------------------------------------- | ------------- | -------------- | --------------- | -------- | ------- |
+| `benchmarkThrowableStackTraceArray`                | `3.076 us/op` | `0.327 ops/us` | `1496.022 B/op` | `4`      | `5 ms`  |
+| `benchmarkStackWalkerEAFriendly`                   | `4.091 us/op` | `0.290 ops/us` | `2640.030 B/op` | `5`      | `8 ms`  |
+| `benchmarkStackWalkerNonEAFriendly`                | `3.456 us/op` | `0.284 ops/us` | `2576.025 B/op` | `6`      | `9 ms`  |
+| `benchmarkThrowableStackTraceArrayWyhashFallback`  | `3.801 us/op` | `0.257 ops/us` | `3032.027 B/op` | `7`      | `10 ms` |
+| `benchmarkThrowableStackTraceArrayWyhashZeroAlloc` | `4.059 us/op` | `0.248 ops/us` | `1632.028 B/op` | `3`      | `4 ms`  |
 
 > Notes: the average-time mode results are the most natural comparison here. Throughput and GC norms are consistent with the same ranking.
 
@@ -54,6 +54,7 @@ Why? Because `String.hashCode()` on stack frame names is cheap and often reuses 
 
 - `benchmarkStackWalkerEAFriendly` is marginally faster than `benchmarkStackWalkerNonEAFriendly`.
 - Both allocate about `2.6 KB/op`, which is higher than the direct stack trace path because of `StackWalker` frame objects and stream infrastructure.
+- `StackWalker.walk()` is already building a stream abstraction, and the JMH measurement includes the cost of the Java stream pipeline and lambda invocation overhead.
 - The difference between the two `StackWalker` variants is within noise, so the pipeline-vs-forEach choice is not a strong performance factor here.
 
 This means `StackWalker` is not yet winning on raw speed or allocation for this simple frame-hashing use case.
@@ -100,9 +101,3 @@ The term “zero alloc” in `benchmarkThrowableStackTraceArrayWyhashZeroAlloc()
 - If you need content-based or byte-oriented hashing for deduplication, WyHash is still useful, but expect a performance cost.
 - The fallback path (`getBytes(StandardCharsets.UTF_8)`) is the most expensive WyHash variant and should be avoided unless byte-array input is required.
 - The StackWalker API is more ergonomic and can be used safely, but it does not outperform direct array traversal in this microbenchmark.
-
-## Recommended next steps
-
-- If the goal is direct stack trace deduplication of existing stack frame names, continue with the `String.hashCode()` path or measure a `String`-to-byte cache before switching to WyHash.
-- If you want a fairer WyHash comparison, consider a benchmark that reuses a single `Wyhash64.Streaming` object across frames or avoids per-frame allocations.
-- Add a run that measures `benchmarkThrowableStackTraceArray()` together with the StackWalker and WyHash variants in exactly the same `avg` mode to confirm rankings across repeated runs.
