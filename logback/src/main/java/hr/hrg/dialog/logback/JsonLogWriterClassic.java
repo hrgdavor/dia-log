@@ -30,7 +30,7 @@ import ch.qos.logback.classic.spi.IThrowableProxy;
 /// - delegates custom key/value and MDC to jackson
 /// - writes stack trace into JSON with optimized low allocation code
 ///
-public class JsonLogWriter {
+public class JsonLogWriterClassic {
 
     /** Newline bytes (UTF-8) - strictly Unix LF (\n). */
     public static final byte[] NL = new byte[]{ 0x0A };
@@ -44,7 +44,7 @@ public class JsonLogWriter {
     private volatile boolean started = false;
     private final ObjectWriteContext writeCtxt = ObjectWriteContext.empty();
 
-    public JsonLogWriter() {}
+    public JsonLogWriterClassic() {}
 
     public void writeJsonEvent(JsonGenerator gen, ILoggingEvent event, OutputStream out) throws IOException {
         try {
@@ -111,7 +111,6 @@ public class JsonLogWriter {
                 gen.flush();// flush whatever is in buffer so we can safely dump stack trace into OutputStream
                 out.write('"');
                 STRING_STRATEGY.write(out, tp.getClassName());
-                // TODO without array conversion
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
                 StackTraceElement[] arr = new StackTraceElement[arrProxy.length];
                 for(int i=0;i<arr.length;i++){
