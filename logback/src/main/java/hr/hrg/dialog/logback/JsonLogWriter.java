@@ -11,7 +11,6 @@ import java.util.Set;
 
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import hr.hrg.dialog.core.EscapedJsonStringWriter;
-import hr.hrg.dialog.core.JavaStackTraceWriter;
 import hr.hrg.dialog.core.JsonNumberWriter;
 import hr.hrg.dialog.core.RawJsonSelfWriter;
 import hr.hrg.dialog.core.StringByteExtractor;
@@ -120,22 +119,24 @@ public class JsonLogWriter {
                 writeFieldPrefix(out, KEY_ERR_MESSAGE);
                 writeJsonStringOrNull(out, throwableMessage);
 
-                writeFieldPrefix(out, KEY_ERR_HASH);
-                JsonNumberWriter.writeLong(out, longNumberBuffer, JavaStackSanitizerLogback.fingerprint(tp, te->true));
-
                 writeFieldPrefix(out, KEY_STACK);
                 out.write('"');
                 if (throwableClassName != null) {
                     STRING_STRATEGY.write(out, throwableClassName);
                 }
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
-                StackTraceElement[] arr = new StackTraceElement[arrProxy.length];
-                for(int i=0;i<arr.length;i++){
-                    arr[i] = arrProxy[i].getStackTraceElement();
-                }
-                JavaStackTraceWriter.addFromTraceToOutputStreamJson(arr, out);
+                long fingerPrint = JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                    arrProxy,
+                    te -> true,
+                    out,
+                    throwableClassName
+                );
 
                 out.write('"');
+
+                writeFieldPrefix(out, KEY_ERR_HASH);
+                JsonNumberWriter.writeLong(out, longNumberBuffer, fingerPrint);
+
             }
 
             out.write('}');

@@ -793,6 +793,15 @@ public final class Wyhash64 {
         private int bufLen;
 
         public Streaming(long seed) {
+            reset(seed);
+        }
+
+        /**
+         * Resets this streaming hasher instance for reuse.
+         *
+         * @param seed new seed value
+         */
+        public void reset(long seed) {
             long s = initSeed(seed);
             this.state[0] = s;
             this.state[1] = s;
@@ -805,6 +814,22 @@ public final class Wyhash64 {
 
         public void update(byte[] input) {
             update(input, 0, input.length);
+        }
+
+        /**
+         * Feed a single byte into the streaming hash.
+         * <p>
+         * This is optimized for high-frequency delimiters in call sites that
+         * would otherwise route through update(byte[], off, len) with len=1.
+         * </p>
+         */
+        public void updateByte(byte b) {
+            this.totalLen += 1;
+            if (bufLen == 48) {
+                round(buf, 0);
+                bufLen = 0;
+            }
+            buf[bufLen++] = b;
         }
 
         public void update(byte[] input, int off, int len) {

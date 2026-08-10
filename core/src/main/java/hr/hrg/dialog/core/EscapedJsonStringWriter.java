@@ -109,7 +109,7 @@ public final class EscapedJsonStringWriter {
                 if (escape != null) {
                     out.write(escape);
                 } else {
-                    // Control chars not covered above use \u00XX form.
+                    // Control chars not covered above use \\u00XX form.
                     out.write('\\');
                     out.write('u');
                     out.write('0');

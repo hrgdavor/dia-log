@@ -106,4 +106,29 @@ class JavaStackSanitizerLogbackTest {
 
         assertEquals(core.toString(StandardCharsets.UTF_8), logback.toString(StandardCharsets.UTF_8));
     }
+
+    @Test
+    void singlePassJsonWriteAndFingerprint_matchesTwoPass() throws IOException {
+        Throwable throwable = sampleThrowable();
+        IThrowableProxy proxy = new ThrowableProxy(throwable);
+
+        ByteArrayOutputStream twoPassOut = new ByteArrayOutputStream();
+        JavaStackSanitizerLogback.addFromTraceToOutputStreamJson(
+                proxy.getStackTraceElementProxyArray(),
+                ACCEPT_ALL,
+                twoPassOut
+        );
+        long twoPassHash = JavaStackSanitizerLogback.fingerprint(proxy, ACCEPT_ALL);
+
+        ByteArrayOutputStream singlePassOut = new ByteArrayOutputStream();
+        long singlePassHash = JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                proxy.getStackTraceElementProxyArray(),
+                ACCEPT_ALL,
+                singlePassOut,
+                proxy.getClassName()
+        );
+
+        assertEquals(twoPassOut.toString(StandardCharsets.UTF_8), singlePassOut.toString(StandardCharsets.UTF_8));
+        assertEquals(twoPassHash, singlePassHash);
+    }
 }

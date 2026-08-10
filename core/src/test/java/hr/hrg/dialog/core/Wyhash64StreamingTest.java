@@ -10,6 +10,67 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class Wyhash64StreamingTest {
 
     @Test
+    public void testSingleByteUpdateMatchesBulkHash() {
+        long seed = 0x9E3779B97F4A7C15L;
+        byte[] data = "single-byte-fast-path-validation-payload".getBytes(StandardCharsets.UTF_8);
+
+        long expected = Wyhash64.hash(seed, data);
+
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(seed);
+        for (byte b : data) {
+            stream.updateByte(b);
+        }
+
+        assertEquals(expected, stream.finalHash(), "updateByte path must match bulk hash");
+    }
+
+    @Test
+    public void testSingleByteMixedWithChunkedUpdateMatchesBulkHash() {
+        long seed = 0x1234ABCD5678EF90L;
+        byte[] data = new byte[256];
+        for (int i = 0; i < data.length; i++) {
+            data[i] = (byte) i;
+        }
+
+        long expected = Wyhash64.hash(seed, data);
+
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(seed);
+        for (int i = 0; i < 73; i++) {
+            stream.updateByte(data[i]);
+        }
+        stream.update(data, 73, 101);
+        for (int i = 174; i < data.length; i++) {
+            stream.updateByte(data[i]);
+        }
+
+        assertEquals(expected, stream.finalHash(), "Mixed updateByte + chunked update must match bulk hash");
+    }
+
+    @Test
+    public void testSingleByteUpdateAfterResetMatchesBulkHash() {
+        long seed = 0xCAFEBABE12345678L;
+
+        byte[] first = "first-payload-for-reset-check".getBytes(StandardCharsets.UTF_8);
+        byte[] second = "second-payload-with-different-length-and-content".getBytes(StandardCharsets.UTF_8);
+
+        long expectedFirst = Wyhash64.hash(seed, first);
+        long expectedSecond = Wyhash64.hash(seed, second);
+
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(seed);
+
+        for (byte b : first) {
+            stream.updateByte(b);
+        }
+        assertEquals(expectedFirst, stream.finalHash(), "First updateByte hash must match bulk hash");
+
+        stream.reset(seed);
+        for (byte b : second) {
+            stream.updateByte(b);
+        }
+        assertEquals(expectedSecond, stream.finalHash(), "updateByte after reset must match bulk hash");
+    }
+
+    @Test
     public void testStreamingWithScratchReuse() {
         long seed = 42L;
 

@@ -3,7 +3,6 @@ package hr.hrg.dialog.core;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
 import java.util.function.Predicate;
 
 /**
@@ -37,6 +36,8 @@ public class JavaStackSanitizer {
     public static final byte[] NEWLINE_BYTES = {'\n'};
     public static final byte[] NEWLINE_JSON_BYTES = {'\\','n'};
     public static final byte[] LAMBDA_METHOD_BYTES = "lambda".getBytes(StandardCharsets.UTF_8);
+    private static final byte DOT_BYTE = '.';
+    private static final byte NEWLINE_BYTE = '\n';
     public static final StringByteExtractor.ByteWriter stringWriteStrategy = StringByteExtractor.getStrategy();
     public static final String LAMBDA_SUFFIX_FOR_CLASS = "$$Lambda$";
     public static final String LAMBDA_PREFIX_FOR_METHOD = "lambda$";
@@ -54,11 +55,116 @@ public class JavaStackSanitizer {
     public static long fingerprint(Throwable rootCause, Predicate<String> filter) {
         Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
 
+        return fingerprint(rootCause, filter, stream);
+    }
+
+    /**
+     * Builds a deterministic fingerprint for a throwable using a reusable hasher instance.
+     *
+     * @param rootCause throwable whose stack trace is fingerprinted
+     * @param filter frame class filter used to include application-relevant frames
+     * @param stream reusable streaming hash sink
+     * @return deterministic 64-bit hash
+     */
+    public static long fingerprint(Throwable rootCause, Predicate<String> filter, Wyhash64.Streaming stream) {
+        stream.reset(0);
+
         // 1. Exception type
-        byte[] exBytes = rootCause.getClass().getName().getBytes(StandardCharsets.UTF_8);
-        stream.update(exBytes, 0, exBytes.length);
+        stream.update(rootCause.getClass().getName());
 
         addFromTrace(rootCause.getStackTrace(), filter, stream);
+
+        return stream.finalHash();
+    }
+
+    /**
+     * Builds a deterministic fingerprint from a prepared stack trace.
+     * <p>
+     * This variant avoids calling {@link Throwable#getStackTrace()} and uses
+     * zero-allocation-capable {@link Wyhash64.Streaming#update(String)} updates
+     * for normalized class/method segments.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter used to include application-relevant frames
+     * @param throwableClassName exception class name to prepend to the hash payload, may be null
+     * @return deterministic 64-bit hash
+     */
+    public static long fingerprintFromTrace(
+            StackTraceElement[] trace,
+            Predicate<String> filter,
+            String throwableClassName) {
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+
+        return fingerprintFromTrace(trace, filter, throwableClassName, stream);
+    }
+
+    /**
+     * Builds a deterministic fingerprint from a prepared stack trace into a reusable hasher.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter used to include application-relevant frames
+     * @param throwableClassName exception class name to prepend to the hash payload, may be null
+     * @param stream reusable streaming hash sink
+     * @return deterministic 64-bit hash
+     */
+    public static long fingerprintFromTrace(
+            StackTraceElement[] trace,
+            Predicate<String> filter,
+            String throwableClassName,
+            Wyhash64.Streaming stream) {
+        stream.reset(0);
+
+        if (throwableClassName != null) {
+            stream.update(throwableClassName);
+        }
+
+        boolean isFirstFrame = true;
+
+        for (StackTraceElement el : trace) {
+            String className = el.getClassName();
+            if (!filter.test(className)) continue;
+
+            isFirstFrame = false;
+            stream.updateByte(NEWLINE_BYTE);
+
+            String methodName = el.getMethodName();
+            int lambdaClassIdx = className.indexOf(LAMBDA_SUFFIX_FOR_CLASS);
+            int classEnd = (lambdaClassIdx != -1) ? lambdaClassIdx : className.length();
+
+            stream.update(className, 0, classEnd);
+            stream.update(DOT_BYTES, 0, 1);
+
+            if (lambdaClassIdx != -1) {
+                stream.update(LAMBDA_METHOD_BYTES, 0, LAMBDA_METHOD_BYTES.length);
+            } else {
+                int start = 0;
+                int end = methodName.length();
+
+                if (methodName.startsWith(LAMBDA_PREFIX_FOR_METHOD)) {
+                    int firstDollar = methodName.indexOf('$');
+                    if (firstDollar != -1) {
+                        start = firstDollar + 1;
+                        int secondDollar = methodName.indexOf('$', firstDollar + 1);
+                        if (secondDollar != -1) {
+                            end = secondDollar;
+                        }
+                    }
+                }
+
+                stream.update(methodName, start, end - start);
+            }
+        }
+
+        if (isFirstFrame) {
+            int limit = Math.min(3, trace.length);
+            for (int i = 0; i < limit; i++) {
+                stream.updateByte(NEWLINE_BYTE);
+                StackTraceElement el = trace[i];
+                stream.update(el.getClassName());
+                stream.updateByte(DOT_BYTE);
+                stream.update(el.getMethodName());
+            }
+        }
 
         return stream.finalHash();
     }
@@ -84,7 +190,7 @@ public class JavaStackSanitizer {
             if (!filter.test(className)) continue;
 
             isFirstFrame = false;
-            stream.update(NEWLINE_BYTES, 0, 1);
+            stream.updateByte(NEWLINE_BYTE);
             String methodName = el.getMethodName();
 
             addFromTraceElement(stream, className, methodName);
@@ -97,10 +203,10 @@ public class JavaStackSanitizer {
     private static void printTracesFallback(StackTraceElement[] trace, Wyhash64.Streaming stream) {
         int limit = Math.min(3, trace.length);
         for (int i = 0; i < limit; i++) {
-            stream.update(NEWLINE_BYTES, 0, 1);
+            stream.updateByte(NEWLINE_BYTE);
             StackTraceElement el = trace[i];
             stream.update(el.getClassName());
-            stream.update(DOT_BYTES, 0, 1);
+            stream.updateByte(DOT_BYTE);
             stream.update(el.getMethodName());
         }
     }
@@ -118,11 +224,10 @@ public class JavaStackSanitizer {
         // -------- Class name (strip $$Lambda$ suffix) --------
         int lambdaClassIdx = className.indexOf(LAMBDA_SUFFIX_FOR_CLASS);
         int classEnd = (lambdaClassIdx != -1) ? lambdaClassIdx : className.length();
-        byte[] classBytes = className.getBytes(StandardCharsets.UTF_8);
-        // Feed only the enclosing class part (skip synthetic suffix)
-        stream.update(classBytes, 0, classEnd);
+        // Feed only the enclosing class part (skip synthetic suffix).
+        stream.update(className, 0, classEnd);
 
-        stream.update(DOT_BYTES, 0, 1);
+        stream.updateByte(DOT_BYTE);
 
         // -------- Method name (extract original from lambda$...) --------
         if (lambdaClassIdx != -1) {
@@ -242,6 +347,41 @@ public class JavaStackSanitizer {
     }
 
     /**
+     * Writes sanitized frames to an output stream with raw newline separators and computes
+     * the same deterministic fingerprint payload as {@link #fingerprint(Throwable, Predicate)}.
+     * <p>
+     * The hash starts with {@code throwableClassName} when provided, then hashes the
+     * sanitized frame sequence in a single traversal.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter
+     * @param out target stream
+     * @param throwableClassName exception class name to include in hash seed, may be null
+     * @return deterministic 64-bit hash
+     * @throws IOException if writing fails
+     */
+    public static long addFromTraceToOutputStreamAndFingerprint(
+            StackTraceElement[] trace,
+            Predicate<String> filter,
+            OutputStream out,
+            String throwableClassName) throws IOException {
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        return addFromTraceToOutputStreamAndFingerprint(trace, filter, out, throwableClassName, stream);
+        }
+
+        /**
+         * Writes sanitized frames to output and computes fingerprint using a reusable hasher.
+         */
+        public static long addFromTraceToOutputStreamAndFingerprint(
+            StackTraceElement[] trace,
+            Predicate<String> filter,
+            OutputStream out,
+            String throwableClassName,
+            Wyhash64.Streaming stream) throws IOException {
+            return addFromTraceToOutputStreamWithNewlineAndFingerprint(trace, filter, out, NEWLINE_BYTES, throwableClassName, stream);
+    }
+
+    /**
      * Writes sanitized frames to an output stream using JSON-escaped newline separators.
      *
      * @param trace stack trace elements to process
@@ -254,6 +394,41 @@ public class JavaStackSanitizer {
             Predicate<String> filter,
             OutputStream out) throws IOException {
         addFromTraceToOutputStreamWithNewline(trace, filter,out, NEWLINE_JSON_BYTES);
+    }
+
+    /**
+     * Writes sanitized frames to an output stream with JSON-escaped newline separators and computes
+     * the same deterministic fingerprint payload as {@link #fingerprint(Throwable, Predicate)}.
+     * <p>
+     * The hash starts with {@code throwableClassName} when provided, then hashes the
+     * sanitized frame sequence in a single traversal.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter
+     * @param out target stream
+     * @param throwableClassName exception class name to include in hash seed, may be null
+     * @return deterministic 64-bit hash
+     * @throws IOException if writing fails
+     */
+    public static long addFromTraceToOutputStreamJsonAndFingerprint(
+            StackTraceElement[] trace,
+            Predicate<String> filter,
+            OutputStream out,
+            String throwableClassName) throws IOException {
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        return addFromTraceToOutputStreamJsonAndFingerprint(trace, filter, out, throwableClassName, stream);
+        }
+
+        /**
+         * Writes sanitized frames with JSON-escaped newlines and computes fingerprint using a reusable hasher.
+         */
+        public static long addFromTraceToOutputStreamJsonAndFingerprint(
+            StackTraceElement[] trace,
+            Predicate<String> filter,
+            OutputStream out,
+            String throwableClassName,
+            Wyhash64.Streaming stream) throws IOException {
+            return addFromTraceToOutputStreamWithNewlineAndFingerprint(trace, filter, out, NEWLINE_JSON_BYTES, throwableClassName, stream);
     }
 
     /**
@@ -332,5 +507,116 @@ public class JavaStackSanitizer {
                 stringWriteStrategy.write(out,el.getMethodName());
             }
         }
+    }
+
+    /**
+     * Writes sanitized frames using caller-provided newline bytes and computes fingerprint in one pass.
+     * <p>
+     * For hash compatibility with {@link #fingerprint(Throwable, Predicate)}, the hash delimiter remains
+     * a raw newline ({@link #NEWLINE_BYTES}) regardless of the output delimiter.
+     *
+     * @param trace stack trace elements to process
+     * @param filter frame class filter
+     * @param out target stream
+     * @param newlineBytes delimiter bytes placed before each frame in output
+     * @param throwableClassName exception class name to include in hash seed, may be null
+     * @return deterministic 64-bit hash
+     * @throws IOException if writing fails
+     */
+    public static long addFromTraceToOutputStreamWithNewlineAndFingerprint(
+            StackTraceElement[] trace,
+            Predicate<String> filter,
+            OutputStream out,
+            byte[] newlineBytes,
+            String throwableClassName) throws IOException {
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        return addFromTraceToOutputStreamWithNewlineAndFingerprint(trace, filter, out, newlineBytes, throwableClassName, stream);
+    }
+
+    /**
+     * Writes sanitized frames using caller-provided newline bytes and computes fingerprint in one pass.
+     * Uses a caller-supplied reusable hasher instance.
+     */
+    public static long addFromTraceToOutputStreamWithNewlineAndFingerprint(
+            StackTraceElement[] trace,
+            Predicate<String> filter,
+            OutputStream out,
+            byte[] newlineBytes,
+            String throwableClassName,
+            Wyhash64.Streaming stream) throws IOException {
+
+        stream.reset(0);
+        if (throwableClassName != null) {
+            stream.update(throwableClassName);
+        }
+
+        boolean isFirstFrame = true;
+
+        for (StackTraceElement el : trace) {
+            String className = el.getClassName();
+
+            if (!filter.test(className)) {
+                continue;
+            }
+
+            out.write(newlineBytes);
+            isFirstFrame = false;
+
+            stream.updateByte(NEWLINE_BYTE);
+
+            String methodName = el.getMethodName();
+
+            int lambdaClassIdx = className.indexOf(LAMBDA_SUFFIX_FOR_CLASS);
+            int classEnd = (lambdaClassIdx != -1) ? lambdaClassIdx : className.length();
+            stringWriteStrategy.write(out,className.substring(0, classEnd));
+            stream.update(className, 0, classEnd);
+
+            out.write(DOT_BYTES);
+            stream.updateByte(DOT_BYTE);
+
+            if (lambdaClassIdx != -1) {
+                out.write(LAMBDA_METHOD_BYTES);
+                stream.update(LAMBDA_METHOD_BYTES, 0, LAMBDA_METHOD_BYTES.length);
+            } else {
+                int start = 0;
+                int end = methodName.length();
+
+                if (methodName.startsWith(LAMBDA_PREFIX_FOR_METHOD)) {
+                    int firstDollar = methodName.indexOf('$');
+                    if (firstDollar != -1) {
+                        start = firstDollar + 1;
+                        int secondDollar = methodName.indexOf('$', firstDollar + 1);
+                        if (secondDollar != -1) {
+                            end = secondDollar;
+                        }
+                    }
+                }
+
+                stringWriteStrategy.write(out,methodName.substring(start, end));
+                stream.update(methodName, start, end - start);
+            }
+        }
+
+        if (isFirstFrame) {
+            int limit = Math.min(3, trace.length);
+            for (int i = 0; i < limit; i++) {
+                out.write(newlineBytes);
+                stream.updateByte(NEWLINE_BYTE);
+
+                StackTraceElement el = trace[i];
+                String className = el.getClassName();
+                String methodName = el.getMethodName();
+
+                stringWriteStrategy.write(out,className);
+                out.write(DOT_BYTES);
+                stringWriteStrategy.write(out,methodName);
+
+                stream.update(className);
+                stream.updateByte(DOT_BYTE);
+                stream.update(methodName);
+            }
+        }
+
+        return stream.finalHash();
     }
 }
