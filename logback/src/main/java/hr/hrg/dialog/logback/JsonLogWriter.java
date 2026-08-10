@@ -2,6 +2,7 @@ package hr.hrg.dialog.logback;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -9,14 +10,15 @@ import java.util.Map;
 import java.util.Set;
 
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
+import hr.hrg.dialog.core.EscapedJsonStringWriter;
 import hr.hrg.dialog.core.JavaStackTraceWriter;
+import hr.hrg.dialog.core.JsonNumberWriter;
+import hr.hrg.dialog.core.RawJsonSelfWriter;
 import hr.hrg.dialog.core.StringByteExtractor;
 import org.slf4j.event.KeyValuePair;
 
-import tools.jackson.core.JsonGenerator;
-import tools.jackson.core.ObjectWriteContext;
-import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.util.RawValue;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
@@ -35,35 +37,46 @@ public class JsonLogWriter {
     /** Newline bytes (UTF-8) - strictly Unix LF (\n). */
     public static final byte[] NL = new byte[]{ 0x0A };
 
+    public record RawJsonBytes(byte[] bytes){}
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final JsonFactory JSON_FACTORY = JsonFactory.builder().build();
+
     private static final StringByteExtractor.ByteWriter STRING_STRATEGY = StringByteExtractor.getStrategy();
+    private static final byte[] KEY_TS = "\"ts\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_LEVEL = "\"level\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_LOGGER = "\"logger\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_THREAD = "\"thread\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_MSG = "\"msg\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_ERR_CLASS = "\"errClass\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_ERR_MESSAGE = "\"errMessage\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_ERR_HASH = "\"errHash\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KEY_STACK = "\"stack\":".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] JSON_NULL = "null".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] JSON_TRUE = "true".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] JSON_FALSE = "false".getBytes(StandardCharsets.UTF_8);
 
- //   private int maxStackFrames = 255;
-    private volatile boolean started = false;
-    private final ObjectWriteContext writeCtxt = ObjectWriteContext.empty();
+     private final byte[] intNumberBuffer = JsonNumberWriter.makeIntBuffer();
+     private final byte[] longNumberBuffer = JsonNumberWriter.makeLongBuffer();
 
     public JsonLogWriter() {}
 
-    public void writeJsonEvent(JsonGenerator gen, ILoggingEvent event, OutputStream out) throws IOException {
+    public void writeJsonEvent(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
         try {
-            gen.writeStartObject();
+            out.write('{');
 
-            gen.writeName("ts"); // Timestamp
-            gen.writeNumber(event.getTimeStamp());
+            out.write(KEY_TS);
+            JsonNumberWriter.writeLong(out, longNumberBuffer, event.getTimeStamp());
 
-            gen.writeName("level");
-            gen.writeString(event.getLevel().toString());
+            writeFieldPrefix(out, KEY_LEVEL);
+            writeJsonStringOrNull(out, event.getLevel() != null ? event.getLevel().toString() : null);
 
-            gen.writeName("logger");// Logger name
-            gen.writeString(event.getLoggerName());
+            writeFieldPrefix(out, KEY_LOGGER);
+            writeJsonStringOrNull(out, event.getLoggerName());
 
-            gen.writeName("thread");
-            gen.writeString(event.getThreadName());
+            writeFieldPrefix(out, KEY_THREAD);
+            writeJsonStringOrNull(out, event.getThreadName());
 
-            gen.writeName("msg");
-            gen.writeString(event.getFormattedMessage());
+            writeFieldPrefix(out, KEY_MSG);
+            writeJsonStringOrNull(out, event.getFormattedMessage());
 
             Set<String> allKeys = new HashSet<>();
 
@@ -73,7 +86,7 @@ public class JsonLogWriter {
                 for (KeyValuePair kvPair : pairs) {
                     if (kvPair.key != null) {
                         allKeys.add(kvPair.key);
-                        addKey(gen, kvPair.key, kvPair.value);
+                        addKey(out, kvPair.key, kvPair.value, mapper);
                     }
                 }
             }
@@ -89,8 +102,8 @@ public class JsonLogWriter {
                     if (entry.getKey() != null
                             && !isReserved(entry.getKey())
                             && !allKeys.contains(entry.getKey())) {
-                        gen.writeName(entry.getKey());
-                        gen.writeString(entry.getValue());
+                        writeFieldPrefixRawKey(out, entry.getKey());
+                        writeJsonStringOrNull(out, entry.getValue());
                     }
                 }
             }
@@ -98,20 +111,23 @@ public class JsonLogWriter {
             // Exception info
             IThrowableProxy tp = event.getThrowableProxy();
             if (tp != null) {
-                gen.writeName("errClass");
-                gen.writeString(tp.getClassName());
+                String throwableClassName = tp.getClassName();
+                String throwableMessage = tp.getMessage();
 
-                gen.writeName("errMessage");
-                gen.writeString(tp.getMessage());
+                writeFieldPrefix(out, KEY_ERR_CLASS);
+                writeJsonStringOrNull(out, throwableClassName);
 
-                gen.writeName("errHash");
-                gen.writeNumber(JavaStackSanitizerLogback.fingerprint(tp, te->true));
+                writeFieldPrefix(out, KEY_ERR_MESSAGE);
+                writeJsonStringOrNull(out, throwableMessage);
 
-                gen.writeName("stack");
-                gen.flush();// flush whatever is in buffer so we can safely dump stack trace into OutputStream
+                writeFieldPrefix(out, KEY_ERR_HASH);
+                JsonNumberWriter.writeLong(out, longNumberBuffer, JavaStackSanitizerLogback.fingerprint(tp, te->true));
+
+                writeFieldPrefix(out, KEY_STACK);
                 out.write('"');
-                STRING_STRATEGY.write(out, tp.getClassName());
-                // TODO without array conversion
+                if (throwableClassName != null) {
+                    STRING_STRATEGY.write(out, throwableClassName);
+                }
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
                 StackTraceElement[] arr = new StackTraceElement[arrProxy.length];
                 for(int i=0;i<arr.length;i++){
@@ -122,7 +138,7 @@ public class JsonLogWriter {
                 out.write('"');
             }
 
-            gen.writeEndObject();
+            out.write('}');
         } catch (IOException e) {
             System.err.println(Instant.now() + " Failed to write JSON log event for logger: " + event.getLoggerName());
             e.printStackTrace(System.err);
@@ -137,19 +153,59 @@ public class JsonLogWriter {
         };
     }
 
-    protected void addKey(JsonGenerator gen, String key, Object value) throws IOException {
+    private static void writeFieldPrefix(OutputStream out, byte[] keyBytes) throws IOException {
+        out.write(',');
+        out.write(keyBytes);
+    }
+
+    private static void writeFieldPrefixRawKey(OutputStream out, String key) throws IOException {
+        out.write(',');
+        out.write('"');
+        // Caller contract: key-value and MDC keys are expected to not require JSON escaping.
+        STRING_STRATEGY.write(out, key);
+        out.write('"');
+        out.write(':');
+    }
+
+    protected void addKey(OutputStream out, String key, Object value, ObjectMapper mapper) throws IOException {
         if (value == null) return;
 
-        gen.writeName(key);
+        writeFieldPrefixRawKey(out, key);
 
         switch (value) {
-            case String s -> gen.writeString(s);
-            case Long l -> gen.writeNumber(l);
-            case Integer i -> gen.writeNumber(i);
-            case Double d -> gen.writeNumber(d);
-            case Number n -> gen.writeNumber(n.toString());
-            case Boolean b -> gen.writeBoolean(b);
-            default -> MAPPER.writeValue(gen, value);
+            case String s -> EscapedJsonStringWriter.writeJsonStringOrNull(out, s);
+            case CharSequence cs -> EscapedJsonStringWriter.writeJsonStringOrNull(out, cs.toString());
+            case Character c -> EscapedJsonStringWriter.writeJsonStringOrNull(out, c.toString());
+            case Enum<?> e -> EscapedJsonStringWriter.writeJsonStringOrNull(out, e.name());
+            case RawValue raw -> writeRawValue(out, raw, mapper);
+            case Long l -> JsonNumberWriter.writeLong(out, longNumberBuffer, l);
+            case Integer i -> JsonNumberWriter.writeInt(out, intNumberBuffer, i);
+            case Short s -> JsonNumberWriter.writeInt(out, intNumberBuffer, s.intValue());
+            case Byte b -> JsonNumberWriter.writeInt(out, intNumberBuffer, b.intValue());
+            case Float f -> JsonNumberWriter.writeFloat(out, f);
+            case Double d -> JsonNumberWriter.writeDouble(out, d);
+            case Number n -> JsonNumberWriter.writeNumber(out, intNumberBuffer, longNumberBuffer, n);
+            case Boolean b -> out.write(b ? JSON_TRUE : JSON_FALSE);
+            case RawJsonSelfWriter w -> w.writeJson(out);
+            case RawJsonBytes b -> out.write(b.bytes());
+            default -> mapper.writeValue(out, value);
         }
+    }
+
+    private static void writeRawValue(OutputStream out, RawValue raw, ObjectMapper mapper) throws IOException {
+        Object backing = raw.rawValue();
+        if (backing == null) {
+            out.write(JSON_NULL);
+            return;
+        }
+        if (backing instanceof String s) {
+            STRING_STRATEGY.write(out, s);
+            return;
+        }
+        mapper.writeValue(out, raw);
+    }
+
+    private static void writeJsonStringOrNull(OutputStream out, String value) throws IOException {
+        EscapedJsonStringWriter.writeJsonStringOrNull(out, value);
     }
 }
