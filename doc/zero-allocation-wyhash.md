@@ -31,7 +31,7 @@ Additionally, for `CharSequence` inputs that are not `String`, you must iterate 
 
 The Java 9+ `String` internals store characters in a `byte[]` (compact strings), with a `byte coder` field indicating the encoding:
 
-| Coder | Encoding | Bytes per char |
+| Coder | Encoding | Bytes per char|
 |-------|----------|---------------|
 | `0`   | LATIN-1  | 1             |
 | `1`   | UTF-16   | 2             |

@@ -1,6 +1,14 @@
 # Separating Errors Into Their Own Log File
 
-This is a very common and highly recommended pattern for production environments—it gives you a detailed "everything" log for debugging while maintaining a clean, high-priority "errors-only" log for quick troubleshooting and alerting. To achieve this in Logback, you define two separate `RollingFileAppender` beans and attach them both to your `<root>` logger. Crucially, you use a `ThresholdFilter` on the error appender to block everything below the `ERROR` level, so only events at `ERROR` or `FATAL` reach that file. The main log receives all levels (`INFO`, `WARN`, `ERROR`) and serves as your full-detail archive, while the error log stays small, focused, and can be retained longer (e.g. 60 days vs 30) because it grows much slower. GZIP compression via `.gz` in the `fileNamePattern` applies **only to rolled/archived files** — the active file configured in `<file>` (e.g. `logs/errors.log`) is always uncompressed and written to in real time. On rollover, Logback renames the active file to match the `fileNamePattern` and compresses it to `.gz` before starting a fresh active file. This means you can `tail -f logs/errors.log` to watch new errors appear live, while old rotated files sit compressed in the archive directory, dramatically reducing disk usage.
+This is a common production pattern: keep a full-detail log for debugging, while routing only `ERROR` and above to a smaller, high-priority error log. The same rolling-policy pattern works for text logs and for the JSON output emitted by this module.
+
+The core idea is simple:
+
+- a main rolling appender accepts all events
+- a second rolling appender uses a `ThresholdFilter` so only `ERROR` and above are written to the error file
+- the error file can be retained longer and searched separately from the main log
+
+For the JSON path, the current implementation writes flat top-level fields such as `ts`, `level`, `logger`, `msg`, your key/value pairs, and (for exceptions) `errClass`, `errMessage`, `stack`, and `errHash`. That means the schema is slightly different from the older examples that showed a nested `err` object.
 
 ```xml
 <configuration>
@@ -30,7 +38,7 @@ This is a very common and highly recommended pattern for production environments
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -42,48 +50,4 @@ This is a very common and highly recommended pattern for production environments
 </configuration>
 ```
 
-Since compression applies only to the archived files (not the active one), you can search them directly on Linux without decompressing first using `zgrep`. For the text-based log, finding all ERROR entries across all archived files is as simple as `zgrep "ERROR" logs/archived/errors-*.log.gz`. For the JSON log, you can search within specific fields using `zgrep` combined with JSON-aware tools: `zgrep '"level":"ERROR"' logs/archived/errors-*.json.gz` finds all error-level JSON lines across the full archive, or pipe through `jq` for more targeted queries like `zcat logs/archived/errors-2026-05-31.0.json.gz | jq 'select(.kv.orderId != null) | {msg, kv}'` to extract only messages that contain a specific structured key. This makes it practical to keep months of compressed history online and still answer operational questions in seconds.
-
-The same pattern works with `CustomJsonEncoder` from this library, giving you structured JSON in both the main log and the error-only file. You configure the encoder properties (`includeMDC`, `includeKeys`, etc.) on both appenders, and the error log still uses a `ThresholdFilter` to accept only `ERROR` and above. This way your full-detail JSON log and your error-only JSON log share the identical schema—every field (`ts`, `level`, `logger`, `msg`, `kv`, `ctx`, `err`) is present—so you can feed the error log into Elasticsearch, Loki, or any log aggregator with the same parsing rules, while the main log retains all lower-severity events for deeper forensic analysis.
-
-```xml
-<configuration>
-
-    <appender name="MAIN_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/application.json</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>logs/archived/application-%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
-            <maxFileSize>10MB</maxFileSize>
-            <maxHistory>30</maxHistory>
-            <totalSizeCap>2GB</totalSizeCap>
-        </rollingPolicy>
-        <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
-            <includeMDC>true</includeMDC>
-            <includeKeys>true</includeKeys>
-        </encoder>
-    </appender>
-
-    <appender name="ERROR_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/errors.json</file>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>ERROR</level>
-        </filter>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>logs/archived/errors-%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
-            <maxFileSize>10MB</maxFileSize>
-            <maxHistory>60</maxHistory>
-            <totalSizeCap>1GB</totalSizeCap>
-        </rollingPolicy>
-        <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
-            <includeMDC>true</includeMDC>
-            <includeKeys>true</includeKeys>
-            <customFields>{"logType":"error-only"}</customFields>
-        </encoder>
-    </appender>
-
-    <root level="INFO">
-        <appender-ref ref="MAIN_LOG" />
-        <appender-ref ref="ERROR_LOG" />
-    </root>
-
-</configuration>
+The same approach works for the JSON output written by this module. The current writer emits the values as plain fields, so queries against the error-only log should use the current field names such as `errClass`, `errMessage`, `stack`, and `errHash` rather than the older nested `err.*` schema.

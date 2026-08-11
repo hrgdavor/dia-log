@@ -1,38 +1,20 @@
 
+The logback module currently exposes `JsonAppender` and `JsonAppenderRolling` rather than a `CustomJsonEncoder` wrapper. Both classes delegate to `JsonLogWriter`, which emits flat JSON fields such as `ts`, `level`, `logger`, `thread`, `msg`, your key/value pairs, and exception fields like `errClass`, `errMessage`, `stack`, and `errHash`.
 
+Example usage from Java:
 
-configure encoder
-```xml
-<configuration scan="true">
-    <!-- 1. Console Appender -->
-    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
-            <includeMDC>true</includeMDC>
-            <includeKeys>true</includeKeys>
-            <includeSource>false</includeSource>
-            <prettyPrint>false</prettyPrint>
-            <customFields>{"env":"prod","version":"1.0"}</customFields>
-        </encoder>
-    </appender>
-
-    <!-- 2. File Appender -->
-    <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/application.jsonl</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>logs/archive/application.%d{yyyy-MM-dd}.%i.jsonl.gz</fileNamePattern>
-            <maxFileSize>50MB</maxFileSize>
-            <maxHistory>30</maxHistory>
-        </rollingPolicy>
-        <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
-            <includeMDC>true</includeMDC>
-            <includeKeys>true</includeKeys>
-            <customFields>{"env":"prod","version":"1.0"}</customFields>
-        </encoder>
-    </appender>
-
-    <root level="INFO">
-        <appender-ref ref="CONSOLE_JSON" />
-        <appender-ref ref="FILE_JSON" />
-    </root>
-</configuration>
+```java
+Logger logger = LoggerFactory.getLogger(MyClass.class);
+logger.atInfo()
+    .kv("userId", 42)
+    .kv("action", "login")
+    .log("User {userId} performed {action}");
 ```
+
+The resulting JSON shape is similar to:
+
+```json
+{"ts":1748765696789,"level":"INFO","logger":"com.example.MyClass","thread":"main","msg":"User {userId} performed {action}","userId":42,"action":"login"}
+```
+
+`JsonLogWriterClassic` remains available as an alternative implementation, but `JsonLogWriter` is the default high-throughput path.
