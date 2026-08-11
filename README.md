@@ -38,6 +38,54 @@ The current JSON writer emits flat top-level fields such as `ts`, `level`, `logg
 - **Deterministic stack traces** — `JavaStackSanitizer` normalizes frames and produces a stable fingerprint for `errHash`.
 - **Generic builder pattern** — `LoggingEventBuilderWrapperBase` keeps fluent chaining intact for subclasses and no-op wrappers.
 
+## Performance Optimizations
+
+Dia-Log is built around a simple goal: **emit structured JSON as fast as possible while creating as few objects as possible**. Logging sits on the hot path of every request, and every allocation adds pressure on the garbage collector. The optimizations below are a best-effort engineering effort to keep both latency and GC pressure low — and the project remains open to suggestions for further improvements.
+
+### Reducing allocations across the hot path
+
+The `JsonLogWriter` hot path is aggressively tuned to avoid allocation:
+
+- **Pre-encoded key bytes** — Common field names (`"ts":`, `"level":`, `"logger":`, `"msg":`, etc.) and literals (`true`, `false`, `null`) are stored once as `byte[]` constants, so writing a field name never allocates a new byte array per event.
+- **Direct string data access** — With `--add-opens java.base/java.lang=ALL-UNNAMED`, `StringByteExtractor` uses `VarHandle` to read a `String`'s backing `byte[]` and `coder` directly, streaming UTF-8 bytes to the output without an intermediate `String.getBytes()` array. When `--add-opens` is unavailable it transparently falls back to the classic path, so behavior is identical either way.
+- **Low-allocation stack-trace writing** — `JavaStackSanitizer` writes stack frames straight to the output stream instead of building intermediate strings, dramatically reducing allocation for throwable-heavy events.
+
+### Sidestepping Jackson for top-level values
+
+`JsonLogWriter` writes the well-known top-level fields (`ts`, `level`, `logger`, `thread`, `msg`, and the `err*`/`stack` fields) **directly to the `OutputStream`**, bypassing Jackson entirely. Jackson is only invoked for the *generic* key/value and MDC values that Dia-Log cannot predict ahead of time.
+
+This matters because the predictable fields make up most of every event's output. By writing them with hand-tuned, allocation-free code instead of routing them through a general-purpose serializer, Dia-Log avoids Jackson's per-field machinery (generator state, intermediate buffers, and internal objects) for the common case — while still delegating the genuinely arbitrary values to Jackson for correctness. The result is measurably lower latency and dramatically lower allocation than a full Jackson serialization of the same payload.
+
+### Number writing without intermediate strings
+
+Numeric fields are written with `JsonNumberWriter`, which converts `int`/`long`/`double`/`float` **directly into the output stream** using a precomputed ASCII lookup table for digit pairs (00–99). It never builds a `String` or an intermediate `byte[]` for the number — digits are computed and emitted straight to the output. This avoids both the `String.valueOf(...)` allocation and the transient UTF-8 encoding step a naive implementation would introduce.
+
+### Buffer and streaming-hash object reuse
+
+- **Reusable number buffers** — Each `JsonLogWriter` instance owns reusable `int`/`long` scratch buffers (`intNumberBuffer`, `longNumberBuffer`) that are filled and written per event, so no per-number buffer is allocated.
+- **Streaming hash reuse** — `Wyhash64.Streaming` is designed to be reset and reused (`reset(...)`) on the hot path instead of creating a fresh hasher per event, keeping hashing allocation-free.
+
+### Single-pass hash + write
+
+Stack-trace fingerprinting and writing used to be two separate passes (traverse the trace twice). Dia-Log now offers **single-pass** APIs (`addFromTraceToOutputStreamJsonAndFingerprint(...)` and friends) that compute the `errHash` fingerprint *while* writing the stack JSON in one traversal. `JsonLogWriter` uses these, so a throwable event is serialized and fingerprinted in a single pass over the trace instead of two — cutting both CPU work and allocation.
+
+### Measured impact
+
+These optimizations are validated with JMH benchmarks (`-prof gc`). On the latest run, `JsonLogWriter` beats the classic generator path in both latency and allocation:
+
+| Benchmark method              | includeThrowable | Avg time    | Alloc norm   |
+| ----------------------------- | ---------------- | ----------- | ------------ |
+| `writeWithJsonLogWriter`        | false            | 0.540 us/op | 344 B/op     |
+| `writeWithJsonLogWriterClassic` | false            | 0.667 us/op | 784 B/op     |
+| `writeWithJsonLogWriter`        | true             | 1.898 us/op | 480 B/op     |
+| `writeWithJsonLogWriterClassic` | true             | 2.194 us/op | 1040 B/op    |
+
+### Current best effort, open to improvement
+
+This is the **current best effort** — a set of practical trade-offs that favor the common logging hot path. It is not claimed to be optimal. The project is open to suggestions for further improvements, whether that means new allocation-avoidance techniques, different serialization strategies, or better benchmark methodology.
+
+For a detailed, curated history of these optimizations — the step-by-step changes, the benchmark methodology lessons, and the historical gains — see [Benchmark Optimization History](doc/benchmark-optimization-history.md).
+
 ## Cookbook
 
 Practical guides for common logging patterns:
