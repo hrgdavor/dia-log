@@ -6,6 +6,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.function.Predicate;
 
 public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -16,6 +17,27 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
     public void setOutputStream(OutputStream outputStream) {
         this.activeStream = outputStream;
         super.setOutputStream(outputStream);
+    }
+
+    /**
+     * Configures the predicate used to filter stack trace frames during fingerprinting.
+     * <p>
+     * The value must be the fully-qualified name of a class that implements
+     * {@link Predicate}{@code <String>} and has a public no-arg constructor. The predicate is
+     * fed the fully-qualified class name of each stack frame; frames rejected by it are excluded
+     * from both the written {@code stack} field and the {@code errHash} fingerprint.
+     * <p>
+     * Example logback.xml:
+     * <pre>{@code
+     * <appender name="JSON" class="hr.hrg.dialog.logback.JsonAppenderRolling">
+     *     <stackTraceFilter>com.example.MyFrameFilter</stackTraceFilter>
+     * </appender>
+     * }</pre>
+     *
+     * @param filterClassName fully-qualified class name of a {@code Predicate<String>} implementation
+     */
+    public void setStackTraceFilter(String filterClassName) {
+        jsonLogWriter.setStackTraceFilter(JsonAppender.instantiateStackTraceFilter(filterClassName));
     }
 
     @Override

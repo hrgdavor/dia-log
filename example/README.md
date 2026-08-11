@@ -75,6 +75,8 @@ The current writer emits flat top-level fields:
 | `stack` | Sanitized stack-trace text (when present) |
 | `errHash` | Deterministic 64-bit fingerprint for deduplication (when present) |
 
+By default every stack frame contributes to `stack` and `errHash`. Both appenders accept a logback-configurable `<stackTraceFilter>` (a fully-qualified class name implementing `Predicate<String>`) to exclude frames from fingerprinting — see [Filtering stack-trace frames](../logback/README.md#filtering-stack-trace-frames-during-fingerprinting).
+
 ### Example Output
 
 A simple key/value log line looks like:

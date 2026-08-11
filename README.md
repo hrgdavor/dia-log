@@ -35,7 +35,7 @@ The current JSON writer emits flat top-level fields such as `ts`, `level`, `logg
 - **Structured key/value logging** — `kv()` is a shorthand for statement-scoped key/value pairs.
 - **Logback integration** — the logback module exposes `JsonAppender` and `JsonAppenderRolling`, both backed by `JsonLogWriter`.
 - **Conditional stack visibility** — `stackWhenTraceEnabled()` attaches a synthetic throwable only when TRACE is enabled.
-- **Deterministic stack traces** — `JavaStackSanitizer` normalizes frames and produces a stable fingerprint for `errHash`.
+- **Deterministic stack traces** — `JavaStackSanitizer` normalizes frames and produces a stable fingerprint for `errHash`. The logback appenders can exclude noisy/framework frames from fingerprinting via a configurable `<stackTraceFilter>` predicate (see [Filtering stack-trace frames](logback/README.md#filtering-stack-trace-frames-during-fingerprinting)).
 - **Generic builder pattern** — `LoggingEventBuilderWrapperBase` keeps fluent chaining intact for subclasses and no-op wrappers.
 
 ## Performance Optimizations

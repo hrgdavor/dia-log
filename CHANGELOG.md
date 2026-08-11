@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `JsonAppender` and `JsonAppenderRolling` accept a logback-configurable
+  `<stackTraceFilter>` predicate (a fully-qualified class name implementing
+  `Predicate<String>`) to exclude stack-trace frames from the written `stack`
+  field and the `errHash` fingerprint.
+
 ## [1.0.0] - 2026-08-11
 
 ### Added

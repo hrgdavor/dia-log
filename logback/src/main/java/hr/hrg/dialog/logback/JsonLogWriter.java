@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import hr.hrg.dialog.core.EscapedJsonStringWriter;
@@ -56,7 +57,22 @@ public class JsonLogWriter {
      private final byte[] intNumberBuffer = JsonNumberWriter.makeIntBuffer();
      private final byte[] longNumberBuffer = JsonNumberWriter.makeLongBuffer();
 
+    /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
+    private Predicate<String> stackTraceFilter = cls -> true;
+
     public JsonLogWriter() {}
+
+    /**
+     * Sets the predicate used to decide which stack trace frames are included in the {@code errHash} fingerprint.
+     * <p>
+     * Only the class name of each frame is passed to the predicate. Frames that fail the test are excluded
+     * from both the written {@code stack} field and the fingerprint.
+     *
+     * @param filter frame class filter; {@code null} resets to the default accept-all predicate
+     */
+    public void setStackTraceFilter(Predicate<String> filter) {
+        this.stackTraceFilter = filter != null ? filter : (cls -> true);
+    }
 
     public void writeJsonEvent(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
         try {
@@ -127,7 +143,7 @@ public class JsonLogWriter {
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
                 long fingerPrint = JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                     arrProxy,
-                    te -> true,
+                    stackTraceFilter,
                     out,
                     throwableClassName
                 );
