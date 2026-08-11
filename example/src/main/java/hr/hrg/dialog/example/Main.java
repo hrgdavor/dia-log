@@ -53,6 +53,37 @@ public class Main {
             .log("Rate limit approaching");
 
         System.out.println();
+        System.out.println("=== {key} placeholder in the message ===");
+
+        // You can embed {key} placeholders in the message that reference the
+        // key/value pairs (and MDC entries) attached to the same event. Each value
+        // is still written as its OWN top-level JSON field, so the log stays
+        // machine-readable, while the message stays readable for humans.
+        //
+        // The {key} tokens are written into JSON *as-is* (the message is not
+        // interpolated at log time). To see the expanded message, tail the log
+        // with jlx using message_expand = curly (see jlx.conf in this module).
+        log.atInfo()
+            .kv("method", "GET")
+            .kv("path", "/api/users")
+            .kv("statusCode", 200)
+            .kv("durationMs", 42)
+            .log("Request {method} {path} -> {statusCode} in {durationMs}ms");
+
+        log.atWarn()
+            .kv("endpoint", "/api/orders")
+            .kv("retryCount", 3)
+            .kv("threshold", 0.95)
+            .kv("fallback", "cache")
+            .log("Rate limit approaching on {endpoint}, retry {retryCount}, threshold {threshold}, fallback {fallback}");
+
+        // MDC entries can be referenced the same way: {requestId}, {userId}, {tenant}
+        // are all set above via MDC.put(...) and appear as top-level JSON fields.
+        log.atInfo()
+            .kv("path", "/api/orders")
+            .log("User {userId} from tenant {tenant} requested {path} (request {requestId})");
+
+        System.out.println();
         System.out.println("=== stackWhenTraceEnabled() ===");
 
         // Conditional call stack: a synthetic throwable is attached only when TRACE is enabled.
@@ -64,6 +95,9 @@ public class Main {
         System.out.println();
         System.out.println("=== Parameterized logging ===");
 
+        // SLF4J positional {} parameters are still interpolated at log time, and are
+        // NOT stored as top-level JSON fields. Use the fluent .kv() API + {key}
+        // placeholders when you want the value both structured AND in the message.
         log.info("User {} logged in from IP {}", "alice", "192.168.1.42");
         log.warn("Disk usage at {}/{} MB", 850, 1024);
 
@@ -94,6 +128,8 @@ public class Main {
         System.out.println();
         System.out.println("=== Done! Check the JSON output above ===");
         System.out.println("Each line is a valid JSON object with fields: ts, level, logger, thread, msg, kv, errClass, errMessage, stack, errHash");
+        System.out.println("Messages may contain {key} placeholders that reference key/value or MDC fields.");
+        System.out.println("They are written as-is; use jlx with message_expand = curly to expand them (see jlx.conf).");
         System.out.println("Try: java -jar example/target/dia-log-example-1.0.0-SNAPSHOT.jar | jq .");
     }
 

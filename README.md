@@ -182,10 +182,52 @@ jlx -c dia-log.conf --serve app.log
 
 Because `jlx` treats the first `{` on a line as the start of JSON, it works even if your appenders prefix lines with application text. See the [`zig-jlx` README](https://github.com/hrgdavor/zig-jlx) for the full option and config reference.
 
+### `{key}` placeholders in the message
+
+Dia-Log lets you reference a value from a key/value pair or the MDC inside the message with `{key}` syntax, so the value is logged both **structurally** (as its own top-level JSON field) and **in the message**:
+
+```java
+log.atInfo()
+    .kv("method", "GET")
+    .kv("path", "/api/users")
+    .kv("statusCode", 200)
+    .log("Request {method} {path} -> {statusCode}");
+
+// MDC entries work the same way:
+MDC.put("userId", "alice");
+log.atInfo().log("User {userId} logged in");
+```
+
+The `{key}` tokens are written into the JSON `msg` field **as-is** (not interpolated at log time), so the stored event stays compact and queryable:
+
+```json
+{"ts":1748765696789,"level":"INFO","msg":"Request {method} {path} -> {statusCode}","method":"GET","path":"/api/users","statusCode":200}
+```
+
+To see the expanded message when tailing/displaying with `jlx`, set `message_expand = curly` (as in the config above). `jlx` then interpolates the `{key}` tokens from the other JSON fields on the same line — without modifying the raw log file:
+
+```
+2025-06-01 12:34:56   INFO | Request GET /api/users -> 200
+```
+
+Placeholders that reference a key absent from a given line are left intact, so no data is lost. A runnable demo of this pattern (plus a ready-made `jlx.conf`) lives in the [`example`](example/) module.
+
 ## Build
 
 ```bash
 mvn clean install
+```
+
+## Publishing
+
+`dia-log-core` and `dia-log-logback` are published to Maven Central via the
+Central Portal. The `dia-log-example` module is not published. See
+[`PUBLISHING.md`](PUBLISHING.md) for the full instructions and a GitHub Actions
+workflow for automated releases.
+
+```bash
+# One-time release (requires GPG key + Central Portal token in ~/.m2/settings.xml)
+mvn clean deploy -DskipTests
 ```
 
 ## Requirements

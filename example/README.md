@@ -6,6 +6,7 @@ This module is a runnable demo that shows how to use Dia-Log with SLF4J 2.x and 
 
 - Basic logging at all levels (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)
 - Structured key/value pairs via the fluent `kv()` API
+- `{key}` placeholders in the message that reference key/value pairs and MDC entries
 - Conditional call-stack visibility with `stackWhenTraceEnabled()`
 - Parameterized (SLF4J) log messages
 - Exception logging, including nested causes
@@ -55,6 +56,8 @@ Because `JsonAppender` extends `OutputStreamAppender`, its output stream must be
 
 Both appenders are backed by `JsonLogWriter`, which emits one JSON object per line (JSON Lines format). The root level is `DEBUG`.
 
+For reading/tailing the generated logs, this module also ships a [`jlx.conf`](jlx.conf) that sets `message_expand = curly` so `{key}` placeholders in messages are expanded on display (see [`{key}` Placeholders](#key-placeholders-in-the-message)).
+
 ### JSON Field Layout
 
 The current writer emits flat top-level fields:
@@ -85,3 +88,58 @@ An exception log line additionally includes `errClass`, `errMessage`, `stack`, a
 ### stackWhenTraceEnabled()
 
 `stackWhenTraceEnabled()` attaches a synthetic throwable only when TRACE is enabled. With the default `DEBUG` root level, no stack is emitted. Switch the root logger to `TRACE` in `logback.xml` to see the call stack appear as `errClass` / `errHash`.
+
+## `{key}` Placeholders in the Message
+
+Values you attach as key/value pairs (via `.kv(...)`) or as MDC entries can be referenced from the message with `{key}` syntax:
+
+```java
+log.atInfo()
+    .kv("method", "GET")
+    .kv("path", "/api/users")
+    .kv("statusCode", 200)
+    .log("Request {method} {path} -> {statusCode}");
+```
+
+Each value is still written as its **own** top-level JSON field, so the log stays machine-readable:
+
+```json
+{"ts":1748765696789,"level":"INFO","logger":"hr.hrg.dialog.example.Main","thread":"main","msg":"Request {method} {path} -> {statusCode}","method":"GET","path":"/api/users","statusCode":200}
+```
+
+The `{key}` tokens are written into the JSON `msg` field **as-is** — the message is not interpolated at log time. This keeps the stored event compact and queryable (you can filter on the structured `method`/`path`/`statusCode` fields), while the message template stays readable.
+
+MDC entries work the same way. With `MDC.put("userId", "alice")`, you can write:
+
+```java
+log.atInfo().log("User {userId} logged in");
+```
+
+### Displaying the expanded message with `jlx`
+
+To see the `{key}` tokens expanded to their values when tailing/displaying the log, use [`jlx`](https://github.com/hrgdavor/zig-jlx) with `message_expand = curly`. This module ships a ready-made [`jlx.conf`](jlx.conf):
+
+```ini
+[folders]
+timestamp = ts
+level     = level
+message   = msg
+output    = {timestamp:datetime} [{level:6}] {logger} | {message}
+message_expand = curly
+```
+
+```bash
+# Pretty-print the file with {key} placeholders expanded
+jlx -c jlx.conf logs/example.jsonl
+
+# Follow live output
+jlx -c jlx.conf -f logs/example.jsonl
+```
+
+With `message_expand = curly`, the line above renders as:
+
+```
+2025-06-01 12:34:56   INFO hr.hrg.dialog.example.Main | Request GET /api/users -> 200
+```
+
+Without `message_expand`, the `{method}`, `{path}`, and `{statusCode}` tokens appear literally in the message. The raw JSON file is never modified — expansion happens only in `jlx`'s display output.

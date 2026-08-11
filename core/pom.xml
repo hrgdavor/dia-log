@@ -7,7 +7,7 @@
     <parent>
         <groupId>hr.hrg.dialog</groupId>
         <artifactId>dia-log-root</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0.0</version>
     </parent>
 
     <artifactId>dia-log-core</artifactId>
@@ -55,6 +55,11 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <!-- Publish this module to Maven Central Portal -->
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
