@@ -21,5 +21,6 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
     @Override
     protected void writeOut(ILoggingEvent event) throws IOException {
         jsonLogWriter.writeJsonEvent(objectMapper, event, activeStream);
+        activeStream.write(JsonLogWriter.NL);
     }
 }

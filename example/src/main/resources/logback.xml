@@ -2,21 +2,29 @@
 <configuration scan="true" scanPeriod="30 seconds">
 
     <!--
-        Standard Logback ConsoleAppender with CustomJsonEncoder.
-        Produces structured JSON output — keeps {name} placeholders literal in msg
-        and stores values in kv for downstream tools to reconstruct.
+        JSON rolling file appender using JsonAppenderRolling + JsonLogWriter.
+        Emits flat JSON fields: ts, level, logger, thread, msg, key/value pairs,
+        and (for exceptions) errClass, errMessage, stack, errHash.
     -->
-    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="hr.hrg.dialog.logback.CustomJsonEncoder">
-            <includeMDC>true</includeMDC>
-            <includeKeys>true</includeKeys>
-            <includeSource>false</includeSource>
-            <prettyPrint>false</prettyPrint>
+    <appender name="JSON_FILE" class="hr.hrg.dialog.logback.JsonAppenderRolling">
+        <file>logs/example.jsonl</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/example.%d{yyyy-MM-dd}.%i.jsonl.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+        <!--
+            JsonAppenderRolling overrides writeOut() to emit JSON directly, so the
+            encoder below is only required to satisfy OutputStreamAppender.start().
+        -->
+        <encoder>
+            <pattern>%msg%n</pattern>
         </encoder>
     </appender>
 
     <root level="DEBUG">
-        <appender-ref ref="JSON" />
+        <appender-ref ref="JSON_FILE" />
     </root>
 
 </configuration>

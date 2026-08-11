@@ -22,5 +22,6 @@ public class JsonAppender extends OutputStreamAppender<ILoggingEvent> {
     @Override
     protected void writeOut(ILoggingEvent event) throws IOException {
         jsonLogWriter.writeJsonEvent(objectMapper, event, activeStream);
+        activeStream.write(JsonLogWriter.NL);
     }
 }
