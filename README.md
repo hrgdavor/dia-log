@@ -70,6 +70,70 @@ The current logback module is configured with standard Logback appenders and the
 
 If you want to use the library's custom JSON writer directly, the repository also contains `JsonAppender` and `JsonAppenderRolling`, which write JSON events using `JsonLogWriter`.
 
+## Reading Logs with `jlx`
+
+Dia-Log writes JSON Lines, so you can read, filter, and analyze the output with [`jlx`](https://github.com/hrgdavor/zig-jlx) — a fast command-line utility for structured JSON logs.
+
+`jlx` is configured via an INI-style config file, so you can define an output format (and named profiles) tailored to Dia-Log's field layout (`ts`, `level`, `logger`, `thread`, `msg`, plus your key/value pairs and `errClass`/`errMessage`/`stack`/`errHash`).
+
+### Example config (`dia-log.conf`)
+
+```ini
+; jlx config tailored to Dia-Log JSON output
+[folders]
+paths     = /path/to/your/logs
+timestamp = ts
+level     = level
+message   = msg
+thread    = thread
+logger    = logger
+trace     = stack
+output    = {timestamp:datetime} [{level:6}] {logger} | {message}
+; Expand {name} placeholders in msg using the line's key/value pairs
+message_expand = curly
+
+[profile.verbose]
+output = {timestamp:datetime} [{level:6}] {logger} {thread} | {message}
+; Show only ERROR/WARN lines and anything with an exception hash
+include = level:ERROR, level:WARN, errHash
+
+[profile.errors]
+output = {timestamp:datetime} [{level:6}] {message}
+include = level:ERROR
+exclude = healthcheck
+```
+
+### Usage
+
+```bash
+# Basic formatted output
+jlx -c dia-log.conf app.log
+
+# Follow a live log as lines are appended
+jlx -c dia-log.conf -f app.log
+
+# Use the "errors" profile to focus on errors
+jlx -c dia-log.conf -p errors app.log
+
+# Filter to a time window (e.g. morning)
+jlx -c dia-log.conf -r "08:00..09:30" app.log
+
+# Show only lines with a given key/value pair
+jlx -c dia-log.conf -i "component:order-service" app.log
+
+# List all unique levels / error hashes
+jlx -c dia-log.conf -v level app.log
+jlx -c dia-log.conf -v errHash app.log
+
+# Pipe from another source (e.g. kubectl logs)
+kubectl logs my-pod | jlx -c dia-log.conf
+
+# Start the interactive web workbench
+jlx -c dia-log.conf --serve app.log
+```
+
+Because `jlx` treats the first `{` on a line as the start of JSON, it works even if your appenders prefix lines with application text. See the [`zig-jlx` README](https://github.com/hrgdavor/zig-jlx) for the full option and config reference.
+
 ## Build
 
 ```bash
