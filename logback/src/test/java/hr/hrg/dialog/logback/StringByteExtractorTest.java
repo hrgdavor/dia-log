@@ -92,4 +92,102 @@ class StringByteExtractorTest {
         StringByteExtractor.writeAsciiDirect(out, null);
         assertEquals(0, out.toByteArray().length, "Null string should produce 0 bytes");
     }
+
+    // =========================================================================
+    // Latin-1 (coder == 0) encoding verification
+    // =========================================================================
+
+    /**
+     * Builds a Latin-1 string containing every code point 0x00-0xFF (excluding 0x00 which is a
+     * NUL and would be awkward, and control chars that don't round-trip cleanly in a test string).
+     * Latin-1 chars in 0x80-0xFF exercise the single-pass Latin-1 -> UTF-8 expansion.
+     */
+    private static String allLatin1Range() {
+        StringBuilder sb = new StringBuilder(256);
+        for (int cp = 0x20; cp <= 0xFF; cp++) {
+            sb.append((char) cp);
+        }
+        return sb.toString();
+    }
+
+    @Test
+    @DisplayName("VarHandle Latin-1 encoding matches Java UTF-8 byte-for-byte over the full Latin-1 range")
+    void testVarHandleLatin1_matchesJavaUtf8_fullRange() throws IOException {
+        assumeTrue(valueHandle != null, "Skipping VarHandle test: --add-opens flag missing");
+
+        String latin1 = allLatin1Range();
+        // Confirm the test string is actually stored as Latin-1 (coder == 0) by the JVM.
+        assumeTrue((byte) coderHandle.get(latin1) == 0,
+                "Test string should be a Latin-1 compact string (coder==0)");
+
+        // Java's canonical UTF-8 encoding (the reference).
+        byte[] expected = latin1.getBytes(StandardCharsets.UTF_8);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        StringByteExtractor.writeVarHandle(out, latin1, valueHandle, coderHandle);
+        byte[] actual = out.toByteArray();
+
+        assertArrayEquals(expected, actual,
+                "VarHandle Latin-1 encoding must match Java UTF-8 for every Latin-1 code point");
+
+        // Round-trip: decoding the bytes must reproduce the original string.
+        assertEquals(latin1, new String(actual, StandardCharsets.UTF_8),
+                "Decoded UTF-8 must round-trip to the original Latin-1 string");
+    }
+
+    @Test
+    @DisplayName("VarHandle Latin-1 encoding matches Java UTF-8 for representative Latin-1 extended strings")
+    void testVarHandleLatin1_matchesJavaUtf8_representative() throws IOException {
+        assumeTrue(valueHandle != null, "Skipping VarHandle test: --add-opens flag missing");
+
+        String[] latin1Strings = {
+                "café",                  // U+00E9
+                "naïve résumé",          // U+00EF, U+00E9
+                "über",                  // U+00FC
+                "café au lait à la mode",// U+00E9, U+00E0
+                "ÆØÅ æøå",               // Latin-1 capitals + lowercase
+                "¡Hola! ¿Cómo estás?",   // U+00A1, U+00BF, U+00F3
+                "£100",                  // U+00A3 (pound sign is Latin-1)
+                "°C ±5",                 // U+00B0, U+00B1
+                "«quoted»",              // U+00AB, U+00BB
+                "çüğışö",                // Turkish Latin-1 chars
+        };
+
+        for (String input : latin1Strings) {
+            // Only test strings the JVM stores as Latin-1 (coder == 0).
+            if ((byte) coderHandle.get(input) != 0) {
+                continue;
+            }
+            byte[] expected = input.getBytes(StandardCharsets.UTF_8);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            StringByteExtractor.writeVarHandle(out, input, valueHandle, coderHandle);
+            byte[] actual = out.toByteArray();
+
+            assertArrayEquals(expected, actual,
+                    () -> String.format("Latin-1 encoding for '%s' must match Java UTF-8", input));
+            assertEquals(input, new String(actual, StandardCharsets.UTF_8),
+                    () -> String.format("UTF-8 round-trip for '%s'", input));
+        }
+    }
+
+    @Test
+    @DisplayName("VarHandle Latin-1 encoding matches Java UTF-8 for every single Latin-1 extended char")
+    void testVarHandleLatin1_matchesJavaUtf8_eachExtendedChar() throws IOException {
+        assumeTrue(valueHandle != null, "Skipping VarHandle test: --add-opens flag missing");
+
+        // Every Latin-1 code point in the extended range 0x80-0xFF must encode to the same
+        // UTF-8 bytes as Java's standard encoder.
+        for (int cp = 0x80; cp <= 0xFF; cp++) {
+            final int codePoint = cp;
+            String s = String.valueOf((char) cp);
+            if ((byte) coderHandle.get(s) != 0) {
+                continue; // paranoia: should always be Latin-1
+            }
+            byte[] expected = s.getBytes(StandardCharsets.UTF_8);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            StringByteExtractor.writeVarHandle(out, s, valueHandle, coderHandle);
+            assertArrayEquals(expected, out.toByteArray(),
+                    () -> String.format("Latin-1 char U+%04X must encode like Java UTF-8", codePoint));
+        }
+    }
 }

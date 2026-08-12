@@ -29,6 +29,28 @@ import java.util.function.Predicate;
  * <li>Lambda method names are normalized to either {@code lambda} or extracted original method names</li>
  * <li>Line numbers are ignored by using only class and method names</li>
  * </ul>
+ *
+ * <h2>Derivative generator markers</h2>
+ * This file is also the input for {@code StackSanitizerDerivativeGenerator}, which derives three
+ * sibling classes from it:
+ * <ul>
+ *   <li>{@code JavaStackTraceWriter}      — core, no-filter (drops {@code Predicate} and fallback)</li>
+ *   <li>{@code JavaStackSanitizerLogback} — logback, filter-enabled ({@code IThrowableProxy} input)</li>
+ *   <li>{@code JavaStackWriterLogback}    — logback, no-filter</li>
+ * </ul>
+ * The generator reads marker comment lines that annotate which variant owns the following line:
+ * <pre>{@code
+ *   // @core            next line: kept in JavaStackTraceWriter, commented out in the logback variants
+ *   // @sanitizer       next line: kept in JavaStackSanitizerLogback, commented out in the writers
+ *   // @writer          next line: kept in JavaStackWriterLogback, commented out elsewhere
+ *   // @core,writer     next line: kept in JavaStackTraceWriter and JavaStackWriterLogback
+ *   // @restore:x,y     next (already-commented) line: uncommented in variants x,y
+ * }</pre>
+ * Lines without a preceding marker are shared and kept in every variant. The generator also applies
+ * the input/accessor substitutions for logback ({@code StackTraceElement[]} → {@code StackTraceElementProxy[]},
+ * {@code el} → {@code elp.getStackTraceElement()}, {@code Throwable} → {@code IThrowableProxy},
+ * {@code rootCause.getClass().getName()} → {@code rootCause.getClassName()}, etc.). Code not needed
+ * in a variant is kept in the source but commented out in the generated derivative, never deleted.
  */
 public class JavaStackSanitizer {
 
@@ -70,9 +92,17 @@ public class JavaStackSanitizer {
         stream.reset(0);
 
         // 1. Exception type
+        // @core
         stream.update(rootCause.getClass().getName());
+        // @restore:sanitizer,writer
+        // stream.update(rootCause.getClassName());
 
+        // @core
         addFromTrace(rootCause.getStackTrace(), filter, stream);
+        // @restore:sanitizer
+        // addFromTrace(rootCause.getStackTraceElementProxyArray(), filter, stream);
+        // @restore:writer
+        // addFromTrace(rootCause.getStackTraceElementProxyArray(), stream);
 
         return stream.finalHash();
     }
@@ -89,6 +119,7 @@ public class JavaStackSanitizer {
      * @param throwableClassName exception class name to prepend to the hash payload, may be null
      * @return deterministic 64-bit hash
      */
+    // @source
     public static long fingerprintFromTrace(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -107,6 +138,7 @@ public class JavaStackSanitizer {
      * @param stream reusable streaming hash sink
      * @return deterministic 64-bit hash
      */
+    // @source
     public static long fingerprintFromTrace(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -118,12 +150,20 @@ public class JavaStackSanitizer {
             stream.update(throwableClassName);
         }
 
+        // @sanitizer
         boolean isFirstFrame = true;
 
+        // @core
         for (StackTraceElement el : trace) {
+        // @restore:sanitizer,writer
+        // for (StackTraceElementProxy elp : trace) {
+        // @restore:sanitizer,writer
+        //     StackTraceElement el = elp.getStackTraceElement();
             String className = el.getClassName();
+            // @sanitizer
             if (!filter.test(className)) continue;
 
+            // @sanitizer
             isFirstFrame = false;
             stream.updateByte(NEWLINE_BYTE);
 
@@ -155,6 +195,7 @@ public class JavaStackSanitizer {
             }
         }
 
+        // @sanitizer:begin
         if (isFirstFrame) {
             int limit = Math.min(3, trace.length);
             for (int i = 0; i < limit; i++) {
@@ -165,6 +206,7 @@ public class JavaStackSanitizer {
                 stream.update(el.getMethodName());
             }
         }
+        // @sanitizer:end
 
         return stream.finalHash();
     }
@@ -183,23 +225,36 @@ public class JavaStackSanitizer {
             StackTraceElement[] trace,
             Predicate<String> filter,
             Wyhash64.Streaming stream) {
+        // @sanitizer
         boolean isFirstFrame = true;
 
+        // @core
         for (StackTraceElement el : trace) {
+        // @restore:sanitizer,writer
+        // for (StackTraceElementProxy elp : trace) {
+        // @restore:sanitizer,writer
+        //     StackTraceElement el = elp.getStackTraceElement();
             String className = el.getClassName();
+            // @sanitizer
             if (!filter.test(className)) continue;
 
+            // @sanitizer
             isFirstFrame = false;
             stream.updateByte(NEWLINE_BYTE);
             String methodName = el.getMethodName();
 
+            // @core
             addFromTraceElement(stream, className, methodName);
+            // @restore:sanitizer,writer
+            // JavaStackSanitizer.addFromTraceElement(stream, className, methodName);
         }
 
         // Fallback: if all frames were skipped, hash top 3 (cleaned)
+        // @sanitizer
         if (isFirstFrame) {printTracesFallback(trace, stream);}
     }
 
+    // @sanitizer
     private static void printTracesFallback(StackTraceElement[] trace, Wyhash64.Streaming stream) {
         int limit = Math.min(3, trace.length);
         for (int i = 0; i < limit; i++) {
@@ -220,6 +275,7 @@ public class JavaStackSanitizer {
      * @param className input class name
      * @param methodName input method name
      */
+    // @core
     public static void addFromTraceElement(Wyhash64.Streaming stream, String className, String methodName) {
         // -------- Class name (strip $$Lambda$ suffix) --------
         int lambdaClassIdx = className.indexOf(LAMBDA_SUFFIX_FOR_CLASS);
@@ -271,18 +327,27 @@ public class JavaStackSanitizer {
         final String DOT = ".";
         final String LAMBDA_METHOD = "lambda";
 
+        // @sanitizer
         boolean isFirstFrame = true;
 
+        // @core
         for (StackTraceElement el : trace) {
+        // @restore:sanitizer,writer
+        // for (StackTraceElementProxy elp : trace) {
+        // @restore:sanitizer,writer
+        //     StackTraceElement el = elp.getStackTraceElement();
             String className = el.getClassName();
 
             // Apply filter; skip frames that don't match
+            // @sanitizer:begin
             if (!filter.test(className)) {
                 continue;
             }
+            // @sanitizer:end
 
             // Delimiter before each frame (matches streaming hash behaviour)
             sb.append(NEWLINE);
+            // @sanitizer
             isFirstFrame = false;
 
             String methodName = el.getMethodName();
@@ -319,6 +384,7 @@ public class JavaStackSanitizer {
         }
 
         // Fallback: if all frames were skipped, hash top 3 (cleaned)
+        // @sanitizer:begin
         if (isFirstFrame) {
             int limit = Math.min(3, trace.length);
             for (int i = 0; i < limit; i++) {
@@ -329,6 +395,7 @@ public class JavaStackSanitizer {
                         .append(el.getMethodName());
             }
         }
+        // @sanitizer:end
     }
 
     /**
@@ -360,6 +427,7 @@ public class JavaStackSanitizer {
      * @return deterministic 64-bit hash
      * @throws IOException if writing fails
      */
+    // @source
     public static long addFromTraceToOutputStreamAndFingerprint(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -372,6 +440,7 @@ public class JavaStackSanitizer {
         /**
          * Writes sanitized frames to output and computes fingerprint using a reusable hasher.
          */
+        // @source
         public static long addFromTraceToOutputStreamAndFingerprint(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -448,18 +517,27 @@ public class JavaStackSanitizer {
             OutputStream out,
             byte[] newlineBytes) throws IOException {
 
+        // @sanitizer
         boolean isFirstFrame = true;
 
+        // @core
         for (StackTraceElement el : trace) {
+        // @restore:sanitizer,writer
+        // for (StackTraceElementProxy elp : trace) {
+        // @restore:sanitizer,writer
+        //     StackTraceElement el = elp.getStackTraceElement();
             String className = el.getClassName();
 
             // Apply filter; skip frames that don't match
+            // @sanitizer:begin
             if (!filter.test(className)) {
                 continue;
             }
+            // @sanitizer:end
 
             // Delimiter before each frame (matches streaming hash behaviour)
             out.write(newlineBytes);
+            // @sanitizer
             isFirstFrame = false;
 
             String methodName = el.getMethodName();
@@ -497,6 +575,7 @@ public class JavaStackSanitizer {
         }
 
         // Fallback: if all frames were skipped, write top 3 (cleaned)
+        // @sanitizer:begin
         if (isFirstFrame) {
             int limit = Math.min(3, trace.length);
             for (int i = 0; i < limit; i++) {
@@ -507,6 +586,7 @@ public class JavaStackSanitizer {
                 stringWriteStrategy.write(out,el.getMethodName());
             }
         }
+        // @sanitizer:end
     }
 
     /**
@@ -523,6 +603,7 @@ public class JavaStackSanitizer {
      * @return deterministic 64-bit hash
      * @throws IOException if writing fails
      */
+    // @source
     public static long addFromTraceToOutputStreamWithNewlineAndFingerprint(
             StackTraceElement[] trace,
             Predicate<String> filter,
@@ -550,16 +631,25 @@ public class JavaStackSanitizer {
             stream.update(throwableClassName);
         }
 
+        // @sanitizer
         boolean isFirstFrame = true;
 
+        // @core
         for (StackTraceElement el : trace) {
+        // @restore:sanitizer,writer
+        // for (StackTraceElementProxy elp : trace) {
+        // @restore:sanitizer,writer
+        //     StackTraceElement el = elp.getStackTraceElement();
             String className = el.getClassName();
 
+            // @sanitizer:begin
             if (!filter.test(className)) {
                 continue;
             }
+            // @sanitizer:end
 
             out.write(newlineBytes);
+            // @sanitizer
             isFirstFrame = false;
 
             stream.updateByte(NEWLINE_BYTE);
@@ -597,25 +687,24 @@ public class JavaStackSanitizer {
             }
         }
 
+        // @sanitizer:begin
         if (isFirstFrame) {
             int limit = Math.min(3, trace.length);
             for (int i = 0; i < limit; i++) {
                 out.write(newlineBytes);
                 stream.updateByte(NEWLINE_BYTE);
-
                 StackTraceElement el = trace[i];
                 String className = el.getClassName();
                 String methodName = el.getMethodName();
-
                 stringWriteStrategy.write(out,className);
                 out.write(DOT_BYTES);
                 stringWriteStrategy.write(out,methodName);
-
                 stream.update(className);
                 stream.updateByte(DOT_BYTE);
                 stream.update(methodName);
             }
         }
+        // @sanitizer:end
 
         return stream.finalHash();
     }

@@ -80,12 +80,33 @@ public final class StringByteExtractor {
     public static void writeVarHandle(OutputStream out, String s, VarHandle valueHandle, VarHandle coderHandle) throws IOException {
         byte coder = (byte) coderHandle.get(s);
 
-        if (coder == 0) { // LATIN1 / ASCII
+        if (coder == 0) { // LATIN1 (compact string): one byte per char
             byte[] internalValue = (byte[]) valueHandle.get(s);
-            out.write(internalValue, 0, internalValue.length);
+            writeLatin1(out, internalValue);
         } else {
             // Safety fallback for non-Latin1 strings (UTF-16)
             writeClassic(out, s);
+        }
+    }
+
+    /**
+     * Writes a Latin-1 compact-string byte array to the output stream, encoding it to UTF-8 in a
+     * single pass (no intermediate allocation). Latin-1 bytes are identical to UTF-8 only for ASCII
+     * (0x00-0x7F); Latin-1 extended chars (0x80-0xFF) are expanded to 2-byte UTF-8 sequences.
+     *
+     * @param out target stream
+     * @param latin1Bytes the internal {@code byte[]} of a Latin-1 compact string (coder == 0)
+     * @throws IOException if writing fails
+     */
+    public static void writeLatin1(OutputStream out, byte[] latin1Bytes) throws IOException {
+        for (byte b : latin1Bytes) {
+            int v = b & 0xFF;
+            if (v < 0x80) {
+                out.write(v);
+            } else {
+                out.write(0xC0 | (v >> 6));       // 110xxxxx
+                out.write(0x80 | (v & 0x3F));     // 10xxxxxx
+            }
         }
     }
 
