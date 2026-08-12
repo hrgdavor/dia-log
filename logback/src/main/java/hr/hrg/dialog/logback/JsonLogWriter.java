@@ -58,7 +58,7 @@ public class JsonLogWriter {
      private final byte[] longNumberBuffer = JsonNumberWriter.makeLongBuffer();
 
     /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
-    private Predicate<String> stackTraceFilter = cls -> true;
+    private Predicate<String> stackTraceFilter = null;
 
     public JsonLogWriter() {}
 
@@ -71,7 +71,7 @@ public class JsonLogWriter {
      * @param filter frame class filter; {@code null} resets to the default accept-all predicate
      */
     public void setStackTraceFilter(Predicate<String> filter) {
-        this.stackTraceFilter = filter != null ? filter : (cls -> true);
+        this.stackTraceFilter = filter;
     }
 
     public void writeJsonEvent(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
@@ -141,13 +141,19 @@ public class JsonLogWriter {
                     STRING_STRATEGY.write(out, throwableClassName);
                 }
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
-                long fingerPrint = JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                // micro optimization to call variant without filter
+                long fingerPrint = stackTraceFilter == null ? 
+                JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                     arrProxy,
                     stackTraceFilter,
                     out,
                     throwableClassName
+                ) : 
+                JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                    arrProxy,
+                    out,
+                    throwableClassName
                 );
-
                 out.write('"');
 
                 writeFieldPrefix(out, KEY_ERR_HASH);

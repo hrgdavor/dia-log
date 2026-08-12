@@ -24,6 +24,9 @@ public class JavaStackTraceWriter {
     public static final StringByteExtractor.ByteWriter stringWriteStrategy = StringByteExtractor.getStrategy();
     public static final String LAMBDA_SUFFIX_FOR_CLASS = "$$Lambda$";
     public static final String LAMBDA_PREFIX_FOR_METHOD = "lambda$";
+
+    private static final byte DOT_BYTE = '.';
+    private static final byte NEWLINE_BYTE = '\n';
     /**
      * Builds a deterministic fingerprint for a throwable using all stack frames.
      * <p>
@@ -301,5 +304,119 @@ public class JavaStackTraceWriter {
                 stringWriteStrategy.write(out,el.getMethodName());
             }
         }*/
+    }
+
+    /**
+     * Writes normalized frame content for all frames with JSON-escaped newline separators
+     * and computes the fingerprint in one pass.
+     * <p>
+     * This is the no-filter single-pass counterpart to
+     * {@link JavaStackSanitizer#addFromTraceToOutputStreamJsonAndFingerprint(StackTraceElement[], Predicate, OutputStream, String)}.
+     * Every frame is included (no filtering, no fallback), and the produced hash is identical to
+     * the sanitizer path invoked with an accept-all predicate.
+     *
+     * @param trace stack trace elements to process
+     * @param out target stream
+     * @param throwableClassName exception class name to include in hash seed, may be null
+     * @return deterministic 64-bit hash
+     * @throws IOException if writing fails
+     */
+    public static long addFromTraceToOutputStreamJsonAndFingerprint(
+            StackTraceElement[] trace,
+            OutputStream out,
+            String throwableClassName) throws IOException {
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        return addFromTraceToOutputStreamJsonAndFingerprint(trace, out, throwableClassName, stream);
+    }
+
+    /**
+     * Writes normalized frame content for all frames with JSON-escaped newline separators
+     * and computes the fingerprint in one pass, using a caller-supplied reusable hasher.
+     *
+     * @param trace stack trace elements to process
+     * @param out target stream
+     * @param throwableClassName exception class name to include in hash seed, may be null
+     * @param stream reusable hasher instance, reset and reused on the hot path
+     * @return deterministic 64-bit hash
+     * @throws IOException if writing fails
+     */
+    public static long addFromTraceToOutputStreamJsonAndFingerprint(
+            StackTraceElement[] trace,
+            OutputStream out,
+            String throwableClassName,
+            Wyhash64.Streaming stream) throws IOException {
+        return addFromTraceToOutputStreamWithNewlineAndFingerprint(
+                trace,
+                out,
+                NEWLINE_JSON_BYTES,
+                throwableClassName,
+                stream
+        );
+    }
+
+    /**
+     * Writes normalized frame content for all frames using caller-provided newline bytes
+     * and computes the fingerprint in one pass.
+     * <p>
+     * For hash compatibility with {@link #fingerprint(Throwable, Predicate)} the hash
+     * delimiter is always raw '\n'.
+     *
+     * @param trace stack trace elements to process
+     * @param out target stream
+     * @param newlineBytes delimiter bytes placed before each frame
+     * @param throwableClassName exception class name to include in hash seed, may be null
+     * @param stream reusable hasher instance, reset and reused on the hot path
+     * @return deterministic 64-bit hash
+     * @throws IOException if writing fails
+     */
+    public static long addFromTraceToOutputStreamWithNewlineAndFingerprint(
+            StackTraceElement[] trace,
+            OutputStream out,
+            byte[] newlineBytes,
+            String throwableClassName,
+            Wyhash64.Streaming stream) throws IOException {
+
+        stream.reset(0);
+        if (throwableClassName != null) {
+            stream.update(throwableClassName);
+        }
+
+        for (StackTraceElement el : trace) {
+            String className = el.getClassName();
+
+            out.write(newlineBytes);
+            stream.updateByte(NEWLINE_BYTE);
+
+            String methodName = el.getMethodName();
+            int lambdaClassIdx = className.indexOf(LAMBDA_SUFFIX_FOR_CLASS);
+            int classEnd = (lambdaClassIdx != -1) ? lambdaClassIdx : className.length();
+            stringWriteStrategy.write(out, className.substring(0, classEnd));
+            stream.update(className, 0, classEnd);
+
+            out.write(DOT_BYTES);
+            stream.updateByte(DOT_BYTE);
+
+            if (lambdaClassIdx != -1) {
+                out.write(LAMBDA_METHOD_BYTES);
+                stream.update(LAMBDA_METHOD_BYTES, 0, LAMBDA_METHOD_BYTES.length);
+            } else if (methodName.startsWith(LAMBDA_PREFIX_FOR_METHOD)) {
+                int firstDollar = methodName.indexOf('$');
+                if (firstDollar != -1) {
+                    int start = firstDollar + 1;
+                    int secondDollar = methodName.indexOf('$', firstDollar + 1);
+                    int end = (secondDollar != -1) ? secondDollar : methodName.length();
+                    stringWriteStrategy.write(out, methodName.substring(start, end));
+                    stream.update(methodName, start, end - start);
+                } else {
+                    stringWriteStrategy.write(out, methodName);
+                    stream.update(methodName);
+                }
+            } else {
+                stringWriteStrategy.write(out, methodName);
+                stream.update(methodName);
+            }
+        }
+
+        return stream.finalHash();
     }
 }

@@ -103,4 +103,61 @@ class JavaStackWriterLogbackTest {
 
         assertEquals(core.toString(StandardCharsets.UTF_8), logback.toString(StandardCharsets.UTF_8));
     }
+
+    @Test
+    void singlePassFingerprint_matchesStreamingHash() throws IOException {
+        Throwable throwable = sampleThrowable();
+        IThrowableProxy proxy = new ThrowableProxy(throwable);
+
+        // Single-pass hash (with class-name seed), compared against the streaming hash fed the same seed.
+        long singlePass = JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                proxy.getStackTraceElementProxyArray(),
+                new ByteArrayOutputStream(),
+                throwable.getClass().getName());
+
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        stream.update(throwable.getClass().getName());
+        JavaStackWriterLogback.addFromTrace(proxy.getStackTraceElementProxyArray(), stream);
+
+        assertEquals(stream.finalHash(), singlePass);
+    }
+
+    @Test
+    void singlePassFingerprint_matchesSanitizerAcceptAllFingerprint() throws IOException {
+        Throwable throwable = sampleThrowable();
+        IThrowableProxy proxy = new ThrowableProxy(throwable);
+
+        long singlePass = JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                proxy.getStackTraceElementProxyArray(),
+                new ByteArrayOutputStream(),
+                throwable.getClass().getName());
+
+        long sanitizer = JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                proxy.getStackTraceElementProxyArray(),
+                cls -> true,
+                new ByteArrayOutputStream(),
+                throwable.getClass().getName());
+
+        assertEquals(sanitizer, singlePass);
+    }
+
+    @Test
+    void singlePassFingerprint_reusableStreamReset() throws IOException {
+        Throwable throwable = sampleThrowable();
+        IThrowableProxy proxy = new ThrowableProxy(throwable);
+
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        long first = JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                proxy.getStackTraceElementProxyArray(),
+                new ByteArrayOutputStream(),
+                throwable.getClass().getName(),
+                stream);
+        long second = JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                proxy.getStackTraceElementProxyArray(),
+                new ByteArrayOutputStream(),
+                throwable.getClass().getName(),
+                stream);
+
+        assertEquals(first, second);
+    }
 }

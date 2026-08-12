@@ -257,4 +257,86 @@ class JavaStackTraceWriterTest {
         assertTrue(JavaStackTraceWriter.NEWLINE_BYTES.length > 0);
         assertTrue(JavaStackTraceWriter.LAMBDA_METHOD_BYTES.length > 0);
     }
+
+    // ---- single-pass write + fingerprint ----
+
+    private static StackTraceElement[] mixedFrames() {
+        return new StackTraceElement[]{
+                ste("com.example.MyClass", "doStuff"),
+                ste("com.example.MyClass$$Lambda$42/0xdeadbeef", "run"),
+                ste("com.example.MyClass", "lambda$doOtherStuff$99"),
+        };
+    }
+
+    @Test
+    void singlePassFingerprint_matchesStreamingHash() throws java.io.IOException {
+        StackTraceElement[] frames = mixedFrames();
+
+        long singlePass = JavaStackTraceWriter.addFromTraceToOutputStreamJsonAndFingerprint(
+                frames,
+                new java.io.ByteArrayOutputStream(),
+                "com.example.MyException");
+
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        stream.update("com.example.MyException");
+        JavaStackTraceWriter.addFromTrace(frames, stream);
+
+        assertEquals(stream.finalHash(), singlePass,
+                "Single-pass hash should match the streaming hash seeded with the exception class name");
+    }
+
+    @Test
+    void singlePassFingerprint_matchesSanitizerAcceptAllFingerprint() throws java.io.IOException {
+        StackTraceElement[] frames = mixedFrames();
+
+        long singlePass = JavaStackTraceWriter.addFromTraceToOutputStreamJsonAndFingerprint(
+                frames,
+                new java.io.ByteArrayOutputStream(),
+                "com.example.MyException");
+
+        long sanitizer = JavaStackSanitizer.addFromTraceToOutputStreamJsonAndFingerprint(
+                frames,
+                cls -> true,
+                new java.io.ByteArrayOutputStream(),
+                "com.example.MyException");
+
+        assertEquals(sanitizer, singlePass,
+                "No-filter single-pass hash should match sanitizer accept-all single-pass hash");
+    }
+
+    @Test
+    void singlePassFingerprint_reusableStreamReset() throws java.io.IOException {
+        StackTraceElement[] frames = mixedFrames();
+
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        long first = JavaStackTraceWriter.addFromTraceToOutputStreamJsonAndFingerprint(
+                frames,
+                new java.io.ByteArrayOutputStream(),
+                "com.example.MyException",
+                stream);
+        long second = JavaStackTraceWriter.addFromTraceToOutputStreamJsonAndFingerprint(
+                frames,
+                new java.io.ByteArrayOutputStream(),
+                "com.example.MyException",
+                stream);
+
+        assertEquals(first, second,
+                "Reusable hasher should reset between calls and produce the same deterministic hash");
+    }
+
+    @Test
+    void singlePassFingerprint_nullThrowableClassName() throws java.io.IOException {
+        StackTraceElement[] frames = mixedFrames();
+
+        long withNull = JavaStackTraceWriter.addFromTraceToOutputStreamJsonAndFingerprint(
+                frames,
+                new java.io.ByteArrayOutputStream(),
+                null);
+
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        JavaStackTraceWriter.addFromTrace(frames, stream);
+
+        assertEquals(stream.finalHash(), withNull,
+                "Null throwable class name should skip the hash seed");
+    }
 }
