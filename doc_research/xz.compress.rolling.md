@@ -1,4 +1,12 @@
-To enable Logback to compress rotated logs to **XZ** format, you need to implement a custom rolling policy that uses the XZ library. Since Logback only natively supports `.gz` and `.zip`, you have to override its compression mechanism. The solution below provides a straightforward extension of `TimeBasedRollingPolicy` (or `SizeAndTimeBasedRollingPolicy`) that uses `XZOutputStream` from the `org.tukaani.xz` package.
+> **UPDATE (Logback 1.5.18+):** Logback now has **native XZ compression support**.
+> `RollingPolicyBase.determineCompressionMode()` auto-detects a `.xz` suffix and sets
+> `CompressionMode.XZ`; the built-in `XZCompressionStrategy` then compresses rotated
+> files with `org.tukaani.xz.XZOutputStream`. No custom rolling policy or compressor
+> is needed — just add the `org.tukaani:xz` dependency and use a `fileNamePattern`
+> ending in `.xz`. The custom-extension approach below is only necessary for
+> Logback versions older than 1.5.18.
+
+To enable Logback to compress rotated logs to **XZ** format on Logback versions before 1.5.18, you need to implement a custom rolling policy that uses the XZ library. Since older Logback only natively supports `.gz` and `.zip`, you have to override its compression mechanism. The solution below provides a straightforward extension of `TimeBasedRollingPolicy` (or `SizeAndTimeBasedRollingPolicy`) that uses `XZOutputStream` from the `org.tukaani.xz` package.
 
 ---
 

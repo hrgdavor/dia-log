@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<stackTraceFilter>` predicate (a fully-qualified class name implementing
   `Predicate<String>`) to exclude stack-trace frames from the written `stack`
   field and the `errHash` fingerprint.
+- XZ compression support for rotated logs documented. The example module now bundles the
+  `org.tukaani:xz` dependency so Logback's native XZ compression
+  (`XZCompressionStrategy`) is available. Using a `fileNamePattern` ending in
+  `.xz` on a `TimeBasedRollingPolicy` or `SizeAndTimeBasedRollingPolicy` to
+  compress rotated files with XZ.
 
 ## [1.0.0] - 2026-08-11
 

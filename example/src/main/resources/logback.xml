@@ -9,7 +9,12 @@
     <appender name="JSON_FILE" class="hr.hrg.dialog.logback.JsonAppenderRolling">
         <file>logs/example.jsonl</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>logs/example.%d{yyyy-MM-dd}.%i.jsonl.gz</fileNamePattern>
+            <!--
+                Logback 1.5.18+ has native XZ compression support: when the
+                fileNamePattern ends with .xz, rotated files are compressed with
+                the org.tukaani:xz library using XZCompressionStrategy.
+            -->
+            <fileNamePattern>logs/example.%d{yyyy-MM-dd}.%i.jsonl.xz</fileNamePattern>
             <maxFileSize>10MB</maxFileSize>
             <maxHistory>7</maxHistory>
             <totalSizeCap>100MB</totalSizeCap>

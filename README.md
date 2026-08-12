@@ -118,6 +118,51 @@ The current logback module is configured with standard Logback appenders and the
 
 If you want to use the library's custom JSON writer directly, the repository also contains `JsonAppender` and `JsonAppenderRolling`, which write JSON events using `JsonLogWriter`.
 
+## XZ Compression of Rotated Logs
+
+Logback 1.5.18+ has **native XZ compression support** for rotated log files. When a
+rolling policy's `fileNamePattern` ends with `.xz`, Logback automatically compresses
+the rotated file using its built-in `XZCompressionStrategy` (which uses the
+`org.tukaani.xz` library).
+
+The `dia-log-logback` module already bundles the `org.tukaani:xz` dependency, so no
+extra dependency is needed when using this module. If you use Logback directly
+(without `dia-log-logback`), add the dependency yourself:
+
+```xml
+<dependency>
+    <groupId>org.tukaani</groupId>
+    <artifactId>xz</artifactId>
+    <version>1.12</version>
+</dependency>
+```
+
+### Example
+
+```xml
+<appender name="JSON" class="hr.hrg.dialog.logback.JsonAppenderRolling">
+    <file>logs/app.jsonl</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>logs/app.%d{yyyy-MM-dd}.%i.jsonl.xz</fileNamePattern>
+        <maxFileSize>10MB</maxFileSize>
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>2GB</totalSizeCap>
+    </rollingPolicy>
+    <encoder>
+        <pattern>%msg%n</pattern>
+    </encoder>
+</appender>
+```
+
+### Notes
+
+- The active `<file>` should **not** end in `.xz` — it is the uncompressed, currently
+  written log file. Only the archived `fileNamePattern` uses the `.xz` suffix.
+- If the `org.tukaani:xz` library is missing from the classpath, Logback logs a
+  warning and falls back to GZIP compression (replacing the `.xz` suffix with `.gz`).
+- XZ offers better compression ratios than GZIP but is slower to compress. Consider
+  asynchronous logging if compression latency matters.
+
 ## Reading Logs with `jlx`
 
 Dia-Log writes JSON Lines, so you can read, filter, and analyze the output with [`jlx`](https://github.com/hrgdavor/zig-jlx) — a fast command-line utility for structured JSON logs.

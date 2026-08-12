@@ -34,6 +34,18 @@
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
         </dependency>
+
+        <!--
+            Required for XZ compression of rotated logs. Logback 1.5.18+ has native
+            XZ support (XZCompressionStrategy) but needs the org.tukaani:xz library
+            on the classpath. dia-log-logback already bundles this dependency, so
+            this is only needed if you use the example standalone.
+        -->
+        <dependency>
+            <groupId>org.tukaani</groupId>
+            <artifactId>xz</artifactId>
+            <version>1.12</version>
+        </dependency>
     </dependencies>
 
     <build>

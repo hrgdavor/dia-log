@@ -80,3 +80,48 @@ If `<stackTraceFilter>` is omitted or left blank, the default accept-all predica
 - Frames rejected by the predicate are skipped in the single-pass writer, so they affect neither the JSON `stack` content nor the `errHash` value.
 - If **all** frames are rejected, the sanitizer falls back to hashing/writing the top 3 raw frames (the same fallback used when a filter matches nothing), so `errHash` is still deterministic.
 - The predicate receives the frame's fully-qualified class name exactly as reported by the JVM (including lambda suffixes such as `$$Lambda$42/0x...`), so write your matchers accordingly (e.g. `startsWith(...)` rather than exact equality).
+
+## XZ compression of rotated logs
+
+Logback 1.5.18+ has **native XZ compression support** for rotated log files. When a
+rolling policy's `fileNamePattern` ends with `.xz`, Logback automatically compresses
+the rotated file using its built-in `XZCompressionStrategy` (which uses the
+`org.tukaani.xz` library).
+
+The `dia-log-logback` module already bundles the `org.tukaani:xz` dependency, so no
+extra dependency is needed when using this module. If you use Logback directly
+(without `dia-log-logback`), add the dependency yourself:
+
+```xml
+<dependency>
+    <groupId>org.tukaani</groupId>
+    <artifactId>xz</artifactId>
+    <version>1.12</version>
+</dependency>
+```
+
+### Example
+
+```xml
+<appender name="JSON" class="hr.hrg.dialog.logback.JsonAppenderRolling">
+    <file>logs/app.jsonl</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+        <fileNamePattern>logs/app.%d{yyyy-MM-dd}.%i.jsonl.xz</fileNamePattern>
+        <maxFileSize>10MB</maxFileSize>
+        <maxHistory>30</maxHistory>
+        <totalSizeCap>2GB</totalSizeCap>
+    </rollingPolicy>
+    <encoder>
+        <pattern>%msg%n</pattern>
+    </encoder>
+</appender>
+```
+
+### Notes
+
+- The active `<file>` should **not** end in `.xz` — it is the uncompressed, currently
+  written log file. Only the archived `fileNamePattern` uses the `.xz` suffix.
+- If the `org.tukaani:xz` library is missing from the classpath, Logback logs a
+  warning and falls back to GZIP compression (replacing the `.xz` suffix with `.gz`).
+- XZ offers better compression ratios than GZIP but is slower to compress. Consider
+  asynchronous logging if compression latency matters.
