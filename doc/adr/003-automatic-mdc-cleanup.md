@@ -2,6 +2,7 @@
 
 * **Status:** Not accepted
 * **Date:** 2026-07-26
+* **Implementation Status:** Not implemented
 
 ## Context
 

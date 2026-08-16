@@ -2,6 +2,7 @@
 
 * **Status:** Superseded (removed 2026-07-30)
 * **Date:** 2026-07-26
+* **Implementation Status:** Removed
 
 ## Context
 
