@@ -1,5 +1,8 @@
 package hr.hrg.dialog.core;
 
+import hr.hrg.dialog.ryu.RyuDouble;
+import hr.hrg.dialog.ryu.RyuFloat;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +21,10 @@ public final class JsonNumberWriter {
     private static final int MAX_LONG_BYTES = 20;
     private static final byte[] MIN_LONG_BYTES = "-9223372036854775808".getBytes(StandardCharsets.UTF_8);
 
+    // IEEE 754 max ASCII lengths
+    public static final int MAX_FLOAT_BYTES = 16;
+    public static final int MAX_DOUBLE_BYTES = 25;
+
     static {
         for (int i = 0; i < 100; i++) {
             DIGIT_PAIRS[i * 2] = (byte) ('0' + (i / 10));
@@ -33,6 +40,14 @@ public final class JsonNumberWriter {
 
     public static byte[] makeLongBuffer() {
         return new byte[MAX_LONG_BYTES];
+    }
+
+    public static byte[] makeFloatBuffer() {
+        return new byte[MAX_FLOAT_BYTES];
+    }
+
+    public static byte[] makeDoubleBuffer() {
+        return new byte[MAX_DOUBLE_BYTES];
     }
 
     public static void writeInt(OutputStream out, byte[] intBuffer, int value) throws IOException {
@@ -102,23 +117,25 @@ public final class JsonNumberWriter {
         out.write(longBuffer, cursor, MAX_LONG_BYTES - cursor);
     }
 
-    public static void writeFloat(OutputStream out, float value) throws IOException {
+    public static void writeFloat(OutputStream out, byte[] floatBuffer, float value) throws IOException {
         if (!Float.isFinite(value)) {
             out.write(JSON_NULL);
             return;
         }
-        STRING_STRATEGY.write(out, Float.toString(value));
+        int len = RyuFloat.writeFloat(value, floatBuffer, 0);
+        out.write(floatBuffer, 0, len);
     }
 
-    public static void writeDouble(OutputStream out, double value) throws IOException {
+    public static void writeDouble(OutputStream out, byte[] doubleBuffer, double value) throws IOException {
         if (!Double.isFinite(value)) {
             out.write(JSON_NULL);
             return;
         }
-        STRING_STRATEGY.write(out, Double.toString(value));
+        int len = RyuDouble.writeDouble(value, doubleBuffer, 0);
+        out.write(doubleBuffer, 0, len);
     }
 
-    public static void writeNumber(OutputStream out, byte[] intBuffer, byte[] longBuffer, Number value) throws IOException {
+    public static void writeNumber(OutputStream out, byte[] intBuffer, byte[] longBuffer, byte[] floatBuffer, byte[] doubleBuffer, Number value) throws IOException {
         if (value == null) {
             out.write(JSON_NULL);
             return;
@@ -129,9 +146,10 @@ public final class JsonNumberWriter {
             case Long l -> writeLong(out, longBuffer, l);
             case Short s -> writeInt(out, intBuffer, s.intValue());
             case Byte b -> writeInt(out, intBuffer, b.intValue());
-            case Float f -> writeFloat(out, f);
-            case Double d -> writeDouble(out, d);
+            case Float f -> writeFloat(out, floatBuffer, f);
+            case Double d -> writeDouble(out, doubleBuffer, d);
             default -> STRING_STRATEGY.write(out, value.toString());
         }
     }
+
 }

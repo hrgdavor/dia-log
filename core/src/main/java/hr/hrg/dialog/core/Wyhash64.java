@@ -448,17 +448,23 @@ public final class Wyhash64 {
         long a, b;
 
         if (byteLen <= 16) {
-            if (byteLen >= 8) {
-                // 4 to 8 chars: read two 4-char (8-byte) chunks
-                a = charToLongLE(chars, off);
-                b = charToLongLE(chars, off + len - 4);
-            } else if (byteLen >= 4) {
-                // 2 chars: read as a single int (4 bytes)
-                a = ((long) charToIntLE(chars, off) << 32) | charToIntLE(chars, off) & 0xFFFFFFFFL;
-                b = 0;
+            if (byteLen >= 4) {
+                // Mirror the byte[] path's read32-interleave formulas (all int
+                // reads land on even byte offsets, so charToIntLE applies).
+                // This keeps hash(char[]) consistent with hash(byte[]) of the
+                // UTF-16 little-endian bytes for every length <= 16.
+                int q = (byteLen >> 3) << 2;
+                a = ((long) charToIntLE(chars, off) << 32)
+                        | (charToIntLE(chars, off + (q >> 1)) & 0xFFFFFFFFL);
+                b = ((long) charToIntLE(chars, off + ((byteLen - 4) >> 1)) << 32)
+                        | (charToIntLE(chars, off + ((byteLen - 4 - q) >> 1)) & 0xFFFFFFFFL);
             } else if (byteLen > 0) {
-                // 1 char: read as 2 bytes
-                a = (chars[off] & 0xFFFFL) << 8 | 1L;
+                // 1 char: read as 2 bytes, using the same wyr3 layout as the
+                // byte[]/Latin-1 paths so hash(char[]) of a single UTF-16 char
+                // agrees with hash(byte[]) of its little-endian bytes.
+                a = ((chars[off] & 0xFFL) << 16)
+                  | (((chars[off] >> 8) & 0xFFL) << 8)
+                  | ((chars[off] >> 8) & 0xFFL);
                 b = 0;
             } else {
                 a = 0;
@@ -932,15 +938,21 @@ public final class Wyhash64 {
                 }
                 bufLen += charsToBuf;
                 off += charsToBuf;
-                if (bufLen == 48) {
+                if (bufLen == 48 && off < charEnd) {
+                    // Round only when more input follows. If this update ends with
+                    // the buffer exactly full, defer the round: the final 48-byte
+                    // block must stay unrounded (like the byte[] path) so finalHash
+                    // processes it in 16-byte steps and matches hash(byte[]).
                     round(buf, 0);
                     bufLen = 0;
                 }
                 if (off >= charEnd) return;
             }
 
-            // Process full 48-char blocks directly from char[] as single bytes
-            while (charEnd - off >= 48) {
+            // Process full 48-char blocks directly from char[] as single bytes.
+            // Strictly greater: the last 48 chars of the stream stay in buf,
+            // unrounded, for finalHash to process as 16-byte steps.
+            while (charEnd - off > 48) {
                 round(chars, off);
                 off += 48;
             }
@@ -978,39 +990,98 @@ public final class Wyhash64 {
                 }
                 bufLen += charsToBuf * 2;
                 off += charsToBuf;
-                if (bufLen == 48) {
+                if (bufLen == 48 && off < charEnd) {
+                    // Defer the round when this update ends with the buffer
+                    // exactly full (see updateLatin1) so the final 48-byte block
+                    // is processed by finalHash in 16-byte steps.
                     round(buf, 0);
                     bufLen = 0;
+                } else if (bufLen == 47 && off < charEnd) {
+                    // Odd pending byte count with more chars to come: the next
+                    // char's low byte completes the 48-byte block. Split the
+                    // char across the boundary — low byte finishes the block,
+                    // high byte starts the new pending region (bufLen = 1).
+                    char c = chars[off];
+                    buf[47] = (byte) (c & 0xFF);
+                    round(buf, 0);
+                    buf[0] = (byte) ((c >> 8) & 0xFF);
+                    bufLen = 1;
+                    off++;
                 }
                 if (off >= charEnd) return;
             }
 
-            // Process full 24-char (48-byte) blocks
-            while (charEnd - off >= 24) {
-                // Pack 24 chars as 48 bytes (LE) into buf and round
-                for (int i = 0; i < 24; i++) {
-                    char c = chars[off + i];
-                    buf[i * 2] = (byte) (c & 0xFF);
-                    buf[i * 2 + 1] = (byte) ((c >> 8) & 0xFF);
+            if (bufLen == 0) {
+                // Process full 24-char (48-byte) blocks. Strictly greater: the
+                // last 24 chars of the stream stay packed in buf, unrounded,
+                // for finalHash to process as 16-byte steps.
+                while (charEnd - off > 24) {
+                    // Pack 24 chars as 48 bytes (LE) into buf and round
+                    for (int i = 0; i < 24; i++) {
+                        char c = chars[off + i];
+                        buf[i * 2] = (byte) (c & 0xFF);
+                        buf[i * 2 + 1] = (byte) ((c >> 8) & 0xFF);
+                    }
+                    round(buf, 0);
+                    off += 24;
                 }
-                round(buf, 0);
-                off += 24;
-            }
 
-            // Remaining chars go into the buffer
-            int remainingChars = charEnd - off;
-            if (remainingChars > 0) {
-                int remainingBytes = remainingChars * 2;
-                // Tail handling: match byte[] path's <16-bytes-after-round logic.
-                // Since we pack chars into buf and round from buf, the last full
-                // block's bytes (including the tail prefix) are already in buf[32..47].
-                // No copy needed — finalHash will find them at buf[48-(16-remainingBytes)..47].
-                for (int i = 0; i < remainingChars; i++) {
-                    char c = chars[off + i];
-                    buf[i * 2] = (byte) (c & 0xFF);
-                    buf[i * 2 + 1] = (byte) ((c >> 8) & 0xFF);
+                // Remaining chars go into the buffer
+                int remainingChars = charEnd - off;
+                if (remainingChars > 0) {
+                    int remainingBytes = remainingChars * 2;
+                    // Tail handling: match byte[] path's <16-bytes-after-round logic.
+                    // Since we pack chars into buf and round from buf, the last full
+                    // block's bytes (including the tail prefix) are already in buf[32..47].
+                    // No copy needed — finalHash will find them at buf[48-(16-remainingBytes)..47].
+                    for (int i = 0; i < remainingChars; i++) {
+                        char c = chars[off + i];
+                        buf[i * 2] = (byte) (c & 0xFF);
+                        buf[i * 2 + 1] = (byte) ((c >> 8) & 0xFF);
+                    }
+                    bufLen = remainingBytes;
                 }
-                bufLen = remainingBytes;
+            } else {
+                // bufLen == 1: an odd pending byte (from the char split above).
+                // Append the rest char-by-char, splitting at the 48-byte boundary
+                // when a char would straddle it.
+                appendUtf16(chars, off, charEnd);
+            }
+        }
+
+        /**
+         * Append the UTF-16 little-endian bytes of {@code chars[off..charEnd)}
+         * to the pending buffer, rounding full 48-byte blocks. Handles an odd
+         * pending byte count by splitting a char across the block boundary
+         * (low byte completes the block, high byte starts the new tail).
+         */
+        private void appendUtf16(char[] chars, int off, int charEnd) {
+            while (off < charEnd) {
+                int avail = 48 - bufLen;
+                if (avail == 0) {
+                    round(buf, 0);
+                    bufLen = 0;
+                    avail = 48;
+                }
+                if (avail == 1) {
+                    // Only one byte slot left: split the char so its low byte
+                    // completes the 48-byte block and its high byte becomes the
+                    // first pending byte of the next region.
+                    char c = chars[off++];
+                    buf[47] = (byte) (c & 0xFF);
+                    round(buf, 0);
+                    buf[0] = (byte) ((c >> 8) & 0xFF);
+                    bufLen = 1;
+                    continue;
+                }
+                int charsToTake = Math.min(charEnd - off, avail / 2);
+                for (int i = 0; i < charsToTake; i++) {
+                    char c = chars[off + i];
+                    buf[bufLen + i * 2] = (byte) (c & 0xFF);
+                    buf[bufLen + i * 2 + 1] = (byte) ((c >> 8) & 0xFF);
+                }
+                bufLen += charsToTake * 2;
+                off += charsToTake;
             }
         }
 
@@ -1068,7 +1139,10 @@ public final class Wyhash64 {
 
         public long finalHash() {
             long _a = 0, _b = 0;
-            long[] _state = { state[0], state[1], state[2] };
+            // Local copies of the state — finalHash must not mutate the
+            // streaming instance (it may be called again or the hasher reused
+            // via reset()). Locals instead of a long[] avoid any allocation.
+            long s0 = state[0], s1 = state[1], s2 = state[2];
             byte[] input = buf;
             int inputLen = bufLen;
 
@@ -1087,31 +1161,51 @@ public final class Wyhash64 {
                     _b = 0;
                 }
             } else {
-                byte[] scratch = null;
-                if (inputLen < 16) {
-                    int rem = 16 - inputLen;
-                    scratch = new byte[16];
-                    System.arraycopy(buf, 48 - rem, scratch, 0, rem);
-                    System.arraycopy(buf, 0, scratch, rem, inputLen);
-                    input = scratch;
-                    inputLen = 16;
-                }
-
                 if (totalLen >= 48) {
-                    _state[0] ^= _state[1] ^ _state[2];
+                    s0 ^= s1 ^ s2;
                 }
 
-                int i = 0;
-                while (i + 16 < inputLen) {
-                    _state[0] = mix(getLong(input, i) ^ DEFAULT_SECRET[1], getLong(input, i + 8) ^ _state[0]);
-                    i += 16;
+                if (inputLen >= 16) {
+                    int i = 0;
+                    while (i + 16 < inputLen) {
+                        s0 = mix(getLong(input, i) ^ DEFAULT_SECRET[1], getLong(input, i + 8) ^ s0);
+                        i += 16;
+                    }
+                    _a = getLong(input, inputLen - 16);
+                    _b = getLong(input, inputLen - 8);
+                } else {
+                    // Fewer than 16 pending bytes. The final 16-byte window is
+                    // split across two regions of buf: the last `rem` bytes of
+                    // the last full 48-byte block (kept at buf[48-rem..48)) and
+                    // the pending tail (buf[0..inputLen)). Read both longs
+                    // directly from those regions — no scratch array allocation.
+                    int rem = 16 - inputLen;
+                    if (rem == 16) {
+                        // No pending tail: the window is the last 16 bytes of the block.
+                        _a = getLong(buf, 32);
+                        _b = getLong(buf, 40);
+                    } else if (rem > 8) {
+                        // Tail <= 8 bytes: _a lies fully inside the cached prefix,
+                        // _b wraps from the prefix into the tail.
+                        _a = getLong(buf, 48 - rem);
+                        int shift = 8 * (16 - rem);
+                        _b = (getLong(buf, 40) >>> shift)
+                           | ((getLong(buf, 0) & ((1L << shift) - 1)) << (8 * (rem - 8)));
+                    } else if (rem == 8) {
+                        _a = getLong(buf, 40);
+                        _b = getLong(buf, 0);
+                    } else {
+                        // Tail >= 9 bytes: _b lies fully inside the tail,
+                        // _a wraps from the cached prefix into the tail.
+                        _b = getLong(buf, 8 - rem);
+                        int shift = 8 * (8 - rem);
+                        _a = (getLong(buf, 40) >>> shift)
+                           | ((getLong(buf, 0) & ((1L << shift) - 1)) << (8 * rem));
+                    }
                 }
-
-                _a = getLong(input, inputLen - 16);
-                _b = getLong(input, inputLen - 8);
             }
 
-            return finish(_a, _b, _state[0], totalLen);
+            return finish(_a, _b, s0, totalLen);
         }
     }
 }
