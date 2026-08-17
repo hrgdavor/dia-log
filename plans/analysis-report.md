@@ -19,11 +19,11 @@ Updated: 2026-08-17 — every item annotated with its current implementation sta
 | P1.9 `prependPrefix()` synchronized | ✅ RESOLVED (2026-08-17) — `prefix` field made `volatile`; `synchronized` retained for compound prepend |
 | P1.11 missing tests | ✅ RESOLVED (2026-08-17) — `TraceIdTest`, `DiaLoggerTest`, `LoggingEventBuilderWrapperBaseTest`, `Wyhash64EdgeCaseTest`, `JsonLogWriterTest`, `ExampleIntegrationTest` all added; `ConsoleAppenderJsonTest`/`RollingFileAppenderJsonTest` moot (classes removed, replaced by `JsonAppender`/`JsonAppenderRolling`) |
 | P1.12 writer → core sanitizer | ✅ RESOLVED — writer uses the generated streaming fingerprint APIs |
-| P2.13 Javadoc | 🔶 PARTIAL — key classes documented; not exhaustive |
-| P2.14 repo docs | 🔶 PARTIAL — `LICENSE` + `CHANGELOG.md` exist; `CONTRIBUTING.md` + `SECURITY.md` missing |
-| P2.15 Maven Enforcer | ❌ STILL OPEN |
-| P2.16 JaCoCo | ❌ STILL OPEN |
-| P2.17 CI pipeline | 🔶 PARTIAL — `.github/workflows/publish.yml` exists; no `ci.yml` (push/PR verify) |
+| P2.13 Javadoc | ✅ RESOLVED (2026-08-17) — class-level Javadoc added to all remaining public classes (JsonNumberWriter, StringByteExtractor, EscapedJsonStringWriter, RawJsonSelfWriter, LoggingEventBuilderWrapper, LoggingEventBuilderWrapperNoop, LogFiller, JsonLogWriterClassic, ZeroCopyDirectAppender) |
+| P2.14 repo docs | ✅ RESOLVED (2026-08-17) — `LICENSE` + `CHANGELOG.md` existed; `CONTRIBUTING.md` + `SECURITY.md` added |
+| P2.15 Maven Enforcer | ✅ RESOLVED (2026-08-17) — enforcer 3.5.0: Java 25, Maven 3.9+, banned `commons-logging`/`log4j-over-slf4j`/`log4j` |
+| P2.16 JaCoCo | ✅ RESOLVED (2026-08-17) — JaCoCo 0.8.14 agent + report + floor check (line ≥55%, branch ≥40%; 80/70 target documented); example module skipped |
+| P2.17 CI pipeline | ✅ RESOLVED (2026-08-17) — `.github/workflows/ci.yml` (push/PR → `mvn clean verify -Dgpg.skip=true`, JaCoCo reports as artifacts); `publish.yml` unchanged |
 | P2.18 `TraceId` `String.format` | ✅ RESOLVED — `padHex()` with `Long.toHexString` (`TraceId.java:53-57`) |
 | P2.19 empty `usage.brainstorm.md` | ✅ RESOLVED — file has content |
 | P2.20 `addKeyValues()` generics | 🔶 RECLASSIFIED — design note, not a bug; see §20 below |
@@ -238,24 +238,17 @@ The `addKey()` method handles `String` and falls back to `writePOJO()` for every
 |---|---|---|
 | P0 Critical | 0 remaining | All 4 reported issues resolved (1 outdated, 3 fixed) |
 | P1 Important | 0 remaining | all planned unit tests added (2026-08-17) |
-| P2 Nice-to-Have | 4 remaining | Maven Enforcer, JaCoCo, CI (`ci.yml`), CONTRIBUTING/SECURITY; Javadoc partial |
+| P2 Nice-to-Have | 0 remaining | all items resolved (2026-08-17) |
 
 ---
 
 ## Remaining Work (as of 2026-08-17)
 
-All P0/P1 items are resolved. Remaining P2 items:
+**None.** Every item in this report is resolved — see the status audit above.
 
-```
-Phase 1: Build & CI
-  ├── Add maven-enforcer-plugin (Java 25, banned duplicate bindings)
-  ├── Add JaCoCo coverage
-  └── Add .github/workflows/ci.yml (push/PR → mvn verify)
-
-Phase 2: Docs
-  ├── Add CONTRIBUTING.md and SECURITY.md
-  └── Complete Javadoc on remaining public API
-```
+Open items that live in other plans (`plans/critical-analysis.md`): `StringByteExtractor.writeClassic()`
+and `Float/Double.toString()` allocation hotspots (3.2/3.3), silent MDC-suppression catch (5.2),
+`@NotThreadSafe`-relevant buffering (7.3), and `packCharsLow`-style cleanup — none are regressions.
 
 ---
 

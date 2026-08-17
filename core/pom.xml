@@ -22,11 +22,12 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
 
-        <!-- Compile-only thread-safety annotations (@ThreadSafe / @NotThreadSafe); not transitive -->
+        <!-- Thread-safety annotations (@ThreadSafe / @NotThreadSafe) appear in the
+             compiled public API (CLASS retention), so consumers must be able to
+             resolve them transitively; same practice as Guava. -->
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
-            <optional>true</optional>
         </dependency>
 
         <dependency>

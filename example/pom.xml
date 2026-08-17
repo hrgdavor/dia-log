@@ -14,6 +14,11 @@
     <artifactId>dia-log-example</artifactId>
     <packaging>jar</packaging>
 
+    <!-- The example module is a demo; its coverage is not measured or enforced. -->
+    <properties>
+        <jacoco.skip>true</jacoco.skip>
+    </properties>
+
     <name>Diagnostic Logger :: Example</name>
     <description>Example project demonstrating dia-log usage</description>
 

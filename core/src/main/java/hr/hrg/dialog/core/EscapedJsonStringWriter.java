@@ -9,10 +9,10 @@ import java.lang.invoke.VarHandle;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Writes JSON strings with mandatory escaping (quote, backslash, control chars,
- * {@code \u00XX} form, non-ASCII as UTF-8). Uses the {@code VarHandle} fast path
- * when {@code --add-opens java.base/java.lang=ALL-UNNAMED} is available and falls
- * back to a char-scanning classic path otherwise. Thread-safe.
+ * Writes JSON strings with mandatory escaping (quote, backslash, control
+ * characters below 0x20 written as U+XXXX escapes, non-ASCII as UTF-8). Uses the
+ * {@code VarHandle} fast path when {@code --add-opens java.base/java.lang=ALL-UNNAMED}
+ * is available and falls back to a char-scanning classic path otherwise. Thread-safe.
  */
 @ThreadSafe
 public final class EscapedJsonStringWriter {

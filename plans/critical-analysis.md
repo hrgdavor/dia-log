@@ -193,9 +193,9 @@ private static void writeFieldPrefixRawKey(OutputStream out, String key) throws 
 
 ## 7. Code Quality Issues
 
-### 7.1 Unused/Dead Code — 🔶 PARTIAL
-- `Wyhash64.java` - `packChars()` and `packCharsLow()` — both still present (`Wyhash64.java:625,633`); `packCharsLow` usage not re-verified
-- `TraceId.java` - Unused class — ❌ OUTDATED: `TraceId` is now a documented public API class (byte[]/String form, OTel-compatible static methods). Still no `TraceIdTest`.
+### 7.1 Unused/Dead Code — ✅ RESOLVED (2026-08-17)
+- `Wyhash64.java` - `packChars()` and `packCharsLow()` — **both removed**; they were byte-identical and neither had any callers
+- `TraceId.java` - Unused class — kept (now public API)
 
 ### 7.2 `JavaStackWriterLogback.java` - Unused Parameter — 🔶 OUTDATED (regenerated)
 ```java
@@ -212,12 +212,15 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 
 ## 8. Build/POM Issues
 
-### 8.1 GPG Signing Configuration — 🔶 PARTIAL
+### 8.1 GPG Signing Configuration — 🔶 PARTIAL (documented)
 - Parent POM configures `maven-gpg-plugin`
 - `example` module must skip signing
 - `project-automation` module may fail on build
 
-> Partially addressed: child POMs configure `skipSource`/`skip` for source/javadoc plugins; `.github/workflows/publish.yml` exists for releases (JDK 25, GPG secrets). Whether `example`/`project-automation` artifacts should be published at all is a remaining packaging question.
+> Partially addressed: child POMs configure `skipSource`/`skip` for source/javadoc plugins;
+> local `verify` and CI pass `-Dgpg.skip=true` (documented in `CONTRIBUTING.md` and `ci.yml`);
+> `.github/workflows/publish.yml` does the signed release (JDK 25, GPG secrets). The
+> `example` module additionally skips JaCoCo (`jacoco.skip`) since it is a demo.
 
 ### 8.2 Jackson Dependency — ✅ STILL TRUE
 - Uses `tools.jackson` (Jackson 3 Tooling profile) not standard `com.fasterxml.jackson` — still the case (`jackson.version` 3.2.1, `tools.jackson.core`/`tools.jackson.databind` in `logback/pom.xml`)
@@ -240,12 +243,12 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 
 ## 10. Documentation Gaps
 
-### 10.1 Missing API Documentation — 🔶 PARTIAL
-- `RawJsonSelfWriter` and `RawJsonBytes` - no usage examples — still the case
-- `packCharsLow()` in Wyhash64 - should be removed or documented — still present
+### 10.1 Missing API Documentation — ✅ RESOLVED (2026-08-17)
+- `RawJsonSelfWriter` and `RawJsonBytes` - no usage examples — class-level Javadoc added; `RawJsonBytes` documented via `JsonLogWriter`
+- `packCharsLow()` in Wyhash64 - should be removed or documented — removed (dead code)
 
-### 10.2 Comment Style Inconsistency — ✅ STILL TRUE
-- Some files use `///` C# style comments (not standard Java documentation) — e.g. `JsonLogWriter` class comment
+### 10.2 Comment Style Inconsistency — 🔶 PARTIAL
+- Some files use `///` C# style comments (not standard Java documentation) — `JsonLogWriterClassic` converted to standard Javadoc (2026-08-17); `JsonLogWriter` still uses `///` at the class level
 
 ---
 
@@ -255,7 +258,7 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 1. Make `prefix` field `volatile` or remove synchronization from `prependPrefix()` — ✅ DONE (volatile added 2026-08-17)
 2. Make `activeStream` and `stackTraceFilter` volatile in appenders/writer — 🔶 DECLINED by design (AGENTS.md documents intentional non-volatility + snapshot)
 3. Escape JSON keys in `writeFieldPrefixRawKey()` — ✅ DONE (2026-08-17)
-4. Remove dead code (`packCharsLow`, `TraceId.java`) — 🔶 `TraceId` kept (now public API); `packCharsLow` still present
+4. Remove dead code (`packCharsLow`, `TraceId.java`) — ✅ DONE (2026-08-17): `packChars` + `packCharsLow` removed; `TraceId` kept (public API)
 5. Use `addError()` instead of `System.err` for IOException — ✅ DONE (2026-08-17; also fixed an inverted filter-routing ternary in the stack path that NPE'd with no filter set — found by the new `ExampleIntegrationTest`)
 
 ### Medium Priority
@@ -265,8 +268,8 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 
 ### Low Priority
 1. Consider code generation that produces non-commented variants — ✅ DONE (StackSanitizerDerivativeGenerator)
-2. Add proper `@ThreadSafe` or `@NotThreadSafe` annotations — ❌ OPEN
-3. Add `@FunctionalInterface` to `LogFiller` — 🔶 VERIFY
+2. Add proper `@ThreadSafe` or `@NotThreadSafe` annotations — ✅ DONE (2026-08-17): `@ThreadSafe` on `Wyhash64`, `TraceId`, `DiaLoggerBase`, `DiaLogger`, `JsonNumberWriter`, `StringByteExtractor`, `EscapedJsonStringWriter`, `LoggingEventBuilderWrapperNoop`, `JsonAppender`, `JsonAppenderRolling`; `@NotThreadSafe` on `LoggingEventBuilderWrapperBase`, `Wyhash64.Streaming`, `JsonLogWriter`, `JsonLogWriterClassic`, `ZeroCopyDirectAppender` (jsr305, compile dependency)
+3. Add `@FunctionalInterface` to `LogFiller` — ✅ DONE (2026-08-17)
 
 ### Accepted Trade-offs
 1. **Code duplication is intentional** - Modify `JavaStackSanitizer.java` only, then regenerate — ✅ still the rule
