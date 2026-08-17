@@ -40,9 +40,19 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
         jsonLogWriter.setStackTraceFilter(JsonAppender.instantiateStackTraceFilter(filterClassName));
     }
 
+    /**
+     * Writes the logging event to the currently active output stream.
+     * <p>
+     * {@code activeStream} is intentionally non-volatile. The field is copied to a local variable
+     * at method entry so that the entire log line (event payload + newline) is written to the same
+     * stream snapshot. Concurrent changes to {@code activeStream} (e.g. during rollover) do not
+     * split a single event across two streams.
+     */
     @Override
     protected void writeOut(ILoggingEvent event) throws IOException {
-        jsonLogWriter.writeJsonEvent(objectMapper, event, activeStream);
-        activeStream.write(JsonLogWriter.NL);
+        var activeStreamLoc = activeStream;
+        jsonLogWriter.writeJsonEvent(objectMapper, event, activeStreamLoc);
+        activeStreamLoc.write(JsonLogWriter.NL);
     }
+
 }

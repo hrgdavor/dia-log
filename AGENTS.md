@@ -43,8 +43,9 @@ When adding new features, check these allocation hotspots:
 ### Thread Safety Requirements
 
 - `DiaLoggerBase.prefix` must remain `volatile` if `prependPrefix()` exists
-- `JsonLogWriter.stackTraceFilter` - make volatile or document as thread-confined
-- `JsonAppender.activeStream` - consider ThreadLocal for per-thread writers
+- `JsonLogWriter.stackTraceFilter` - configured once at startup via `setStackTraceFilter()`; no concurrent mutation, no additional synchronization required
+- `JsonAppender.activeStream` - intentionally non-volatile; `writeOut()` snapshots it to a local variable to avoid splitting a single log event across concurrent stream changes
+- `JsonAppenderRolling.activeStream` - intentionally non-volatile; `writeOut()` snapshots it to a local variable to avoid splitting a single log event across concurrent stream changes
 
 ### JSON Escape Discipline
 
