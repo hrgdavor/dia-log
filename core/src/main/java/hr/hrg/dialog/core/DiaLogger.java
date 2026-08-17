@@ -1,8 +1,11 @@
 package hr.hrg.dialog.core;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import org.slf4j.Logger;
 import org.slf4j.spi.LoggingEventBuilder;
 
+@ThreadSafe
 public class DiaLogger extends DiaLoggerBase<LoggingEventBuilderWrapperBase>{
 
     public DiaLogger(Logger delegate) {

@@ -1,5 +1,7 @@
 package hr.hrg.dialog.logback;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.rolling.RollingFileAppender;
 import tools.jackson.databind.ObjectMapper;
@@ -8,6 +10,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.function.Predicate;
 
+@ThreadSafe
 public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private OutputStream activeStream;

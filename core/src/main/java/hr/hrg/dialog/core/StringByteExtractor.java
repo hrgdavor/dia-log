@@ -1,11 +1,20 @@
 package hr.hrg.dialog.core;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Streams a {@link String}'s bytes to an {@link OutputStream}. When the JVM is
+ * started with {@code --add-opens java.base/java.lang=ALL-UNNAMED}, reads the
+ * backing {@code byte[]}/{@code coder} via {@code VarHandle} with zero copying;
+ * otherwise falls back to a classic {@code getBytes()} path. Thread-safe.
+ */
+@ThreadSafe
 public final class StringByteExtractor {
 
     // Functional interface designed to align with Future Java MethodHandles / ConstantBootstraps

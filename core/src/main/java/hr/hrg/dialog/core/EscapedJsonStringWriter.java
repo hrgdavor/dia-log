@@ -1,11 +1,20 @@
 package hr.hrg.dialog.core;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Writes JSON strings with mandatory escaping (quote, backslash, control chars,
+ * {@code \u00XX} form, non-ASCII as UTF-8). Uses the {@code VarHandle} fast path
+ * when {@code --add-opens java.base/java.lang=ALL-UNNAMED} is available and falls
+ * back to a char-scanning classic path otherwise. Thread-safe.
+ */
+@ThreadSafe
 public final class EscapedJsonStringWriter {
 
     @FunctionalInterface

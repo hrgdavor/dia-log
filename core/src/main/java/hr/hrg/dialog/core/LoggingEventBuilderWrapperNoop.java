@@ -1,10 +1,19 @@
 package hr.hrg.dialog.core;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import org.slf4j.Marker;
 import org.slf4j.spi.NOPLoggingEventBuilder;
 
 import java.util.function.Supplier;
 
+/**
+ * Singleton no-op {@link LoggingEventBuilderWrapperBase} returned when the target
+ * level is disabled. Every fluent method returns this instance (covariantly) and
+ * every {@code log(...)} overload does nothing, so call sites keep their fluent
+ * shape without paying for event construction. Thread-safe (stateless).
+ */
+@ThreadSafe
 public final class LoggingEventBuilderWrapperNoop extends LoggingEventBuilderWrapperBase {
     private static final LoggingEventBuilderWrapperNoop INSTANCE = new LoggingEventBuilderWrapperNoop();
 

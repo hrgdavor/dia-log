@@ -2,11 +2,14 @@ package hr.hrg.dialog.core;
 
 import java.util.Objects;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import org.slf4j.Logger;
 import org.slf4j.Marker;
 import org.slf4j.event.Level;
 import org.slf4j.spi.LoggingEventBuilder;
 
+@ThreadSafe
 public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> implements Logger {
 
 	protected Logger delegate;

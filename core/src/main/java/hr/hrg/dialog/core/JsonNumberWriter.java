@@ -3,10 +3,19 @@ package hr.hrg.dialog.core;
 import hr.hrg.dialog.ryu.RyuDouble;
 import hr.hrg.dialog.ryu.RyuFloat;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Low-allocation JSON number serialization (int/long/float/double) that writes
+ * digits directly to an {@link OutputStream} using caller-provided reusable
+ * buffers, with Ryu-based float/double formatting. All methods are stateless
+ * and thread-safe.
+ */
+@ThreadSafe
 public final class JsonNumberWriter {
 
     // Pre-encoded ASCII byte lookup table for 00..99 (tens, ones)

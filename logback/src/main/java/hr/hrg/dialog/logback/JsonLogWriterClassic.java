@@ -1,5 +1,7 @@
 package hr.hrg.dialog.logback;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Instant;
@@ -22,14 +24,18 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
 
 
-/// Reusable JSON log event writer used internally.
-///
-/// It tries to minimize allocations
-/// - if add-opens available, uses direct string data access to avoid allocating byte[] for each string
-/// - holds byte[] for common keys, to again avoid allocation byte[] caused by writing string in Java
-/// - delegates custom key/value and MDC to jackson
-/// - writes stack trace into JSON with optimized low allocation code
-///
+/**
+ * Reusable JSON log event writer that delegates to a Jackson {@link JsonGenerator}.
+ * <p>
+ * This is the classic/baseline writer (used by benchmarks and as a reference
+ * implementation). The optimized streaming writer is {@link JsonLogWriter}, which
+ * writes straight to an {@link OutputStream} and reuses byte[] buffers for common
+ * keys and low-allocation number/string serialization.
+ * <p>
+ * Thread-safety: instances hold reusable state and are not safe for concurrent use;
+ * share one writer per appender/thread as {@link JsonAppender} does.
+ */
+@NotThreadSafe
 public class JsonLogWriterClassic {
 
     /** Newline bytes (UTF-8) - strictly Unix LF (\n). */

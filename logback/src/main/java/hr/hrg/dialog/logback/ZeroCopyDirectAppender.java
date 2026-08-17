@@ -1,5 +1,7 @@
 package hr.hrg.dialog.logback;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import ch.qos.logback.core.OutputStreamAppender;
@@ -9,6 +11,16 @@ import tools.jackson.core.JsonGenerator;
 
 import java.io.OutputStream;
 
+/**
+ * Experimental logback appender that writes events directly to a Jackson
+ * {@link JsonGenerator} over the target {@link OutputStream}, bypassing the
+ * encoder pipeline entirely.
+ * <p>
+ * Kept as an experiment/reference — it is not wired into any configuration and
+ * emits a minimal fixed schema (timestamp/level/message) without key-value or
+ * MDC support. Not thread-safe: {@link #setOutputStream} reassigns the generator.
+ */
+@NotThreadSafe
 public class ZeroCopyDirectAppender extends OutputStreamAppender<ILoggingEvent> {
 
     private final JsonFactory jsonFactory = new JsonFactory();

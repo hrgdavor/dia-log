@@ -1,5 +1,8 @@
 package hr.hrg.dialog.core;
 
+import javax.annotation.concurrent.NotThreadSafe;
+import javax.annotation.concurrent.ThreadSafe;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
@@ -40,6 +43,7 @@ import java.nio.ByteOrder;
  * {@code sun.misc.Unsafe}, no FFM API dependency.
  * </p>
  */
+@ThreadSafe
 public final class Wyhash64 {
 
     private static final long[] DEFAULT_SECRET = {
@@ -622,22 +626,6 @@ public final class Wyhash64 {
     //  Internal helpers — CharSequence & char[] packing
     // ==========================================================================
 
-    private static long packChars(CharSequence cs, int pos, int nChars) {
-        long v = 0;
-        for (int i = 0; i < nChars && pos + i < cs.length(); i++) {
-            v |= ((long) cs.charAt(pos + i) & 0xFFFFL) << (i * 16);
-        }
-        return v;
-    }
-
-    private static long packCharsLow(CharSequence cs, int pos, int nChars) {
-        long v = 0;
-        for (int i = 0; i < nChars && pos + i < cs.length(); i++) {
-            v |= ((long) cs.charAt(pos + i) & 0xFFFFL) << (i * 16);
-        }
-        return v;
-    }
-
     private static long charToLongLE(char[] chars, int off) {
         return ((long) chars[off] & 0xFFFFL)
              | (((long) chars[off + 1] & 0xFFFFL) << 16)
@@ -792,6 +780,7 @@ public final class Wyhash64 {
     //  Streaming hasher
     // ==========================================================================
 
+    @NotThreadSafe
     public static final class Streaming {
         private final long[] state = new long[3];
         private long totalLen;

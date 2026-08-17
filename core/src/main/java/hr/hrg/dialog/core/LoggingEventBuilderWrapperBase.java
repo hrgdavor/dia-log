@@ -1,5 +1,7 @@
 package hr.hrg.dialog.core;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
 import org.slf4j.Logger;
 import org.slf4j.Marker;
 import org.slf4j.spi.LoggingEventBuilder;
@@ -28,6 +30,7 @@ import java.util.function.Supplier;
  *     .log("Change state to {state}");
  * }</pre>
  */
+@NotThreadSafe
 public class LoggingEventBuilderWrapperBase implements LoggingEventBuilder {
 
     protected final LoggingEventBuilder delegate;

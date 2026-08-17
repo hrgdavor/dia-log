@@ -1,5 +1,7 @@
 package hr.hrg.dialog.logback;
 
+import javax.annotation.concurrent.NotThreadSafe;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +33,7 @@ import ch.qos.logback.classic.spi.IThrowableProxy;
 /// - delegates custom key/value and MDC to jackson
 /// - writes stack trace into JSON with optimized low allocation code
 ///
+@NotThreadSafe
 public class JsonLogWriter {
 
     /** Newline bytes (UTF-8) - strictly Unix LF (\n). */

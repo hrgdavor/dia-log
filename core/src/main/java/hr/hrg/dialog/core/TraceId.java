@@ -4,6 +4,8 @@ import java.nio.ByteBuffer;
 import java.util.HexFormat;
 import java.util.concurrent.ThreadLocalRandom;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 /**
  * Class representing both byte[] and string for a specific traceid.
  *
@@ -12,6 +14,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * Create a class that implements it and point to these static methods if integrating with OpenTelemetry.
  *
  */
+@ThreadSafe
 public class TraceId {
 
     private final byte[] bytes;
