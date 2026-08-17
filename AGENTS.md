@@ -49,7 +49,10 @@ When adding new features, check these allocation hotspots:
 
 ### JSON Escape Discipline
 
-All string keys passed to `writeFieldPrefixRawKey()` in `JsonLogWriter.java:184` are **NOT JSON-escaped**. If accepting user input, add escaping.
+All string keys passed to `writeFieldPrefixRawKey()` in `JsonLogWriter.java` are **JSON-escaped**
+(quotes, backslash, control chars) via `EscapedJsonStringWriter`, because KV/MDC keys are user
+input. Raw unescaped bytes are written only where the caller explicitly requests raw JSON
+(`RawValue` / `RawJsonBytes` passthrough).
 
 ---
 

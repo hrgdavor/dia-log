@@ -20,7 +20,7 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 	protected abstract L initBuilder(LoggingEventBuilder builder);
 	protected abstract L noOpWrapper();
 
-	protected String prefix;
+	protected volatile String prefix;
 
 	/**
 	 * Wrap the builder in {@link LoggingEventBuilderWrapper}.

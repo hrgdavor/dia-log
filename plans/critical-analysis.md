@@ -42,7 +42,7 @@ mvn -pl project-automation compile exec:java \
 
 **Issues found**:
 
-### 2.1 `DiaLoggerBase.java:36` — ❌ STILL OPEN
+### 2.1 `DiaLoggerBase.java:36` — ✅ RESOLVED (2026-08-17: `prefix` now `volatile`)
 ```java
 public synchronized void prependPrefix(String prefix){
     if(this.prefix == null)
@@ -51,9 +51,9 @@ public synchronized void prependPrefix(String prefix){
         this.prefix = prefix+this.prefix;
 }
 ```
-- `synchronized` method but `prefix` field is **not volatile** — ✅ still true (`protected String prefix;` at `DiaLoggerBase.java:23`)
-- Other threads may never see updated prefix value
-- Race condition if prefix is read while being modified
+- `synchronized` method but `prefix` field is **not volatile** — fixed: field is now `protected volatile String prefix;` (`DiaLoggerBase.java:23`); `synchronized` retained so the compound prepend stays atomic
+- Other threads may never see updated prefix value — resolved via volatile
+- Race condition if prefix is read while being modified — resolved via volatile
 
 > Note: `AGENTS.md` states `DiaLoggerBase.prefix` *must remain volatile* if `prependPrefix()` exists — the field is still non-volatile, so this item is open.
 
@@ -109,11 +109,11 @@ STRING_STRATEGY.write(out, Double.toString(value));
 
 > Related in-flight work: the working tree contains an uncommitted `core/src/main/java/hr/hrg/dialog/ryu/` package (Ryu float/double formatting) plus `JsonNumberWriter` modifications — likely aimed at this hotspot.
 
-### 3.4 `JsonLogWriter.java` — ❌ STILL OPEN
+### 3.4 `JsonLogWriter.java` — ✅ RESOLVED (2026-08-17: lazy init)
 ```java
 Set<String> allKeys = new HashSet<>();
 ```
-- **Always allocates HashSet**, even when no KV pairs or MDC (`JsonLogWriter.java:98`)
+- **Always allocates HashSet**, even when no KV pairs or MDC — fixed: `allKeys` is now lazily created only when KV pairs exist (`JsonLogWriter.java:98`), so events without KV/MDC allocate no HashSet
 - Should be lazily initialized
 
 ---
@@ -172,20 +172,16 @@ try {
 
 ## 6. JSON Safety Issues
 
-### 6.1 `JsonLogWriter.java` - Unescaped Keys — ❌ STILL OPEN (documented)
+### 6.1 `JsonLogWriter.java` - Unescaped Keys — ✅ RESOLVED (2026-08-17)
 ```java
 private static void writeFieldPrefixRawKey(OutputStream out, String key) throws IOException {
     out.write(',');
-    out.write('"');
-    STRING_STRATEGY.write(out, key);  // No JSON escaping!
-    out.write('"');
+    EscapedJsonStringWriter.writeJsonStringOrNull(out, key);  // now JSON-escaped
     out.write(':');
 }
 ```
-- **KV/MDC keys are NOT JSON-escaped**
-- Keys containing `"`, `\`, or other special chars produce malformed JSON
-
-> Known and documented in `AGENTS.md` ("JSON Escape Discipline": all string keys passed to `writeFieldPrefixRawKey()` are NOT JSON-escaped; add escaping if accepting user input). The current `writeFieldPrefixRawKey` routes the key through `STRING_STRATEGY.write()` (a raw byte writer), so escaping is still absent by design.
+- **KV/MDC keys are NOT JSON-escaped** — fixed: keys are now escaped (quotes, backslash, control chars) via `EscapedJsonStringWriter`, since KV/MDC keys are user input
+- Keys containing `"`, `\`, or other special chars produce malformed JSON — resolved; `AGENTS.md` updated accordingly
 
 ---
 
@@ -250,14 +246,14 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 ## Recommendations Summary — status updated 2026-08-17
 
 ### Immediate Fixes (High Priority)
-1. Make `prefix` field `volatile` or remove synchronization from `prependPrefix()` — ❌ OPEN
+1. Make `prefix` field `volatile` or remove synchronization from `prependPrefix()` — ✅ DONE (volatile added 2026-08-17)
 2. Make `activeStream` and `stackTraceFilter` volatile in appenders/writer — 🔶 DECLINED by design (AGENTS.md documents intentional non-volatility + snapshot)
-3. Escape JSON keys in `writeFieldPrefixRawKey()` — ❌ OPEN (documented risk in AGENTS.md)
+3. Escape JSON keys in `writeFieldPrefixRawKey()` — ✅ DONE (2026-08-17)
 4. Remove dead code (`packCharsLow`, `TraceId.java`) — 🔶 `TraceId` kept (now public API); `packCharsLow` still present
 5. Use `addError()` instead of `System.err` for IOException — ❌ OPEN
 
 ### Medium Priority
-1. Lazily initialize `allKeys` HashSet in `JsonLogWriter` — ❌ OPEN (`JsonLogWriter.java:98`)
+1. Lazily initialize `allKeys` HashSet in `JsonLogWriter` — ✅ DONE (2026-08-17)
 2. Use `StringBuilder` instead of `StringBuffer` in `addFromTraceToStringBuffer()` — 🔶 VERIFY (derivative files regenerated since)
 3. Document that key duplication is intentional performance optimization — ✅ DONE (AGENTS.md + doc/java-stack-trace-sanitizer-and-derivatives.md)
 

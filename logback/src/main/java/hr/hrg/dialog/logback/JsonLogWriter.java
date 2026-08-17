@@ -95,11 +95,12 @@ public class JsonLogWriter {
             writeFieldPrefix(out, KEY_MSG);
             writeJsonStringOrNull(out, event.getFormattedMessage());
 
-            Set<String> allKeys = new HashSet<>();
+            Set<String> allKeys = null;
 
             // Structured key-value pairs
             List<KeyValuePair> pairs = event.getKeyValuePairs();
             if (pairs != null && !pairs.isEmpty()) {
+                allKeys = new HashSet<>();
                 for (KeyValuePair kvPair : pairs) {
                     if (kvPair.key != null) {
                         allKeys.add(kvPair.key);
@@ -118,7 +119,7 @@ public class JsonLogWriter {
                 for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
                     if (entry.getKey() != null
                             && !isReserved(entry.getKey())
-                            && !allKeys.contains(entry.getKey())) {
+                            && (allKeys == null || !allKeys.contains(entry.getKey()))) {
                         writeFieldPrefixRawKey(out, entry.getKey());
                         writeJsonStringOrNull(out, entry.getValue());
                     }
@@ -185,10 +186,8 @@ public class JsonLogWriter {
 
     private static void writeFieldPrefixRawKey(OutputStream out, String key) throws IOException {
         out.write(',');
-        out.write('"');
-        // Caller contract: key-value and MDC keys are expected to not require JSON escaping.
-        STRING_STRATEGY.write(out, key);
-        out.write('"');
+        // Keys are user input — JSON-escape them (quotes, backslash, control chars).
+        EscapedJsonStringWriter.writeJsonStringOrNull(out, key);
         out.write(':');
     }
 

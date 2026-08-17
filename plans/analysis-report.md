@@ -16,7 +16,7 @@ Updated: 2026-08-17 — every item annotated with its current implementation sta
 | P1.6 JUnit versions | ✅ RESOLVED — JUnit 6.1.2 centralized in root `dependencyManagement` |
 | P1.7 logback/jackson centralization | ✅ RESOLVED — `logback.version` (1.5.38), `jackson.version` (3.2.1); jackson-bom imported |
 | P1.8 `NL` line separator | ✅ RESOLVED — `NL = new byte[]{0x0A}` (`JsonLogWriter.java:38`) |
-| P1.9 `prependPrefix()` synchronized | ❌ STILL OPEN — `DiaLoggerBase.java:36` |
+| P1.9 `prependPrefix()` synchronized | ✅ RESOLVED (2026-08-17) — `prefix` field made `volatile`; `synchronized` retained for compound prepend |
 | P1.11 missing tests | 🔶 PARTIAL — `JavaStackSanitizerLogbackTest` created (6 tests); `TraceIdTest`, `DiaLoggerTest`, `LoggingEventBuilderWrapperBaseTest`, `Wyhash64EdgeCaseTest`, `JsonLogWriterTest` still missing |
 | P1.12 writer → core sanitizer | ✅ RESOLVED — writer uses the generated streaming fingerprint APIs |
 | P2.13 Javadoc | 🔶 PARTIAL — key classes documented; not exhaustive |
@@ -137,7 +137,7 @@ JSON Lines format requires `\n` (LF) as the line separator. Using `System.lineSe
 
 ---
 
-### 9. `DiaLoggerBase.prependPrefix()` is `synchronized` unnecessarily — ❌ STILL OPEN
+### 9. `DiaLoggerBase.prependPrefix()` is `synchronized` unnecessarily — ✅ RESOLVED (prefix now `volatile`)
 
 **File:** `core/src/main/java/hr/hrg/dialog/core/DiaLoggerBase.java:36`
 
@@ -237,7 +237,7 @@ The `addKey()` method handles `String` and falls back to `writePOJO()` for every
 | Priority | Count | Key Areas (as of 2026-08-17) |
 |---|---|---|
 | P0 Critical | 0 remaining | All 4 reported issues resolved (1 outdated, 3 fixed) |
-| P1 Important | 2 remaining | `prependPrefix()` synchronization; planned unit tests (partial) |
+| P1 Important | 1 remaining | planned unit tests (partial — `TraceIdTest`, `JsonLogWriterTest` added 2026-08-17) |
 | P2 Nice-to-Have | 4 remaining | Maven Enforcer, JaCoCo, CI (`ci.yml`), CONTRIBUTING/SECURITY; Javadoc partial |
 
 ---
@@ -248,7 +248,6 @@ The original P0/P1 fixes and most P2 items are implemented (see status audit abo
 
 ```
 Phase 1: Code quality (small)
-  ├── Remove `synchronized` from DiaLoggerBase.prependPrefix() (P1.9)
   └── (Optional) Revisit addKeyValues() generics if the wrapper hierarchy is ever made generic (P2.20 — not a bug)
 
 Phase 2: Test coverage

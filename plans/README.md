@@ -25,8 +25,7 @@ JDK 25 passes).
 
 ## Known remaining gaps (see `analysis-report.md` for details)
 
-- Tests: `TraceIdTest`, `DiaLoggerTest`, `Wyhash64EdgeCaseTest`, `LoggingEventBuilderWrapperBaseTest`, `JsonLogWriterTest`, `ExampleIntegrationTest`
+- Tests: `DiaLoggerTest`, `Wyhash64EdgeCaseTest`, `LoggingEventBuilderWrapperBaseTest`, `ExampleIntegrationTest` (`TraceIdTest` + `JsonLogWriterTest` added 2026-08-17)
 - Build: Maven Enforcer, JaCoCo, `ci.yml` (push/PR verify)
 - Docs: `CONTRIBUTING.md`, `SECURITY.md`, remaining Javadoc
-- Code: `prependPrefix()` synchronization / volatile prefix; `JsonLogWriter` `allKeys` HashSet;
-  JSON key escaping; `System.err` error channel; `addKeyValues()` silent failures
+- Code: `System.err` error channel; `addKeyValues()` silent failures; `packCharsLow` cleanup
