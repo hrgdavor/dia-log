@@ -3,7 +3,6 @@ package hr.hrg.dialog.logback;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -145,15 +144,15 @@ public class JsonLogWriter {
                 }
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
                 // micro optimization to call variant without filter
-                long fingerPrint = stackTraceFilter == null ? 
-                JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                long fingerPrint = stackTraceFilter == null ?
+                JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                     arrProxy,
-                    stackTraceFilter,
                     out,
                     throwableClassName
                 ) : 
-                JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                     arrProxy,
+                    stackTraceFilter,
                     out,
                     throwableClassName
                 );
@@ -166,8 +165,8 @@ public class JsonLogWriter {
 
             out.write('}');
         } catch (IOException e) {
-            System.err.println(Instant.now() + " Failed to write JSON log event for logger: " + event.getLoggerName());
-            e.printStackTrace(System.err);
+            // Error reporting is the caller's job: logback appenders report write
+            // failures through their StatusManager (AppenderBase.doAppend -> addError).
             throw e;
         }
     }

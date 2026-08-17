@@ -25,7 +25,11 @@ JDK 25 passes).
 
 ## Known remaining gaps (see `analysis-report.md` for details)
 
-- Tests: `DiaLoggerTest`, `Wyhash64EdgeCaseTest`, `LoggingEventBuilderWrapperBaseTest`, `ExampleIntegrationTest` (`TraceIdTest` + `JsonLogWriterTest` added 2026-08-17)
 - Build: Maven Enforcer, JaCoCo, `ci.yml` (push/PR verify)
 - Docs: `CONTRIBUTING.md`, `SECURITY.md`, remaining Javadoc
-- Code: `System.err` error channel; `addKeyValues()` silent failures; `packCharsLow` cleanup
+- Code: `packCharsLow` cleanup; `@ThreadSafe`/`@NotThreadSafe` annotations; `@FunctionalInterface` on `LogFiller`
+
+> All planned test files were added 2026-08-17 (`TraceIdTest`, `DiaLoggerTest`, `Wyhash64EdgeCaseTest`,
+> `LoggingEventBuilderWrapperBaseTest`, `JsonLogWriterTest`, `ExampleIntegrationTest`), and the
+> thread-safety (`prefix` volatile), allocation (lazy `allKeys`), JSON-key-escaping, `System.err`,
+> and `addKeyValues()` validation items were fixed the same day.

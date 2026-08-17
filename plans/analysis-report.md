@@ -17,7 +17,7 @@ Updated: 2026-08-17 — every item annotated with its current implementation sta
 | P1.7 logback/jackson centralization | ✅ RESOLVED — `logback.version` (1.5.38), `jackson.version` (3.2.1); jackson-bom imported |
 | P1.8 `NL` line separator | ✅ RESOLVED — `NL = new byte[]{0x0A}` (`JsonLogWriter.java:38`) |
 | P1.9 `prependPrefix()` synchronized | ✅ RESOLVED (2026-08-17) — `prefix` field made `volatile`; `synchronized` retained for compound prepend |
-| P1.11 missing tests | 🔶 PARTIAL — `JavaStackSanitizerLogbackTest` created (6 tests); `TraceIdTest`, `DiaLoggerTest`, `LoggingEventBuilderWrapperBaseTest`, `Wyhash64EdgeCaseTest`, `JsonLogWriterTest` still missing |
+| P1.11 missing tests | ✅ RESOLVED (2026-08-17) — `TraceIdTest`, `DiaLoggerTest`, `LoggingEventBuilderWrapperBaseTest`, `Wyhash64EdgeCaseTest`, `JsonLogWriterTest`, `ExampleIntegrationTest` all added; `ConsoleAppenderJsonTest`/`RollingFileAppenderJsonTest` moot (classes removed, replaced by `JsonAppender`/`JsonAppenderRolling`) |
 | P1.12 writer → core sanitizer | ✅ RESOLVED — writer uses the generated streaming fingerprint APIs |
 | P2.13 Javadoc | 🔶 PARTIAL — key classes documented; not exhaustive |
 | P2.14 repo docs | 🔶 PARTIAL — `LICENSE` + `CHANGELOG.md` exist; `CONTRIBUTING.md` + `SECURITY.md` missing |
@@ -237,30 +237,22 @@ The `addKey()` method handles `String` and falls back to `writePOJO()` for every
 | Priority | Count | Key Areas (as of 2026-08-17) |
 |---|---|---|
 | P0 Critical | 0 remaining | All 4 reported issues resolved (1 outdated, 3 fixed) |
-| P1 Important | 1 remaining | planned unit tests (partial — `TraceIdTest`, `JsonLogWriterTest` added 2026-08-17) |
+| P1 Important | 0 remaining | all planned unit tests added (2026-08-17) |
 | P2 Nice-to-Have | 4 remaining | Maven Enforcer, JaCoCo, CI (`ci.yml`), CONTRIBUTING/SECURITY; Javadoc partial |
 
 ---
 
 ## Remaining Work (as of 2026-08-17)
 
-The original P0/P1 fixes and most P2 items are implemented (see status audit above). Only these remain:
+All P0/P1 items are resolved. Remaining P2 items:
 
 ```
-Phase 1: Code quality (small)
-  └── (Optional) Revisit addKeyValues() generics if the wrapper hierarchy is ever made generic (P2.20 — not a bug)
-
-Phase 2: Test coverage
-  ├── Add TraceIdTest, DiaLoggerTest, Wyhash64EdgeCaseTest, LoggingEventBuilderWrapperBaseTest (core)
-  ├── Add JsonLogWriterTest (logback)
-  └── Add ExampleIntegrationTest (example)
-
-Phase 3: Build & CI
+Phase 1: Build & CI
   ├── Add maven-enforcer-plugin (Java 25, banned duplicate bindings)
   ├── Add JaCoCo coverage
   └── Add .github/workflows/ci.yml (push/PR → mvn verify)
 
-Phase 4: Docs
+Phase 2: Docs
   ├── Add CONTRIBUTING.md and SECURITY.md
   └── Complete Javadoc on remaining public API
 ```

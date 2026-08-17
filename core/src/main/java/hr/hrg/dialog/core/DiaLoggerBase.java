@@ -1,5 +1,7 @@
 package hr.hrg.dialog.core;
 
+import java.util.Objects;
+
 import org.slf4j.Logger;
 import org.slf4j.Marker;
 import org.slf4j.event.Level;
@@ -40,7 +42,23 @@ public abstract class DiaLoggerBase<L extends LoggingEventBuilderWrapperBase> im
 			this.prefix = prefix+this.prefix;
 	}
 
+	/**
+	 * Adds key/value pairs (flat {@code key, value, key, value, ...}) to the given builder.
+	 * <p>
+	 * Pairs are added in order. A {@code null} key is ignored (no pair is added);
+	 * a {@code null} value is passed through to SLF4J (writers may skip it).
+	 *
+	 * @param builder the wrapper to add pairs to
+	 * @param keyVal  flat key/value array
+	 * @return the same {@code builder}, for chaining
+	 * @throws NullPointerException     if {@code keyVal} is null
+	 * @throws IllegalArgumentException if {@code keyVal} has an odd length (a key without a value)
+	 */
 	public static  <L1 extends  LoggingEventBuilderWrapperBase> L1 addKeyValues(L1 builder, Object ...keyVal) {
+		Objects.requireNonNull(keyVal, "keyVal");
+		if ((keyVal.length & 1) != 0)
+			throw new IllegalArgumentException(
+				"addKeyValues expects key/value pairs (even number of arguments), got " + keyVal.length);
 		for(int i=1; i< keyVal.length; i+=2) {
 			Object key = keyVal[i-1];
 			if(key == null) continue;

@@ -125,18 +125,24 @@ Set<String> allKeys = new HashSet<>();
 - **437 lines** of repetitive delegation (still 437 lines)
 - High surface area for API breakage if SLF4J changes
 
-### 4.2 `DiaLoggerBase.addKeyValues()` - Silent Failures — ✅ STILL TRUE (companion to reclassified §20 in `plans/analysis-report.md`)
+### 4.2 `DiaLoggerBase.addKeyValues()` - Silent Failures — ✅ RESOLVED (2026-08-17)
 ```java
 public static  <L1 extends  LoggingEventBuilderWrapperBase> L1 addKeyValues(L1 builder, Object ...keyVal) {
+    Objects.requireNonNull(keyVal, "keyVal");
+    if ((keyVal.length & 1) != 0)
+        throw new IllegalArgumentException(
+            "addKeyValues expects key/value pairs (even number of arguments), got " + keyVal.length);
     for(int i=1; i< keyVal.length; i+=2) {
         Object key = keyVal[i-1];
-        if(key == null) continue;  // Silently skipped
+        if(key == null) continue;
+        builder.addKeyValue(key.toString(), keyVal[i]);
+    }
+    return builder;
+}
 ```
-- Odd-length arrays silently drop last element
-- Null keys silently skipped with no warning
-- No validation of key-value pair completeness
-
-> Note: this is a *different* concern from the generics item (P2.20 in the analysis report, which was reclassified as not-a-bug). The silent-failure behavior here is a real (minor) API ergonomics issue that remains.
+- Odd-length arrays silently drop last element — fixed: throws `IllegalArgumentException`
+- Null keys silently skipped with no warning — documented: null keys are intentionally ignored (Javadoc); null `keyVal` throws `NullPointerException`
+- No validation of key-value pair completeness — fixed: even-length check
 
 ### 4.3 `JavaStackSanitizerLogback.java` - Unused Parameter — 🔶 OUTDATED (regenerated)
 ```java
@@ -149,15 +155,15 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 
 ## 5. Error Handling Issues
 
-### 5.1 `JsonLogWriter.java` - Wrong Error Channel — ❌ STILL OPEN
+### 5.1 `JsonLogWriter.java` - Wrong Error Channel — ✅ RESOLVED (2026-08-17)
 ```java
-catch (IOException e) {
-    System.err.println(Instant.now() + " Failed to write JSON log event for logger: " + event.getLoggerName());
-    e.printStackTrace(System.err);
+} catch (IOException e) {
+    // Error reporting is the caller's job: logback appenders report write
+    // failures through their StatusManager (AppenderBase.doAppend -> addError).
     throw e;
 }
 ```
-- Uses `System.err` instead of SLF4J's `addError()` or logging framework's error channel (still at `JsonLogWriter.java:167-170`)
+- Uses `System.err` instead of SLF4J's `addError()` or logging framework's error channel — fixed: `System.err` printing removed; failures now propagate to the appender layer, which reports via `StatusManager` (`AppenderBase.doAppend -> addError`)
 
 ### 5.2 `JsonLogWriter.java` - Silent MDC Suppression — ❌ STILL OPEN
 ```java
@@ -250,7 +256,7 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 2. Make `activeStream` and `stackTraceFilter` volatile in appenders/writer — 🔶 DECLINED by design (AGENTS.md documents intentional non-volatility + snapshot)
 3. Escape JSON keys in `writeFieldPrefixRawKey()` — ✅ DONE (2026-08-17)
 4. Remove dead code (`packCharsLow`, `TraceId.java`) — 🔶 `TraceId` kept (now public API); `packCharsLow` still present
-5. Use `addError()` instead of `System.err` for IOException — ❌ OPEN
+5. Use `addError()` instead of `System.err` for IOException — ✅ DONE (2026-08-17; also fixed an inverted filter-routing ternary in the stack path that NPE'd with no filter set — found by the new `ExampleIntegrationTest`)
 
 ### Medium Priority
 1. Lazily initialize `allKeys` HashSet in `JsonLogWriter` — ✅ DONE (2026-08-17)

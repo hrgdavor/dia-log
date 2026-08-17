@@ -1,0 +1,9 @@
+<configuration>
+    <!--
+        Test config: no appenders configured on purpose. The example Main
+        attaches its own console JsonAppender programmatically, so this file
+        only suppresses the rolling file appender from logback.xml during tests
+        (avoids writing logs/example.jsonl from the test run).
+    -->
+    <root level="DEBUG"/>
+</configuration>

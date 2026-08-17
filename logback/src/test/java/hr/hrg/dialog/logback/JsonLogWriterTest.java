@@ -108,6 +108,27 @@ class JsonLogWriterTest {
         assertTrue(json.contains("\"msg\":\"no extras\""), "message must be present: " + json);
     }
 
+    @Test
+    void exceptionEvent_writesCompleteStackAndErrHash() throws Exception {
+        LoggerContext context = new LoggerContext();
+        Logger logger = context.getLogger("test.json");
+        logger.setLevel(Level.ERROR);
+
+        LoggingEvent event = new LoggingEvent("test.json", logger, Level.ERROR, "boom",
+                new RuntimeException("boom"), null);
+        event.setTimeStamp(123456789L);
+
+        String json = write(event);
+
+        // Regression: the event must not be truncated mid-stack (previously the
+        // no-filter path called the filter variant with a null filter -> NPE).
+        assertTrue(json.endsWith("}"), "event must be complete, not truncated: " + json);
+        assertTrue(json.contains("\"errClass\":\"java.lang.RuntimeException\""), "errClass missing: " + json);
+        assertTrue(json.contains("\"errMessage\":\"boom\""), "errMessage missing: " + json);
+        assertTrue(json.contains("\"stack\":"), "stack field missing: " + json);
+        assertTrue(json.contains("\"errHash\":"), "errHash missing: " + json);
+    }
+
     private static void applyIfPresent(Object target, String methodName, Class<?>[] argTypes, Object arg) {
         try {
             Method method = target.getClass().getMethod(methodName, argTypes);
