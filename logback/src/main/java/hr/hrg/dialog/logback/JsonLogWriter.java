@@ -56,6 +56,8 @@ public class JsonLogWriter {
 
      private final byte[] intNumberBuffer = JsonNumberWriter.makeIntBuffer();
      private final byte[] longNumberBuffer = JsonNumberWriter.makeLongBuffer();
+    private final byte[] floatNumberBuffer = JsonNumberWriter.makeFloatBuffer();
+    private final byte[] doubleNumberBuffer = JsonNumberWriter.makeDoubleBuffer();
 
     /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
     private Predicate<String> stackTraceFilter = null;
@@ -195,6 +197,10 @@ public class JsonLogWriter {
 
         writeFieldPrefixRawKey(out, key);
 
+        writeValue(out, value, mapper);
+    }
+
+    private void writeValue(OutputStream out, Object value, ObjectMapper mapper) throws IOException {
         switch (value) {
             case String s -> EscapedJsonStringWriter.writeJsonStringOrNull(out, s);
             case CharSequence cs -> EscapedJsonStringWriter.writeJsonStringOrNull(out, cs.toString());
@@ -205,9 +211,9 @@ public class JsonLogWriter {
             case Integer i -> JsonNumberWriter.writeInt(out, intNumberBuffer, i);
             case Short s -> JsonNumberWriter.writeInt(out, intNumberBuffer, s.intValue());
             case Byte b -> JsonNumberWriter.writeInt(out, intNumberBuffer, b.intValue());
-            case Float f -> JsonNumberWriter.writeFloat(out, f);
-            case Double d -> JsonNumberWriter.writeDouble(out, d);
-            case Number n -> JsonNumberWriter.writeNumber(out, intNumberBuffer, longNumberBuffer, n);
+            case Float f -> JsonNumberWriter.writeFloat(out, floatNumberBuffer, f);
+            case Double d -> JsonNumberWriter.writeDouble(out, doubleNumberBuffer, d);
+            case Number n -> JsonNumberWriter.writeNumber(out, intNumberBuffer, longNumberBuffer, floatNumberBuffer, doubleNumberBuffer, n);
             case Boolean b -> out.write(b ? JSON_TRUE : JSON_FALSE);
             case RawJsonSelfWriter w -> w.writeJson(out);
             case RawJsonBytes b -> out.write(b.bytes());

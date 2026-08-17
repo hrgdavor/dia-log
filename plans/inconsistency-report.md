@@ -2,6 +2,11 @@
 
 Date: 2026-08-06
 
+> Note (2026-08-17): the root-level `plan2.md` was a condensed summary of this report;
+> it has been removed — this file is the authoritative source for all 36 items. The root
+> `plan.md`/`plan3.md` were incorporated as [`roadmap.md`](roadmap.md) (archived) and
+> [`critical-analysis.md`](critical-analysis.md). See [`README.md`](README.md).
+
 ## Executive Summary
 
 This report identifies inconsistencies between documentation, ADRs, plans, and actual code in the Dia-Log project. Many components have evolved since the original design documents were written, leading to mismatches in concepts, APIs, and expected behavior.
@@ -13,7 +18,7 @@ This report identifies inconsistencies between documentation, ADRs, plans, and a
 ### 1.1 `err.hash` field is missing from `JsonLogWriter`
 
 **Documentation claims:**
-- [`plan.md`](plan.md:66) shows `"hash": 1234567890` in the JSON schema
+- [`roadmap.md`](roadmap.md) (original JSON schema) shows `"hash": 1234567890`
 - [`doc/adr/008-jsonlogwriter-reusable-serialization.md`](doc/adr/008-jsonlogwriter-reusable-serialization.md:54) lists `hash` as part of `err` object
 - [`cookbook/stackWhenTrace.md`](cookbook/stackWhenTrace.md:114) documents `err.hash` as Wyhash64 of sanitized stack
 
@@ -26,7 +31,7 @@ This report identifies inconsistencies between documentation, ADRs, plans, and a
 ### 1.2 `err.stack` is an empty string, not an array
 
 **Documentation claims:**
-- [`plan.md`](plan.md:65) shows `"stack": ["com.example.MyClass.method", ...]` as an array of sanitized frames
+- [`roadmap.md`](roadmap.md) shows `"stack": ["com.example.MyClass.method", ...]` as an array of sanitized frames
 - [`cookbook/stackWhenTrace.md`](cookbook/stackWhenTrace.md:65) shows `"stack":["\tat com.example..."]` as an array
 
 **Actual code:**
@@ -38,8 +43,8 @@ This report identifies inconsistencies between documentation, ADRs, plans, and a
 ### 1.3 `msgTpl` field writes formatted message, not template
 
 **Documentation claims:**
-- [`plan.md`](plan.md:77) states: "`msgTpl` preserves the original message template for structured analysis"
-- [`plan.md`](plan.md:78) states: "Named placeholders (`{name}`) in `msg` are kept literal (not expanded)"
+- [`roadmap.md`](roadmap.md) states: "`msgTpl` preserves the original message template for structured analysis"
+- [`roadmap.md`](roadmap.md) states: "Named placeholders (`{name}`) in `msg` are kept literal (not expanded)"
 
 **Actual code:**
 - [`JsonLogWriter.java:83`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:83) writes `event.getFormattedMessage()` — this is the **already-formatted** message with placeholders replaced
@@ -50,7 +55,7 @@ This report identifies inconsistencies between documentation, ADRs, plans, and a
 ### 1.4 `ctx` field does not exist — MDC keys are flattened
 
 **Documentation claims:**
-- [`plan.md`](plan.md:61) shows `"ctx": {"requestId": "abc-123"}` as a nested object
+- [`roadmap.md`](roadmap.md) shows `"ctx": {"requestId": "abc-123"}` as a nested object
 - [`doc/adr/004-key-value-pairs-vs-mdc.md`](doc/adr/004-key-value-pairs-vs-mdc.md:39) references `ctx` in the priority rule
 
 **Actual code:**
@@ -62,7 +67,7 @@ This report identifies inconsistencies between documentation, ADRs, plans, and a
 ### 1.5 `kv` field is not a nested object
 
 **Documentation claims:**
-- [`plan.md`](plan.md:60) shows `"kv": {"state": "PAID"}` as a nested object
+- [`roadmap.md`](roadmap.md) shows `"kv": {"state": "PAID"}` as a nested object
 - [`README.md`](README.md:46) shows `"kv":{"userId":42,"action":"login"}`
 
 **Actual code:**
@@ -339,9 +344,9 @@ public static String generateTraceId() {
 
 ---
 
-## 15. MEDIUM: `plan.md` Generic Type Hierarchy is Outdated
+## 15. MEDIUM: `roadmap.md` Generic Type Hierarchy is Outdated (archived)
 
-**File:** [`plan.md`](plan.md:80-93)
+**File:** [`roadmap.md`](roadmap.md) (Generic Type Hierarchy section)
 
 **Documented hierarchy:**
 ```
@@ -364,9 +369,9 @@ DiaLogger<L extends LoggingEventBuilderWrapper<L>>
 
 ---
 
-## 16. MEDIUM: `plan.md` Lists `TraceId` in Core Module Contents
+## 16. MEDIUM: `roadmap.md` Lists `TraceId` in Core Module Contents (archived)
 
-**File:** [`plan.md`](plan.md:9)
+**File:** [`roadmap.md`](roadmap.md) (module table)
 
 **Documented:**
 ```
@@ -453,9 +458,9 @@ Already covered in section 2.2, but worth noting again as it appears in both the
 
 ---
 
-## 22. LOW: `plan.md` References `DefaultDiaLogger` as Unimplemented
+## 22. LOW: `roadmap.md` References `DefaultDiaLogger` as Unimplemented (archived)
 
-**File:** [`plan.md`](plan.md:23)
+**File:** [`roadmap.md`](roadmap.md) (Phase 1, item 1.1)
 
 **Documented:**
 ```
@@ -466,9 +471,9 @@ Already covered in section 2.2, but worth noting again as it appears in both the
 
 ---
 
-## 23. LOW: `plan.md` Phase 1 Items Marked Complete But Not Actually Complete
+## 23. LOW: `roadmap.md` Phase 1 Items Marked Complete But Not Actually Complete (archived)
 
-**File:** [`plan.md`](plan.md:19-22)
+**File:** [`roadmap.md`](roadmap.md) (Phase 1 checklist)
 
 **Documented as complete:**
 - `DiaLogger` — "Supports `contextStart(L)`/`contextEnd()` lifecycle" — these methods don't exist
@@ -634,5 +639,5 @@ It appears the alignment work has been done, but the plan file wasn't updated to
 8. **Update all line number references** in ADRs and plans
 9. **Update `README.md`** — Fix Java version, module contents, and JSON output example
 10. **Remove or update `cookbook/missing-keys-warn.md`** — It documents a removed feature
-11. **Update `plan.md`** — Fix generic type hierarchy, mark truly completed items, remove references to non-existent files
+11. **Keep `plans/roadmap.md` archived** — the original roadmap is superseded; do not treat it as current (the live gap list is `plans/analysis-report.md`)
 12. **Fix `CustomJsonEncoder` newline** — Use `\n` instead of `System.lineSeparator()`

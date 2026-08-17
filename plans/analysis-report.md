@@ -1,6 +1,34 @@
 # Dia-Log — Project Analysis & Improvement Recommendations
 
 Date: 2026-07-30
+Updated: 2026-08-17 — every item annotated with its current implementation status (verified against HEAD `ded5fa2`; `mvn clean test -pl core,logback` on JDK 25 passes, incl. `WyhashZeroAllocTest` 58/58).
+
+---
+
+## Implementation Status Audit (2026-08-17)
+
+| Item | Status |
+|---|---|
+| P0.1 `atLevel` bug | ✅ RESOLVED — outdated; code now uses `at(Level, LogFiller)` with the correct `isEnabledForLevel()` (`DiaLoggerBase.java:101-104`) |
+| P0.2 `err.stack` / `writeTraceString` | ✅ RESOLVED — single-pass `addFromTraceToOutputStreamJsonAndFingerprint()` writes `stack` + `errHash`; dead `writeTraceString()` removed |
+| P0.3 sanitizer duplication | ✅ RESOLVED — derivative classes now `@generated` by `StackSanitizerDerivativeGenerator` (see AGENTS.md, doc/java-stack-trace-sanitizer-and-derivatives.md) |
+| P0.4 `AutoCloseable` Javadoc | ✅ RESOLVED — try-with-resources example removed |
+| P1.6 JUnit versions | ✅ RESOLVED — JUnit 6.1.2 centralized in root `dependencyManagement` |
+| P1.7 logback/jackson centralization | ✅ RESOLVED — `logback.version` (1.5.38), `jackson.version` (3.2.1); jackson-bom imported |
+| P1.8 `NL` line separator | ✅ RESOLVED — `NL = new byte[]{0x0A}` (`JsonLogWriter.java:38`) |
+| P1.9 `prependPrefix()` synchronized | ❌ STILL OPEN — `DiaLoggerBase.java:36` |
+| P1.11 missing tests | 🔶 PARTIAL — `JavaStackSanitizerLogbackTest` created (6 tests); `TraceIdTest`, `DiaLoggerTest`, `LoggingEventBuilderWrapperBaseTest`, `Wyhash64EdgeCaseTest`, `JsonLogWriterTest` still missing |
+| P1.12 writer → core sanitizer | ✅ RESOLVED — writer uses the generated streaming fingerprint APIs |
+| P2.13 Javadoc | 🔶 PARTIAL — key classes documented; not exhaustive |
+| P2.14 repo docs | 🔶 PARTIAL — `LICENSE` + `CHANGELOG.md` exist; `CONTRIBUTING.md` + `SECURITY.md` missing |
+| P2.15 Maven Enforcer | ❌ STILL OPEN |
+| P2.16 JaCoCo | ❌ STILL OPEN |
+| P2.17 CI pipeline | 🔶 PARTIAL — `.github/workflows/publish.yml` exists; no `ci.yml` (push/PR verify) |
+| P2.18 `TraceId` `String.format` | ✅ RESOLVED — `padHex()` with `Long.toHexString` (`TraceId.java:53-57`) |
+| P2.19 empty `usage.brainstorm.md` | ✅ RESOLVED — file has content |
+| P2.20 `addKeyValues()` generics | 🔶 RECLASSIFIED — design note, not a bug; see §20 below |
+| P2.21 non-existent appenders | ✅ CONFIRMED — removed per ADR-009; current classes are `JsonAppender` / `JsonAppenderRolling` |
+| P2.22 `addKey()` value types | ✅ RESOLVED — type-specific writers in `writeValue()` (`JsonLogWriter.java:203-222`) |
 
 ---
 
@@ -12,7 +40,7 @@ Dia-Log is a well-structured diagnostic logging library built on SLF4J 2.0 for J
 
 ## P0 — Critical Issues (Fix Immediately)
 
-### 1. Bug in `DiaLoggerBase.atLevel(Level, LogFiller)` — Wrong level check
+### 1. Bug in `DiaLoggerBase.atLevel(Level, LogFiller)` — Wrong level check — ✅ RESOLVED (outdated)
 
 **File:** `core/src/main/java/hr/hrg/dialog/core/DiaLoggerBase.java:102`
 
@@ -30,11 +58,11 @@ All other `atXxx(Level, LogFiller)` methods use `isEnabledForLevel(level)` (the 
 
 ---
 
-### 2. `JsonLogWriter` — Stack trace array is commented out; use `writeTraceString()` instead
+### 2. `JsonLogWriter` — Stack trace array is commented out; use `writeTraceString()` instead — ✅ RESOLVED
 
 **File:** `logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:232-237`
 
-The `err.stack` field (sanitized frame array) is entirely commented out. The JSON output only includes `err.hash` but not `err.stack`. This defeats the purpose of having deterministic stack trace sanitization — consumers cannot see the actual sanitized frames, only a hash. The schema documented in `plan.md` includes `stack`, but the implementation omits it.
+The `err.stack` field (sanitized frame array) is entirely commented out. The JSON output only includes `err.hash` but not `err.stack`. This defeats the purpose of having deterministic stack trace sanitization — consumers cannot see the actual sanitized frames, only a hash. The schema documented in the original roadmap (`plans/roadmap.md`) includes `stack`, but the implementation omits it.
 
 Meanwhile, `writeTraceString()` (lines 312-343) is dead code that already implements streaming stack trace serialization directly to the JSON generator — no intermediate string allocation. It should be integrated into `writeJsonEvent()` to produce the `err.stack` field.
 
@@ -42,7 +70,7 @@ Meanwhile, `writeTraceString()` (lines 312-343) is dead code that already implem
 
 ---
 
-### 3. `JavaStackSanitizerLogback` duplicates `JavaStackSanitizer`
+### 3. `JavaStackSanitizerLogback` duplicates `JavaStackSanitizer` — ✅ RESOLVED (now a `@generated` derivative)
 
 **Files:**
 - `core/src/main/java/hr/hrg/dialog/core/JavaStackSanitizer.java`
@@ -54,7 +82,7 @@ The logback module has its own `JavaStackSanitizerLogback` that duplicates the f
 
 ---
 
-### 4. `LoggingEventBuilderWrapperBase` Javadoc claims `AutoCloseable` but doesn't implement it
+### 4. `LoggingEventBuilderWrapperBase` Javadoc claims `AutoCloseable` but doesn't implement it — ✅ RESOLVED
 
 **File:** `core/src/main/java/hr/hrg/dialog/core/LoggingEventBuilderWrapperBase.java:20-26`
 
@@ -72,7 +100,7 @@ But the class does not implement `AutoCloseable`. The `close()` method is missin
 
 ## P1 — Important Issues
 
-### 6. Inconsistent JUnit version management
+### 6. Inconsistent JUnit version management — ✅ RESOLVED
 
 **Files:**
 - `pom.xml` (root): defines `<junit-version>6.1.0</junit-version>`
@@ -85,7 +113,7 @@ The core module uses JUnit 5.11.4 while the logback module uses JUnit 6.1.0 (via
 
 ---
 
-### 7. `logback-classic` and `jackson-databind` not centralized in `dependencyManagement`
+### 7. `logback-classic` and `jackson-databind` not centralized in `dependencyManagement` — ✅ RESOLVED
 
 **File:** `logback/pom.xml`
 
@@ -95,7 +123,7 @@ These dependencies have versions only in the logback module's POM, not in the ro
 
 ---
 
-### 8. `JsonLogWriter.NL` uses `System.lineSeparator()` — OS-dependent line endings
+### 8. `JsonLogWriter.NL` uses `System.lineSeparator()` — OS-dependent line endings — ✅ RESOLVED
 
 **File:** `logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:44`
 
@@ -109,7 +137,7 @@ JSON Lines format requires `\n` (LF) as the line separator. Using `System.lineSe
 
 ---
 
-### 9. `DiaLoggerBase.prependPrefix()` is `synchronized` unnecessarily
+### 9. `DiaLoggerBase.prependPrefix()` is `synchronized` unnecessarily — ❌ STILL OPEN
 
 **File:** `core/src/main/java/hr/hrg/dialog/core/DiaLoggerBase.java:36`
 
@@ -119,7 +147,7 @@ The `prependPrefix()` method is `synchronized`, but prefix is typically set once
 
 ---
 
-### 11. Missing unit tests for key classes
+### 11. Missing unit tests for key classes — 🔶 PARTIAL
 
 | Missing Test | Class Under Test | What's Untested |
 |---|---|---|
@@ -132,7 +160,7 @@ The `prependPrefix()` method is `synchronized`, but prefix is typically set once
 
 ---
 
-### 12. `JsonLogWriter` uses `JavaStackSanitizerLogback.fingerprint()` instead of core sanitizer
+### 12. `JsonLogWriter` uses `JavaStackSanitizerLogback.fingerprint()` instead of core sanitizer — ✅ RESOLVED (streaming fingerprint APIs)
 
 **File:** `logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:240`
 
@@ -148,27 +176,27 @@ This creates a dependency from the logback module to a logback-specific sanitize
 
 ## P2 — Nice-to-Have Improvements
 
-### 13. No Javadoc on public API
+### 13. No Javadoc on public API — 🔶 PARTIAL
 
 Most public classes and methods lack Javadoc with `{@code ...}`, `@param`, `@return`, and usage examples. This is required for Maven Central publishing and makes the API harder to use.
 
-### 14. No `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`
+### 14. No `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md` — 🔶 PARTIAL
 
 Required for Maven Central publishing and open-source collaboration.
 
-### 15. No Maven Enforcer Plugin
+### 15. No Maven Enforcer Plugin — ❌ STILL OPEN
 
 No Java version enforcement, no banned dependencies (e.g., `commons-logging`, `log4j-over-slf4j`).
 
-### 16. No JaCoCo code coverage
+### 16. No JaCoCo code coverage — ❌ STILL OPEN
 
 No coverage reporting configured. The existing plan targets 80% line coverage.
 
-### 17. No CI pipeline
+### 17. No CI pipeline — 🔶 PARTIAL
 
 No `.github/workflows/ci.yml` for automated build/test on push/PR.
 
-### 18. `TraceId.generateTraceId()` uses `String.format()` — allocates `Formatter`
+### 18. `TraceId.generateTraceId()` uses `String.format()` — allocates `Formatter` — ✅ RESOLVED
 
 **File:** `core/src/main/java/hr/hrg/dialog/core/TraceId.java:37-41`
 
@@ -176,11 +204,11 @@ No `.github/workflows/ci.yml` for automated build/test on push/PR.
 
 **Fix:** Use `StringBuilder` with `Long.toHexString()` and zero-padding.
 
-### 19. `usage.brainstorm.md` is empty
+### 19. `usage.brainstorm.md` is empty — ✅ RESOLVED
 
 The file is essentially a placeholder with no content. Either remove it or flesh it out.
 
-### 20. `DiaLoggerBase.addKeyValues()` uses raw types
+### 20. `DiaLoggerBase.addKeyValues()` uses raw types — 🔶 RECLASSIFIED (design note, not a bug)
 
 **File:** `core/src/main/java/hr/hrg/dialog/core/DiaLoggerBase.java:43`
 
@@ -190,11 +218,13 @@ public static <L1 extends LoggingEventBuilderWrapperBase> L1 addKeyValues(L1 bui
 
 The method doesn't use the self-referential generic type pattern (`L extends LoggingEventBuilderWrapperBase<L>`), which means it doesn't support subclass chaining properly.
 
-### 21. `ConsoleAppenderDev`, `ConsoleAppenderJson`, `RollingFileAppenderJson` don't exist on disk
+**Reclassified (2026-08-17):** Not a bug. `LoggingEventBuilderWrapperBase` is intentionally **non-generic** — the CRTP/`self()` design described in the (stale, archived) `plans/roadmap.md` was dropped. Type inference already binds `L1` to the exact static type of the argument, so `addKeyValues(noop, ...)` returns `LoggingEventBuilderWrapperNoop` and subclass chaining works. The suggested bound `L extends LoggingEventBuilderWrapperBase<L>` would not even compile against the current hierarchy. The only real cost: fluent methods on the base class return `LoggingEventBuilderWrapperBase`, so subclasses preserve chaining via covariant overrides (`LoggingEventBuilderWrapperNoop` overrides all 17 methods; `LoggingEventBuilderWrapper` does not, so chains started from a plain wrapper variable degrade to the base type). If the hierarchy ever adopts self-referential generics, update this helper to match — until then, leave as-is.
+
+### 21. `ConsoleAppenderDev`, `ConsoleAppenderJson`, `RollingFileAppenderJson` don't exist on disk — ✅ CONFIRMED (removed per ADR-009)
 
 The open tabs and plan reference these files, but they don't exist in the `logback/src/main/java/hr/hrg/dialog/logback/` directory. Only `CustomJsonEncoder.java`, `JavaStackSanitizerLogback.java`, and `JsonLogWriter.java` exist. This suggests either the files were never created or were deleted but the tabs/plan weren't updated.
 
-### 22. `JsonLogWriter` `addKey()` doesn't handle non-String, non-POJO value types well
+### 22. `JsonLogWriter` `addKey()` doesn't handle non-String, non-POJO value types well — ✅ RESOLVED
 
 **File:** `logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:299-308`
 
@@ -204,38 +234,36 @@ The `addKey()` method handles `String` and falls back to `writePOJO()` for every
 
 ## Summary of Recommendations by Priority
 
-| Priority | Count | Key Areas |
+| Priority | Count | Key Areas (as of 2026-08-17) |
 |---|---|---|
-| P0 Critical | 5 | Bug fixes, dead code, DRY violations, missing AutoCloseable |
-| P1 Important | 7 | Dependency management, test coverage, reserved fields, line endings |
-| P2 Nice-to-Have | 10 | Documentation, CI/CD, performance, publishing prep |
+| P0 Critical | 0 remaining | All 4 reported issues resolved (1 outdated, 3 fixed) |
+| P1 Important | 2 remaining | `prependPrefix()` synchronization; planned unit tests (partial) |
+| P2 Nice-to-Have | 4 remaining | Maven Enforcer, JaCoCo, CI (`ci.yml`), CONTRIBUTING/SECURITY; Javadoc partial |
 
 ---
 
-## Suggested Execution Order
+## Remaining Work (as of 2026-08-17)
+
+The original P0/P1 fixes and most P2 items are implemented (see status audit above). Only these remain:
 
 ```
-Phase 1: P0 Fixes (1-2 days)
-  ├── Fix atLevel() bug in DiaLoggerBase
-  ├── Integrate writeTraceString() into writeJsonEvent() for err.stack output, remove commented-out array
-  ├── Remove JavaStackSanitizerLogback duplication
-  ├── Fix AutoCloseable Javadoc mismatch
-  └── Remove writeTraceString() dead code (after integrating it)
+Phase 1: Code quality (small)
+  ├── Remove `synchronized` from DiaLoggerBase.prependPrefix() (P1.9)
+  └── (Optional) Revisit addKeyValues() generics if the wrapper hierarchy is ever made generic (P2.20 — not a bug)
 
-Phase 2: P1 Fixes (2-3 days)
-  ├── Centralize dependency versions in root POM
-  ├── Fix NL line separator in JsonLogWriter
-  ├── Fix isReserved() to include all schema fields
-  ├── Fix prependPrefix() synchronization
-  ├── Fix JsonLogWriter to use core JavaStackSanitizer
-  └── Add missing unit tests
+Phase 2: Test coverage
+  ├── Add TraceIdTest, DiaLoggerTest, Wyhash64EdgeCaseTest, LoggingEventBuilderWrapperBaseTest (core)
+  ├── Add JsonLogWriterTest (logback)
+  └── Add ExampleIntegrationTest (example)
 
-Phase 3: P2 Improvements (ongoing)
-  ├── Add Javadoc to public API
-  ├── Add LICENSE, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md
-  ├── Add Maven Enforcer Plugin + JaCoCo + CI pipeline
-  ├── Optimize TraceId.generateTraceId()
-  └── Clean up usage.brainstorm.md
+Phase 3: Build & CI
+  ├── Add maven-enforcer-plugin (Java 25, banned duplicate bindings)
+  ├── Add JaCoCo coverage
+  └── Add .github/workflows/ci.yml (push/PR → mvn verify)
+
+Phase 4: Docs
+  ├── Add CONTRIBUTING.md and SECURITY.md
+  └── Complete Javadoc on remaining public API
 ```
 
 ---
@@ -252,3 +280,5 @@ The existing improvement plan covers many of the same areas but has some gaps:
 6. **Outdated:** The plan references `ConsoleAppenderDev.java`, `ConsoleAppenderJson.java`, and `RollingFileAppenderJson.java` as existing files, but they don't exist on disk.
 7. **Outdated:** The plan references `SegmentedJsonStringWriter.java` as dead code, but it doesn't exist on disk.
 8. **Overlapping:** The existing plan's Phase 1 items (1.1-1.4) overlap with P0 items in this analysis but add different items (e.g., `prependPrefix()` rename which is already done).
+
+> **Note (2026-08-17):** Several items above are now resolved by the codebase evolution — the JSON schema now emits `errClass`/`errMessage`/`stack`/`errHash`, `msgTpl`/`ctx`/`kv` nested objects were dropped in favor of flat top-level keys, and the appender/sanitizer classes were reworked (see the status audit at the top of this report).
