@@ -36,7 +36,8 @@ JaCoCo report + check, 300+ tests).
   on `LogFiller`, `@ThreadSafe`/`@NotThreadSafe` annotations, class Javadoc completed
 - Build/docs: Maven Enforcer, JaCoCo (enforced check: line ≥80% / branch ≥70%;
   actual core 91.7%/82.4%, logback 92.1%/81.2%), `.github/workflows/ci.yml`,
-  `CONTRIBUTING.md`, `SECURITY.md`
+  `CONTRIBUTING.md`, `SECURITY.md`, usage guide (`doc/usage.md`), migration guide
+  (`doc/migration.md`), zero-allocation design doc (`doc/wyhash64-zero-allocation.md`)
 
 Non-blocking observations that remain open (see `critical-analysis.md`): the
 `StringByteExtractor.writeClassic()` and `Float/Double.toString()` allocation hotspots

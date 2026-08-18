@@ -15,6 +15,14 @@ use strided reads, and `Streaming.finalHash()` allocates nothing.
 
 ---
 
+## Usage & Migration
+
+- [Usage guide](usage.md) — setup, JSON config, `kv()`, prefix, `stackWhenTraceEnabled()`,
+  exceptions, MDC, schema.
+- [Migration guide](migration.md) — step-by-step from plain SLF4J to Dia-Log.
+
+---
+
 ## MDC vs Key-Value Pairs
 
 **MDC is thread-local** (`String→String`), applies to every log on that thread, requires manual cleanup. 

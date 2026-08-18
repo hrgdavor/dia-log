@@ -537,11 +537,16 @@ Already covered in section 2.2, but worth noting again as it appears in both the
 
 ---
 
-## 29. LOW: `cookbook/missing-keys-warn.md` is Entirely About Removed Feature
+## 29. LOW: `cookbook/missing-keys-warn.md` is Entirely About Removed Feature — ✅ RESOLVED
 
 **File:** [`cookbook/missing-keys-warn.md`](cookbook/missing-keys-warn.md:1)
 
-**Issue:** The entire cookbook documents `ConsoleAppenderDev` which was removed per ADR-009. The document itself acknowledges this at the top but is still present in the cookbook. It should either be removed or clearly marked as historical reference only.
+**Issue:** The cookbook previously documented the removed `ConsoleAppenderDev` / missing-key
+warning feature.
+
+**Resolution (2026-08-18):** The cookbook no longer references `ConsoleAppenderDev`; it now
+explicitly states that `warnOnMissingKeys` is **not implemented** and that unresolvable
+`{key}` placeholders stay literal — aligned with the current code.
 
 ---
 
@@ -642,6 +647,6 @@ It appears the alignment work has been done, but the plan file wasn't updated to
 7. **Remove dead code** — `SegmentedJsonStringWriter`, `StreamDirectJacksonEncoder`, or complete them
 8. **Update all line number references** in ADRs and plans
 9. **Update `README.md`** — Fix Java version, module contents, and JSON output example
-10. **Remove or update `cookbook/missing-keys-warn.md`** — It documents a removed feature
+10. **Remove or update `cookbook/missing-keys-warn.md`** — ✅ DONE (2026-08-18): the cookbook no longer references the removed `ConsoleAppenderDev`; it documents that `warnOnMissingKeys` is not implemented.
 11. **Keep `plans/roadmap.md` archived** — the original roadmap is superseded; do not treat it as current (the live gap list is `plans/analysis-report.md`)
 12. **Fix `CustomJsonEncoder` newline** — Use `\n` instead of `System.lineSeparator()`

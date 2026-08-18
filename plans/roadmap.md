@@ -63,8 +63,8 @@ Multi-module Maven library (`hr.hrg.dialog:dia-log-root`) targeting Java 21, bui
   - ⚠️ `cookbook/missing-keys-warn.md` documents the removed `ConsoleAppenderDev` feature — flagged in `plans/inconsistency-report.md` §29.
 - [x] **3.1 README.md** — Project overview, maven coordinates, quick-start snippet, module descriptions. — ✅ Done; README now reflects the flat JSON schema and current module contents.
 - [ ] **3.2 Javadoc** — Public API fully documented with `{@code ...}`, `@param`, `@return`, usage examples. — 🔶 Partial (key classes documented; not exhaustive).
-- [ ] **3.3 Usage guide (`docs/usage.md`)** — Practical examples: basic setup, JSON output config, structured logging with `kv()`, contextual prefix, stackWhenTrace, missing key detection, error-only logs. — ❌ Not created.
-- [ ] **3.4 Migration guide (`docs/migration.md`)** — Step-by-step from plain SLF4J to Dia-Log. — ❌ Not created.
+- [x] **3.3 Usage guide (`docs/usage.md`)** — Practical examples: basic setup, JSON output config, structured logging with `kv()`, contextual prefix, stackWhenTrace, missing key detection, error-only logs. — ✅ Created as [`doc/usage.md`](../doc/usage.md) (2026-08-18).
+- [x] **3.4 Migration guide (`docs/migration.md`)** — Step-by-step from plain SLF4J to Dia-Log. — ✅ Created as [`doc/migration.md`](../doc/migration.md) (2026-08-18).
 
 ## Phase 4 — Release Readiness
 
