@@ -85,16 +85,16 @@ These optimizations are validated with JMH benchmarks (`-prof gc`). On the lates
 Allocation summary of the dedicated allocation benchmark (`AllocationBenchmark` /
 `JsonLogWriterDevBenchmark`, `-prof gc`, fast paths with `--add-opens`):
 
-| Path                                                                       | Alloc norm    |
-| -------------------------------------------------------------------------- | ------------- |
-| `Wyhash64.hash` — String (Latin-1/UTF-16), char[], byte[]                  | 0 B/op        |
-| `Wyhash64.Streaming` — reused hasher, `finalHash()`                        | 0 B/op        |
-| `EscapedJsonStringWriter`, `StringByteExtractor`, `JsonNumberWriter` (Ryu) | 0 B/op        |
-| `JsonLogWriter` — no KV                                                    | 0 B/op        |
-| `JsonLogWriter` — with KV (no MDC)                                         | 0 B/op        |
-| `JsonLogWriter` — throwable event                                          | 0 B/op        |
-| `fingerprint(Throwable, …)` — caller-owned reusable hasher                 | 88 B/op        |
-| `JsonLogWriterDev` (missing-key reporting, dev-only)                       | 256–464 B/op  |
+| Path                                                                       | Alloc norm   |
+| -------------------------------------------------------------------------- | ------------ |
+| `Wyhash64.hash` — String (Latin-1/UTF-16), char[], byte[]                  | 0 B/op       |
+| `Wyhash64.Streaming` — reused hasher, `finalHash()`                        | 0 B/op       |
+| `EscapedJsonStringWriter`, `StringByteExtractor`, `JsonNumberWriter` (Ryu) | 0 B/op       |
+| `JsonLogWriter` — no KV                                                    | 0 B/op       |
+| `JsonLogWriter` — with KV (no MDC)                                         | 0 B/op       |
+| `JsonLogWriter` — throwable event                                          | 0 B/op       |
+| `fingerprint(Throwable, …)` — caller-owned reusable hasher                 | 88 B/op      |
+| `JsonLogWriterDev` (missing-key reporting, dev-only)                       | 256–464 B/op |
 
 In short, allocation is avoided across the hot path by:
 
@@ -352,3 +352,29 @@ mvn clean deploy -DskipTests
 - Java 25+
 - SLF4J 2.0.18
 - Logback 1.5.38 (for the logback module)
+
+# Performance paths learned from apache/fory
+
+I noticed from apache fory release notes that there wer perf improvements over jackson,
+and found this commit https://github.com/apache/fory/commit/585eb16fda3b5729f6d6ca6d1be88fc42cd424d6 that
+is a treasure trove.
+
+**Measured results** (JDK 25.0.3, JMH 1.37, `-prof gc`, single thread)
+
+| Workload                         | Before     | After                 | Gain     |
+| -------------------------------- | ---------- | --------------------- | -------- |
+| escaping (typical)               | 52.3 ns    | **34.0 ns** (direct)  | 1.5×     |
+| escaping (all-dirty)             | 586.7 ns   | **241.4 ns** (direct) | 2.4×     |
+| latin1 → UTF-8                   | 27.5 ns    | **12.9 ns** (direct)  | 2.1×     |
+| writeLong                        | 36.4 ns    | **24.6 ns**           | 1.5×     |
+| writeLong (timestamp-sized)      | 22.4 ns    | **15.7 ns**           | 1.4×     |
+| writeInt                         | 22.0 ns    | **18.1 ns**           | 1.2×     |
+| 2 field prefixes                 | 28.0 ns    | **5.0 ns**            | 5.6×     |
+| **whole event (5 fixed fields)** | **215 ns** | **108 ns**            | **2.0×** |
+
+Allocation: ≈ 0 B/op on every leg, before and after — the gains are pure CPU, the zero-allocation property is intact.
+
+**Document:** `doc/perf/fory-perf-benchmark-results.md` — methodology, full tables, per-technique interpretation (T1–T6), and analysis. Key findings:
+- The biggest end-to-end win is *structural* (T3/T4/T6, Fory's writer-owns-buffer design: 215→125 ns from new internals alone, then →108 ns with the direct path), not just the SWAR scan.
+- Stream mode is ~neutral on typical short strings and regresses on all-dirty input (double-scan of dirty blocks + per-escape writes) — acceptable since production always targets the direct buffer.
+- **A real benchmark pitfall was found and fixed:** a fresh `new LoggerContext()` has no MDC adapter, so `event.getMDCPropertyMap()` throws NPE on every call (logback 1.5.38, `LoggingEvent` line 460). `JsonLogWriter` swallows it, but an uninitialized benchmark measures the NPE path (~736 B/op, GC-inflated times — my first run showed exactly that). The event benchmark now initializes a `LogbackMDCAdapter` in `@Setup`, matching production; the discarded run is documented.

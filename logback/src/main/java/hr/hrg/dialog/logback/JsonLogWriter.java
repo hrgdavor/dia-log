@@ -15,6 +15,7 @@ import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import hr.hrg.dialog.core.EscapedJsonStringWriter;
 import hr.hrg.dialog.core.JsonNumberWriter;
 import hr.hrg.dialog.core.RawJsonSelfWriter;
+import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
 import hr.hrg.dialog.core.StringByteExtractor;
 import hr.hrg.dialog.core.Wyhash64;
 import org.slf4j.event.KeyValuePair;
@@ -44,15 +45,21 @@ public class JsonLogWriter {
 
 
     private static final StringByteExtractor.ByteWriter STRING_STRATEGY = StringByteExtractor.getStrategy();
-    private static final byte[] KEY_TS = "\"ts\":".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] KEY_LEVEL = "\"level\":".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] KEY_LOGGER = "\"logger\":".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] KEY_THREAD = "\"thread\":".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] KEY_MSG = "\"msg\":".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] KEY_ERR_CLASS = "\"errClass\":".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] KEY_ERR_MESSAGE = "\"errMessage\":".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] KEY_ERR_HASH = "\"errHash\":".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] KEY_STACK = "\"stack\":".getBytes(StandardCharsets.UTF_8);
+
+    // T6: fixed field prefixes packed as little-endian long words (ported from
+    // Apache Fory commit 585eb16f, "feat(java): optimize json perf", PR #3871,
+    // Utf8WriterCodegen). Each prefix is precomputed once at class init; the
+    // direct-buffer path stores it with 1-2 packed 8-byte stores and one
+    // inlined capacity check instead of a virtual write(byte[]) call.
+    private static final PackedKey KEY_TS = new PackedKey("\"ts\":");
+    private static final PackedKey KEY_LEVEL = new PackedKey("\"level\":");
+    private static final PackedKey KEY_LOGGER = new PackedKey("\"logger\":");
+    private static final PackedKey KEY_THREAD = new PackedKey("\"thread\":");
+    private static final PackedKey KEY_MSG = new PackedKey("\"msg\":");
+    private static final PackedKey KEY_ERR_CLASS = new PackedKey("\"errClass\":");
+    private static final PackedKey KEY_ERR_MESSAGE = new PackedKey("\"errMessage\":");
+    private static final PackedKey KEY_ERR_HASH = new PackedKey("\"errHash\":");
+    private static final PackedKey KEY_STACK = new PackedKey("\"stack\":");
     private static final byte[] JSON_NULL = "null".getBytes(StandardCharsets.UTF_8);
     private static final byte[] JSON_TRUE = "true".getBytes(StandardCharsets.UTF_8);
     private static final byte[] JSON_FALSE = "false".getBytes(StandardCharsets.UTF_8);
@@ -90,9 +97,7 @@ public class JsonLogWriter {
 
     public void writeJsonEvent(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
         try {
-            out.write('{');
-
-            out.write(KEY_TS);
+            writeObjectStartAndField(out, KEY_TS);
             JsonNumberWriter.writeLong(out, longNumberBuffer, event.getTimeStamp());
 
             writeFieldPrefix(out, KEY_LEVEL);
@@ -220,9 +225,25 @@ public class JsonLogWriter {
         };
     }
 
-    private static void writeFieldPrefix(OutputStream out, byte[] keyBytes) throws IOException {
-        out.write(',');
-        out.write(keyBytes);
+    private static void writeFieldPrefix(OutputStream out, PackedKey key) throws IOException {
+        if (out instanceof ReusableByteArrayOutputStream rbo) {
+            rbo.write(',');
+            key.writeDirect(rbo);
+        } else {
+            out.write(',');
+            out.write(key.bytes());
+        }
+    }
+
+    /** Writes '{' fused with the first field's prefix (T6 object-start fusion). */
+    private static void writeObjectStartAndField(OutputStream out, PackedKey key) throws IOException {
+        if (out instanceof ReusableByteArrayOutputStream rbo) {
+            rbo.write('{');
+            key.writeDirect(rbo);
+        } else {
+            out.write('{');
+            out.write(key.bytes());
+        }
     }
 
     private static void writeFieldPrefixRawKey(OutputStream out, String key) throws IOException {
@@ -276,5 +297,42 @@ public class JsonLogWriter {
 
     private static void writeJsonStringOrNull(OutputStream out, String value) throws IOException {
         EscapedJsonStringWriter.writeJsonStringOrNull(out, value);
+    }
+
+    /**
+     * A fixed JSON field prefix (e.g. {@code "level":}) precomputed once as its
+     * UTF-8 bytes plus up to two little-endian packed {@code long} words.
+     * <p>
+     * T6 (from Apache Fory, see class header): the direct-buffer path stores the
+     * prefix with 1-2 packed 8-byte stores and one inlined capacity check; the
+     * stream fallback keeps the original {@code write(byte[])} behavior.
+     */
+    private record PackedKey(byte[] bytes, long word0, long word1) {
+
+        PackedKey(String json) {
+            this(json.getBytes(StandardCharsets.UTF_8));
+        }
+
+        PackedKey(byte[] bytes) {
+            this(bytes, pack(bytes, 0), pack(bytes, 8));
+        }
+
+        /** Packs up to 8 bytes starting at {@code off} little-endian into one long. */
+        private static long pack(byte[] bytes, int off) {
+            long v = 0;
+            int end = Math.min(off + 8, bytes.length);
+            for (int i = off; i < end; i++) {
+                v |= (bytes[i] & 0xFFL) << ((i - off) << 3);
+            }
+            return v;
+        }
+
+        /** Stores the packed prefix into the buffer with one inlined capacity check. */
+        void writeDirect(ReusableByteArrayOutputStream rbo) {
+            rbo.writeLongPrefixLE(word0, Math.min(8, bytes.length));
+            if (bytes.length > 8) {
+                rbo.writeLongPrefixLE(word1, bytes.length - 8);
+            }
+        }
     }
 }

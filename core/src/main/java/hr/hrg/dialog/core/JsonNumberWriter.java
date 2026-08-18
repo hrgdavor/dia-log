@@ -18,8 +18,16 @@ import java.nio.charset.StandardCharsets;
 @ThreadSafe
 public final class JsonNumberWriter {
 
-    // Pre-encoded ASCII byte lookup table for 00..99 (tens, ones)
-    private static final byte[] DIGIT_PAIRS = new byte[200];
+    // T5: packed ASCII digit tables ported from Apache Fory commit 585eb16f
+    // ("feat(java): optimize json perf", PR #3871), Utf8JsonWriter.
+    // DIGIT_QUADS[i] packs the four ASCII digits of i little-endian into one
+    // int: c0 | (c1 << 8) | (c2 << 16) | (c3 << 24), stored with 4 byte stores.
+    // DIGIT_TRIPLES[i] additionally packs a leading-zero skip count in the low
+    // byte: skip | (c0 << 8) | (c1 << 16) | (c2 << 24) with c2 the ones digit, so
+    // 1..3 significant digits come from one lookup and one shifted store group.
+    private static final int[] DIGIT_TRIPLES = new int[1000];
+    private static final int[] DIGIT_QUADS = new int[10000];
+
     public static final int MAX_INT_BYTES = 11;
     private static final byte[] MIN_INT_BYTES = "-2147483648".getBytes(StandardCharsets.UTF_8);
 
@@ -35,9 +43,21 @@ public final class JsonNumberWriter {
     public static final int MAX_DOUBLE_BYTES = 25;
 
     static {
-        for (int i = 0; i < 100; i++) {
-            DIGIT_PAIRS[i * 2] = (byte) ('0' + (i / 10));
-            DIGIT_PAIRS[i * 2 + 1] = (byte) ('0' + (i % 10));
+        for (int i = 0; i < 1000; i++) {
+            int c0 = '0' + i / 100;
+            int c1 = '0' + (i / 10) % 10;
+            int c2 = '0' + i % 10;
+            int skip = i < 10 ? 2 : i < 100 ? 1 : 0;
+            DIGIT_TRIPLES[i] = skip | (c0 << 8) | (c1 << 16) | (c2 << 24);
+        }
+        for (int i = 0; i < 10000; i++) {
+            int high = i / 100;
+            int low = i - high * 100;
+            int c0 = '0' + high / 10;
+            int c1 = '0' + high % 10;
+            int c2 = '0' + low / 10;
+            int c3 = '0' + low % 10;
+            DIGIT_QUADS[i] = c0 | (c1 << 8) | (c2 << 16) | (c3 << 24);
         }
     }
 
@@ -72,25 +92,16 @@ public final class JsonNumberWriter {
         boolean negative = value < 0;
         if (negative) value = -value;
 
-        while (value >= 100) {
-            int q = value / 100;
-            int r = value - ((q << 6) + (q << 5) + (q << 2));
+        // T5: 4 digits per step via DIGIT_QUADS instead of 2 via DIGIT_PAIRS.
+        while (value >= 10000) {
+            int q = value / 10000;
+            int r = value - q * 10000;
             value = q;
-
-            cursor -= 2;
-            int idx = r * 2;
-            intBuffer[cursor] = DIGIT_PAIRS[idx];
-            intBuffer[cursor + 1] = DIGIT_PAIRS[idx + 1];
+            cursor -= 4;
+            putIntLE(intBuffer, cursor, DIGIT_QUADS[r]);
         }
 
-        if (value < 10) {
-            intBuffer[--cursor] = (byte) ('0' + value);
-        } else {
-            cursor -= 2;
-            int idx = value * 2;
-            intBuffer[cursor] = DIGIT_PAIRS[idx];
-            intBuffer[cursor + 1] = DIGIT_PAIRS[idx + 1];
-        }
+        cursor = writeFinalChunk(intBuffer, cursor, value);
 
         if (negative) {
             intBuffer[--cursor] = (byte) '-';
@@ -104,26 +115,79 @@ public final class JsonNumberWriter {
             out.write(MIN_LONG_BYTES);
             return;
         }
+        if (longBuffer.length < MAX_LONG_BYTES) {
+            throw new IllegalArgumentException("Buffer too small, must be at least " + MAX_LONG_BYTES);
+        }
 
         int cursor = MAX_LONG_BYTES;
 
         boolean negative = value < 0;
         if (negative) value = -value;
 
-        while (value >= 10) {
-            long q = value / 10;
-            int digit = (int) (value - (q * 10));
-            longBuffer[--cursor] = (byte) ('0' + digit);
-            value = q;
+        // T5: values that fit an int take the cheaper int path (Fory's
+        // writePositiveLong fast path), otherwise 4 digits per step.
+        if (value <= Integer.MAX_VALUE) {
+            cursor = writePackedInt(longBuffer, cursor, (int) value);
+        } else {
+            while (value >= 10000) {
+                long q = value / 10000;
+                int r = (int) (value - q * 10000);
+                value = q;
+                cursor -= 4;
+                putIntLE(longBuffer, cursor, DIGIT_QUADS[r]);
+            }
+            cursor = writeFinalChunk(longBuffer, cursor, (int) value);
         }
-
-        longBuffer[--cursor] = (byte) ('0' + value);
 
         if (negative) {
             longBuffer[--cursor] = (byte) '-';
         }
 
         out.write(longBuffer, cursor, MAX_LONG_BYTES - cursor);
+    }
+
+    /**
+     * Writes an int into {@code buf} from the end (cursor moves left), returning
+     * the new cursor. Used by the long fast path; the value fits in 10 digits.
+     */
+    private static int writePackedInt(byte[] buf, int cursor, int value) {
+        while (value >= 10000) {
+            int q = value / 10000;
+            int r = value - q * 10000;
+            value = q;
+            cursor -= 4;
+            putIntLE(buf, cursor, DIGIT_QUADS[r]);
+        }
+        return writeFinalChunk(buf, cursor, value);
+    }
+
+    /** Writes the most significant 1..4 digits of {@code v} (v in 0..9999). */
+    private static int writeFinalChunk(byte[] buf, int cursor, int v) {
+        if (v >= 1000) {
+            cursor -= 4;
+            putIntLE(buf, cursor, DIGIT_QUADS[v]);
+            return cursor;
+        }
+        int digits = DIGIT_TRIPLES[v];
+        int skip = digits & 0xFF;
+        int shifted = digits >>> ((skip + 1) << 3);
+        int len = 3 - skip;
+        cursor -= len;
+        switch (len) {
+            case 3: buf[cursor + 2] = (byte) (shifted >>> 16);
+            case 2: buf[cursor + 1] = (byte) (shifted >>> 8);
+            case 1: buf[cursor] = (byte) shifted;
+            default: break;
+        }
+        return cursor;
+    }
+
+    /** Four little-endian byte stores of one packed ASCII digit quad. */
+    private static void putIntLE(byte[] buf, int pos, int digits) {
+        buf[pos] = (byte) digits;
+        buf[pos + 1] = (byte) (digits >>> 8);
+        buf[pos + 2] = (byte) (digits >>> 16);
+        buf[pos + 3] = (byte) (digits >>> 24);
     }
 
     public static void writeFloat(OutputStream out, byte[] floatBuffer, float value) throws IOException {
