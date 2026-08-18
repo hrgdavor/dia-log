@@ -74,6 +74,61 @@ comparison isolates the serialization strategy.
    and 0.490 vs 0.632 us/op without. The Jackson `JsonGenerator` path pays for generator
    state, intermediate buffers, and per-field machinery.
 
+## Where the time goes — why `optimizedJsonLog` is slower than `defaultPatternLog`
+
+The optimized writer is allocation-faster but CPU-slower than the pattern encoder.
+Decomposing the time budget (same event, warmed `nanoTime` micro-measurements on the
+same JDK/machine; trace = 4 frames in the micro-shape):
+
+| Component | measured cost |
+|---|---|
+| bulk `write(byte[])` of 133 bytes | 10.6 ns |
+| same 133 bytes as **133 × `write(int)`** | **543.4 ns (≈51× slower)** |
+| escaped write of the 48-char message (`EscapedJsonStringWriter`, batched segments) | 40.7 ns |
+| raw `StringByteExtractor` strategy write of the same message (`writeLatin1`, per byte) | 257.0 ns |
+| fixed JSON fields `ts..msg` (replica of the writer's fixed-field section) | 167.9 ns |
+| full JSON event, plain (no MDC/KV/trace) | 181.1 ns |
+| full JSON event, with MDC+KV | 377.9 ns |
+| single-pass stack write+fingerprint (4 frames) | 324.2 ns |
+| of which: write only | 254.1 ns |
+| of which: fingerprint only (hash) | 101.3 ns |
+
+### Findings
+
+1. **The stack path writes one byte at a time — that is the dominant avoidable cost.**
+   The single-pass stack writer emits each frame's class/method bytes through
+   `StringByteExtractor.writeLatin1`, which loops `out.write(int)` **per byte** (543 ns
+   per 133 bytes vs 10.6 ns for one bulk write — a ≈51× penalty). With a trace, this is
+   paid for every frame × (class + dot + method). The fingerprint itself is cheap
+   (101 ns / 4 frames); it is not the bottleneck.
+
+2. **`EscapedJsonStringWriter` already batches** — its VarHandle fast path
+   (`writeEscapedLatin1`) writes contiguous ASCII runs as bulk `write(byte[], off, len)`
+   (40.7 ns for the message), which is why the fixed JSON fields are not the problem
+   either (167.9 ns for all five).
+
+3. **Output volume multiplies the write-call cost.** JSON emits ~2.2× more bytes than
+   the default pattern (quotes, commas, field names, plus MDC/KV fields), and every one
+   of those bytes goes through a write call — so both the count and the granularity
+   work against the JSON writer.
+
+4. **MDC+KV processing adds ~200 ns** (the `allKeys` dedup `HashSet`, MDC `entrySet()`
+   iteration, and the extra escaped key/value writes) — the pattern encoder renders none
+   of it.
+
+5. The pattern encoder wins on CPU because its output is short (~100 B) and it performs
+   **one** bulk `getBytes()` + **one** bulk write, appending the trace to its
+   `StringBuilder` in bulk too — at the price of the 728 → ~12–15 KB/op allocation.
+
+### Implication
+
+Batching the ASCII segments in `StringByteExtractor.writeLatin1` the same way
+`EscapedJsonStringWriter.writeEscapedLatin1` already does (write a contiguous run with
+one `write(byte[], off, len)` call instead of per-byte `write(int)`) would remove the
+dominant trace-path cost: class/method names are effectively always ASCII, so each frame's
+string becomes a single bulk write. The trace event cost should then drop toward the
+no-trace + hash/write-remainder budget rather than the current per-byte-write multiple.
+
 ## Current recommendation
 
 - For low-allocation, low-GC-pressure paths (high throughput servers, structured logs),
