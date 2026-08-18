@@ -54,6 +54,33 @@ Previously flagged and **already resolved — do not reintroduce**:
   (`RyuFloat` / `RyuDouble`); also note `String.value` UTF-16 byte order is platform-native,
   never assume it (Wyhash64 probes it once at class init)
 
+### Prefer Reusable Objects as Parameters over ThreadLocal
+
+Scratch/reusable state on hot paths (hashers, number buffers, `byte[]` scratch) is
+**passed as an explicit method parameter and owned by the caller** — do not hide it in a
+`ThreadLocal`. Examples already in the codebase:
+
+- The fingerprint entry points (`JavaStackSanitizer.fingerprint(...)`,
+  `addFromTraceToOutputStream*AndFingerprint(...)`, and their derivatives) take a
+  caller-supplied `Wyhash64.Streaming` and reset it internally (seed 0). There are
+  deliberately **no** no-stream convenience overloads that would allocate a fresh hasher
+  per call, and no hidden per-thread hasher.
+- `JsonLogWriter` owns its `fingerprintStream` as a plain instance field — exactly like
+  its reusable number buffers — and passes it into the single-pass methods.
+
+Why:
+
+- `ThreadLocal` is hidden state: per-thread memory overhead, invisible at the call site,
+  and easy to corrupt through accidental re-entrancy (a nested call resets the same
+  hasher and invalidates the outer hash).
+- Caller-owned reuse is explicit and testable: the same instance is visibly shared across
+  calls, and allocation/reuse is fully controlled where the call happens.
+- A plain field is the zero-cost default; if an instance genuinely needs thread
+  confinement, document the `@NotThreadSafe` contract instead of reaching for `ThreadLocal`.
+
+The dev/diagnostic variants (`JsonLogWriterDev`, `JsonLogWriterClassic`, benchmark
+fixtures) follow the dev-variant policy above and are not held to this rule.
+
 ### Thread Safety Requirements
 
 - `DiaLoggerBase.prefix` must remain `volatile` if `prependPrefix()` exists

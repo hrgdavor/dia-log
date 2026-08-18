@@ -20,6 +20,9 @@ class JavaStackSanitizerLogbackTest {
 
     private static final Predicate<String> ACCEPT_ALL = cls -> true;
 
+    /** Caller-owned reusable hasher, as the API requires (no convenience overloads). */
+    private final Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+
     private static StackTraceElement ste(String className, String methodName) {
         return new StackTraceElement(className, methodName, null, -1);
     }
@@ -51,8 +54,8 @@ class JavaStackSanitizerLogbackTest {
         Throwable throwable = sampleThrowable();
         IThrowableProxy proxy = new ThrowableProxy(throwable);
 
-        long core = JavaStackSanitizer.fingerprint(throwable, ACCEPT_ALL);
-        long logback = JavaStackSanitizerLogback.fingerprint(proxy, ACCEPT_ALL);
+        long core = JavaStackSanitizer.fingerprint(throwable, ACCEPT_ALL, stream);
+        long logback = JavaStackSanitizerLogback.fingerprint(proxy, ACCEPT_ALL, stream);
 
         assertEquals(core, logback);
     }
@@ -120,14 +123,15 @@ class JavaStackSanitizerLogbackTest {
                 ACCEPT_ALL,
                 twoPassOut
         );
-        long twoPassHash = JavaStackSanitizerLogback.fingerprint(proxy, ACCEPT_ALL);
+        long twoPassHash = JavaStackSanitizerLogback.fingerprint(proxy, ACCEPT_ALL, stream);
 
         ByteArrayOutputStream singlePassOut = new ByteArrayOutputStream();
         long singlePassHash = JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                 proxy.getStackTraceElementProxyArray(),
                 ACCEPT_ALL,
                 singlePassOut,
-                proxy.getClassName()
+                proxy.getClassName(),
+                stream
         );
 
         assertEquals(twoPassOut.toString(StandardCharsets.UTF_8), singlePassOut.toString(StandardCharsets.UTF_8));
@@ -137,7 +141,7 @@ class JavaStackSanitizerLogbackTest {
     @Test
     void fingerprint_withRejectAllFilter_usesFallback() {
         IThrowableProxy proxy = new ThrowableProxy(sampleThrowable());
-        long hash = JavaStackSanitizerLogback.fingerprint(proxy, cls -> false);
+        long hash = JavaStackSanitizerLogback.fingerprint(proxy, cls -> false, stream);
         assertNotEquals(0L, hash, "fallback must still produce a hash");
     }
 
@@ -145,8 +149,8 @@ class JavaStackSanitizerLogbackTest {
     void fingerprint_withSelectiveFilter_differsFromAcceptAll() {
         IThrowableProxy proxy = new ThrowableProxy(sampleThrowable());
         // rejects the lambda frame, keeps the two plain com.example.MyClass frames
-        long selective = JavaStackSanitizerLogback.fingerprint(proxy, cls -> !cls.contains("Lambda"));
-        long all = JavaStackSanitizerLogback.fingerprint(proxy, ACCEPT_ALL);
+        long selective = JavaStackSanitizerLogback.fingerprint(proxy, cls -> !cls.contains("Lambda"), stream);
+        long all = JavaStackSanitizerLogback.fingerprint(proxy, ACCEPT_ALL, stream);
         assertNotEquals(all, selective, "different filters must produce different fingerprints");
     }
 
@@ -154,8 +158,8 @@ class JavaStackSanitizerLogbackTest {
     void fingerprint_withRejectAllFilter_matchesCoreFallback() {
         Throwable throwable = sampleThrowable();
         IThrowableProxy proxy = new ThrowableProxy(throwable);
-        long fromProxy = JavaStackSanitizerLogback.fingerprint(proxy, cls -> false);
-        long fromCore = JavaStackSanitizer.fingerprint(throwable, cls -> false);
+        long fromProxy = JavaStackSanitizerLogback.fingerprint(proxy, cls -> false, stream);
+        long fromCore = JavaStackSanitizer.fingerprint(throwable, cls -> false, stream);
         assertEquals(fromCore, fromProxy, "logback fallback must match core fallback");
     }
 

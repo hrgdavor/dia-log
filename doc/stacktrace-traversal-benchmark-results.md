@@ -10,11 +10,13 @@ Historical optimization timeline is tracked in:
 
 ## Latest run
 
+- Date: 2026-08-18
+- Machine: AMD Ryzen 9 7945HX, Windows (x86-64, little-endian)
 - JDK: 25.0.3
 - JMH: 1.37
 - Modes: throughput and average-time
-- Warmup: 3 x 1s
-- Measurement: 5 x 1s
+- Warmup: 2 x 1s
+- Measurement: 3 x 1s
 - Forks: 1
 - Profiler: -prof gc
 
@@ -27,11 +29,11 @@ Artifacts:
 
 | Benchmark method                                 | Avg time    | Throughput   | Alloc norm    |
 | ------------------------------------------------ | ----------- | ------------ | ------------- |
-| benchmarkThrowableStackTraceArray                | 3.048 us/op | 0.316 ops/us | 1496.022 B/op |
-| benchmarkStackWalkerEAFriendly                   | 3.440 us/op | 0.267 ops/us | 2640.025 B/op |
-| benchmarkStackWalkerNonEAFriendly                | 3.527 us/op | 0.251 ops/us | 2576.026 B/op |
-| benchmarkThrowableStackTraceArrayWyhashZeroAlloc | 3.568 us/op | 0.256 ops/us | 1632.025 B/op |
-| benchmarkThrowableStackTraceArrayWyhashFallback  | 3.759 us/op | 0.230 ops/us | 3032.027 B/op |
+| benchmarkThrowableStackTraceArray                | 3.018 us/op | 0.313 ops/us | 1496.045 B/op |
+| benchmarkStackWalkerEAFriendly                   | 3.481 us/op | 0.289 ops/us | 2640.051 B/op |
+| benchmarkStackWalkerNonEAFriendly                | 3.490 us/op | 0.280 ops/us | 2576.079 B/op |
+| benchmarkThrowableStackTraceArrayWyhashZeroAlloc | 3.731 us/op | 0.277 ops/us | 1632.052 B/op |
+| benchmarkThrowableStackTraceArrayWyhashFallback  | 3.904 us/op | 0.273 ops/us | 3000.055 B/op |
 
 ## Current interpretation
 

@@ -132,11 +132,9 @@ public class AllocationBenchmark {
     }
 
     // ---- stack-trace fingerprinting ----------------------------------------
-
-    @Benchmark
-    public long fingerprintNewStream() {
-        return JavaStackSanitizer.fingerprint(throwable, ACCEPT_ALL);
-    }
+    // There are deliberately NO convenience overloads: the fingerprint entry
+    // points require a caller-owned reusable hasher, so the only fingerprint
+    // rows are the reused-hasher variants plus the isolation rows below.
 
     @Benchmark
     public long fingerprintReusedStream() {
@@ -148,6 +146,21 @@ public class AllocationBenchmark {
         blackhole.consume(JavaStackSanitizer.fingerprint(throwable, ACCEPT_ALL, reusableStream));
         blackhole.consume(trace.length);
         blackhole.consume(throwableClassName.length());
+    }
+
+    // Isolation rows for the fingerprint breakdown: they pin down exactly where
+    // the bytes in fingerprint(Throwable, ...) come from.
+    @Benchmark
+    public int getStackTraceCloneOnly() {
+        // JDK behavior: Throwable.getStackTrace() returns a defensive copy.
+        return throwable.getStackTrace().length;
+    }
+
+    @Benchmark
+    public long fingerprintFromTraceReused() {
+        // The zero-allocation alternative: fingerprint a prepared trace into a
+        // caller-owned hasher — no getStackTrace() copy, no hasher allocation.
+        return JavaStackSanitizer.fingerprintFromTrace(trace, ACCEPT_ALL, throwableClassName, reusableStream);
     }
 
     private static Throwable createThrowable() {

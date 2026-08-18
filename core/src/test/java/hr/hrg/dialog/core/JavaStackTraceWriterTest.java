@@ -271,13 +271,15 @@ class JavaStackTraceWriterTest {
     @Test
     void singlePassFingerprint_matchesStreamingHash() throws java.io.IOException {
         StackTraceElement[] frames = mixedFrames();
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
 
         long singlePass = JavaStackTraceWriter.addFromTraceToOutputStreamJsonAndFingerprint(
                 frames,
                 new java.io.ByteArrayOutputStream(),
-                "com.example.MyException");
+                "com.example.MyException",
+                stream);
 
-        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        stream.reset(0); // finalHash() does not reset; start the manual hash from seed 0
         stream.update("com.example.MyException");
         JavaStackTraceWriter.addFromTrace(frames, stream);
 
@@ -288,17 +290,20 @@ class JavaStackTraceWriterTest {
     @Test
     void singlePassFingerprint_matchesSanitizerAcceptAllFingerprint() throws java.io.IOException {
         StackTraceElement[] frames = mixedFrames();
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
 
         long singlePass = JavaStackTraceWriter.addFromTraceToOutputStreamJsonAndFingerprint(
                 frames,
                 new java.io.ByteArrayOutputStream(),
-                "com.example.MyException");
+                "com.example.MyException",
+                stream);
 
         long sanitizer = JavaStackSanitizer.addFromTraceToOutputStreamJsonAndFingerprint(
                 frames,
                 cls -> true,
                 new java.io.ByteArrayOutputStream(),
-                "com.example.MyException");
+                "com.example.MyException",
+                stream);
 
         assertEquals(sanitizer, singlePass,
                 "No-filter single-pass hash should match sanitizer accept-all single-pass hash");
@@ -327,13 +332,15 @@ class JavaStackTraceWriterTest {
     @Test
     void singlePassFingerprint_nullThrowableClassName() throws java.io.IOException {
         StackTraceElement[] frames = mixedFrames();
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
 
         long withNull = JavaStackTraceWriter.addFromTraceToOutputStreamJsonAndFingerprint(
                 frames,
                 new java.io.ByteArrayOutputStream(),
-                null);
+                null,
+                stream);
 
-        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        stream.reset(0); // finalHash() does not reset; start the manual hash from seed 0
         JavaStackTraceWriter.addFromTrace(frames, stream);
 
         assertEquals(stream.finalHash(), withNull,

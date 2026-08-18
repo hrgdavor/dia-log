@@ -46,8 +46,9 @@ class JavaStackWriterLogbackTest {
         Throwable throwable = sampleThrowable();
         IThrowableProxy proxy = new ThrowableProxy(throwable);
 
-        long core = JavaStackTraceWriter.fingerprint(throwable, cls -> true);
-        long logback = JavaStackWriterLogback.fingerprint(proxy, cls -> false);
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        long core = JavaStackTraceWriter.fingerprint(throwable, cls -> true, stream);
+        long logback = JavaStackWriterLogback.fingerprint(proxy, cls -> false, stream);
 
         assertEquals(core, logback);
     }
@@ -108,14 +109,16 @@ class JavaStackWriterLogbackTest {
     void singlePassFingerprint_matchesStreamingHash() throws IOException {
         Throwable throwable = sampleThrowable();
         IThrowableProxy proxy = new ThrowableProxy(throwable);
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
 
         // Single-pass hash (with class-name seed), compared against the streaming hash fed the same seed.
         long singlePass = JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                 proxy.getStackTraceElementProxyArray(),
                 new ByteArrayOutputStream(),
-                throwable.getClass().getName());
+                throwable.getClass().getName(),
+                stream);
 
-        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+        stream.reset(0); // finalHash() does not reset; start the manual hash from seed 0
         stream.update(throwable.getClass().getName());
         JavaStackWriterLogback.addFromTrace(proxy.getStackTraceElementProxyArray(), stream);
 
@@ -126,17 +129,20 @@ class JavaStackWriterLogbackTest {
     void singlePassFingerprint_matchesSanitizerAcceptAllFingerprint() throws IOException {
         Throwable throwable = sampleThrowable();
         IThrowableProxy proxy = new ThrowableProxy(throwable);
+        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
 
         long singlePass = JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                 proxy.getStackTraceElementProxyArray(),
                 new ByteArrayOutputStream(),
-                throwable.getClass().getName());
+                throwable.getClass().getName(),
+                stream);
 
         long sanitizer = JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                 proxy.getStackTraceElementProxyArray(),
                 cls -> true,
                 new ByteArrayOutputStream(),
-                throwable.getClass().getName());
+                throwable.getClass().getName(),
+                stream);
 
         assertEquals(sanitizer, singlePass);
     }

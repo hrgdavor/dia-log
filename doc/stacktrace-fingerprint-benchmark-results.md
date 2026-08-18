@@ -18,11 +18,13 @@ This latest run is focused on the primary comparison methods:
 
 Run settings:
 
+- Date: 2026-08-18
+- Machine: AMD Ryzen 9 7945HX, Windows (x86-64, little-endian)
 - JDK: 25.0.3
 - JMH: 1.37
 - Modes: throughput and average-time
-- Warmup: 3 x 1s
-- Measurement: 5 x 1s
+- Warmup: 2 x 1s
+- Measurement: 3 x 1s
 - Forks: 1
 - Profiler: -prof gc
 
@@ -35,9 +37,14 @@ Artifacts:
 
 | Benchmark method                     | Avg time     | Throughput   | Alloc norm     |
 | ------------------------------------ | ------------ | ------------ | -------------- |
-| writeWithJsonLogWriter               | 12.214 us/op | 0.082 ops/us | 968.084 B/op   |
-| writeWithJsonLogWriterClassic        | 13.505 us/op | 0.077 ops/us | 1336.093 B/op  |
-| writeWithPrintStackTraceStringWriter | 6.073 us/op  | 0.169 ops/us | 19296.042 B/op |
+| writeWithJsonLogWriter               | 14.607 us/op | 0.069 ops/us | 736.101 B/op   |
+| writeWithJsonLogWriterClassic        | 16.044 us/op | 0.062 ops/us | 1200.110 B/op  |
+| writeWithPrintStackTraceStringWriter | 5.584 us/op  | 0.177 ops/us | 19128.038 B/op |
+
+Compared with the previous run, allocation dropped for the structured writers
+(968 → 736 B/op for `writeWithJsonLogWriter`, 1336 → 1200 B/op for
+`writeWithJsonLogWriterClassic`) — the fingerprint entry points now reuse a
+caller-owned hasher, so no `Wyhash64.Streaming` is allocated per event.
 
 ## Current interpretation
 

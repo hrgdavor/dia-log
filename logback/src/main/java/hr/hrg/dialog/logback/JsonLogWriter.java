@@ -65,9 +65,14 @@ public class JsonLogWriter {
     /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
     private Predicate<String> stackTraceFilter = null;
 
-    /** Reusable per-thread hasher for the single-pass stack-trace fingerprint (appenders are shared across threads). */
-    private final ThreadLocal<Wyhash64.Streaming> fingerprintStream =
-            ThreadLocal.withInitial(() -> new Wyhash64.Streaming(0));
+    /**
+     * Reusable hasher for the single-pass stack-trace fingerprint, owned by this
+     * writer like the number buffers below and passed as a parameter to the
+     * single-pass methods (which reset it internally). No hidden ThreadLocal
+     * state — the writer is {@link NotThreadSafe}, so an instance must not be
+     * used from several threads at once, exactly like the number buffers.
+     */
+    private final Wyhash64.Streaming fingerprintStream = new Wyhash64.Streaming(0);
 
     public JsonLogWriter() {}
 
@@ -155,9 +160,10 @@ public class JsonLogWriter {
                     STRING_STRATEGY.write(out, throwableClassName);
                 }
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
-                // Reuse a per-thread hasher so exception events allocate nothing
-                // (the single-pass methods reset the stream internally).
-                Wyhash64.Streaming stream = fingerprintStream.get();
+                // Reuse this writer's hasher (owned like the number buffers) so
+                // exception events allocate nothing — the single-pass methods
+                // reset the stream internally.
+                Wyhash64.Streaming stream = fingerprintStream;
                 // micro optimization to call variant without filter
                 long fingerPrint = stackTraceFilter == null ?
                 JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(

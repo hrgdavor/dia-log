@@ -65,27 +65,26 @@ public class JavaStackSanitizer {
     public static final String LAMBDA_PREFIX_FOR_METHOD = "lambda$";
 
     /**
-     * Builds a deterministic fingerprint for a throwable.
+     * Builds a deterministic fingerprint for a throwable using a caller-supplied hasher.
      * <p>
      * The hash input begins with the exception class name and then appends the
      * sanitized frame sequence produced by {@link #addFromTrace(StackTraceElement[], Predicate, Wyhash64.Streaming)}.
+     * <p>
+     * <b>Reuse policy:</b> {@code stream} is a <i>caller-owned reusable</i> hasher —
+     * pass a long-lived instance (e.g. a field of the logger/appender, like the
+     * reusable number buffers); this method resets it to seed 0 internally. There is
+     * deliberately <i>no</i> no-stream convenience overload and no hidden
+     * {@link ThreadLocal} state: scratch state is passed as a parameter so the caller
+     * controls allocation and reuse explicitly (project guideline: prefer reusable
+     * objects as parameters over ThreadLocal — see {@code AGENTS.md}).
+     * The only fast-path per-call allocation is the defensive {@code StackTraceElement[]}
+     * copy that {@link Throwable#getStackTrace()} returns by JDK design; to avoid even
+     * that copy, fingerprint an already-materialized trace with
+     * {@link #fingerprintFromTrace(StackTraceElement[], Predicate, String, Wyhash64.Streaming)}.
      *
      * @param rootCause throwable whose stack trace is fingerprinted
      * @param filter frame class filter used to include application-relevant frames
-     * @return deterministic 64-bit hash
-     */
-    public static long fingerprint(Throwable rootCause, Predicate<String> filter) {
-        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
-
-        return fingerprint(rootCause, filter, stream);
-    }
-
-    /**
-     * Builds a deterministic fingerprint for a throwable using a reusable hasher instance.
-     *
-     * @param rootCause throwable whose stack trace is fingerprinted
-     * @param filter frame class filter used to include application-relevant frames
-     * @param stream reusable streaming hash sink
+     * @param stream reusable streaming hash sink, reset to seed 0 by this call
      * @return deterministic 64-bit hash
      */
     public static long fingerprint(Throwable rootCause, Predicate<String> filter, Wyhash64.Streaming stream) {
@@ -108,29 +107,13 @@ public class JavaStackSanitizer {
     }
 
     /**
-     * Builds a deterministic fingerprint from a prepared stack trace.
+     * Builds a deterministic fingerprint from a prepared stack trace into a reusable hasher.
      * <p>
      * This variant avoids calling {@link Throwable#getStackTrace()} and uses
      * zero-allocation-capable {@link Wyhash64.Streaming#update(String)} updates
-     * for normalized class/method segments.
-     *
-     * @param trace stack trace elements to process
-     * @param filter frame class filter used to include application-relevant frames
-     * @param throwableClassName exception class name to prepend to the hash payload, may be null
-     * @return deterministic 64-bit hash
-     */
-    // @source
-    public static long fingerprintFromTrace(
-            StackTraceElement[] trace,
-            Predicate<String> filter,
-            String throwableClassName) {
-        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
-
-        return fingerprintFromTrace(trace, filter, throwableClassName, stream);
-    }
-
-    /**
-     * Builds a deterministic fingerprint from a prepared stack trace into a reusable hasher.
+     * for normalized class/method segments. Like all fingerprint entry points,
+     * {@code stream} is a caller-owned reusable hasher (no hidden ThreadLocal
+     * state); it is reset to seed 0 by this call.
      *
      * @param trace stack trace elements to process
      * @param filter frame class filter used to include application-relevant frames
@@ -413,32 +396,10 @@ public class JavaStackSanitizer {
         addFromTraceToOutputStreamWithNewline(trace, filter,out, NEWLINE_BYTES);
     }
 
-    /**
-     * Writes sanitized frames to an output stream with raw newline separators and computes
-     * the same deterministic fingerprint payload as {@link #fingerprint(Throwable, Predicate)}.
-     * <p>
-     * The hash starts with {@code throwableClassName} when provided, then hashes the
-     * sanitized frame sequence in a single traversal.
-     *
-     * @param trace stack trace elements to process
-     * @param filter frame class filter
-     * @param out target stream
-     * @param throwableClassName exception class name to include in hash seed, may be null
-     * @return deterministic 64-bit hash
-     * @throws IOException if writing fails
-     */
-    // @source
-    public static long addFromTraceToOutputStreamAndFingerprint(
-            StackTraceElement[] trace,
-            Predicate<String> filter,
-            OutputStream out,
-            String throwableClassName) throws IOException {
-        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
-        return addFromTraceToOutputStreamAndFingerprint(trace, filter, out, throwableClassName, stream);
-        }
-
         /**
          * Writes sanitized frames to output and computes fingerprint using a reusable hasher.
+         * {@code stream} is a caller-owned reusable hasher (no hidden ThreadLocal state),
+         * reset to seed 0 by this call.
          */
         // @source
         public static long addFromTraceToOutputStreamAndFingerprint(
@@ -465,31 +426,10 @@ public class JavaStackSanitizer {
         addFromTraceToOutputStreamWithNewline(trace, filter,out, NEWLINE_JSON_BYTES);
     }
 
-    /**
-     * Writes sanitized frames to an output stream with JSON-escaped newline separators and computes
-     * the same deterministic fingerprint payload as {@link #fingerprint(Throwable, Predicate)}.
-     * <p>
-     * The hash starts with {@code throwableClassName} when provided, then hashes the
-     * sanitized frame sequence in a single traversal.
-     *
-     * @param trace stack trace elements to process
-     * @param filter frame class filter
-     * @param out target stream
-     * @param throwableClassName exception class name to include in hash seed, may be null
-     * @return deterministic 64-bit hash
-     * @throws IOException if writing fails
-     */
-    public static long addFromTraceToOutputStreamJsonAndFingerprint(
-            StackTraceElement[] trace,
-            Predicate<String> filter,
-            OutputStream out,
-            String throwableClassName) throws IOException {
-        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
-        return addFromTraceToOutputStreamJsonAndFingerprint(trace, filter, out, throwableClassName, stream);
-        }
-
         /**
          * Writes sanitized frames with JSON-escaped newlines and computes fingerprint using a reusable hasher.
+         * {@code stream} is a caller-owned reusable hasher (no hidden ThreadLocal state),
+         * reset to seed 0 by this call.
          */
         public static long addFromTraceToOutputStreamJsonAndFingerprint(
             StackTraceElement[] trace,
@@ -591,32 +531,8 @@ public class JavaStackSanitizer {
 
     /**
      * Writes sanitized frames using caller-provided newline bytes and computes fingerprint in one pass.
-     * <p>
-     * For hash compatibility with {@link #fingerprint(Throwable, Predicate)}, the hash delimiter remains
-     * a raw newline ({@link #NEWLINE_BYTES}) regardless of the output delimiter.
-     *
-     * @param trace stack trace elements to process
-     * @param filter frame class filter
-     * @param out target stream
-     * @param newlineBytes delimiter bytes placed before each frame in output
-     * @param throwableClassName exception class name to include in hash seed, may be null
-     * @return deterministic 64-bit hash
-     * @throws IOException if writing fails
-     */
-    // @source
-    public static long addFromTraceToOutputStreamWithNewlineAndFingerprint(
-            StackTraceElement[] trace,
-            Predicate<String> filter,
-            OutputStream out,
-            byte[] newlineBytes,
-            String throwableClassName) throws IOException {
-        Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
-        return addFromTraceToOutputStreamWithNewlineAndFingerprint(trace, filter, out, newlineBytes, throwableClassName, stream);
-    }
-
-    /**
-     * Writes sanitized frames using caller-provided newline bytes and computes fingerprint in one pass.
-     * Uses a caller-supplied reusable hasher instance.
+     * Uses a caller-supplied reusable hasher instance ({@code stream} is caller-owned,
+     * no hidden ThreadLocal state, reset to seed 0 by this call).
      */
     public static long addFromTraceToOutputStreamWithNewlineAndFingerprint(
             StackTraceElement[] trace,

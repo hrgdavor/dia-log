@@ -30,17 +30,20 @@ class JavaStackSanitizerExtrasTest {
             ste("jdk.internal.reflect.NativeMethodAccessorImpl", "invoke0"),
     };
 
+    /** Caller-owned reusable hasher, as the API requires (no convenience overloads). */
+    private final Wyhash64.Streaming stream = new Wyhash64.Streaming(0);
+
     @Test
     void fingerprintFromTrace_matchesFingerprintOfThrowable() {
         Exception ex = new Exception();
-        long fromTrace = JavaStackSanitizer.fingerprintFromTrace(ex.getStackTrace(), ACCEPT_ALL, ex.getClass().getName());
-        long fromThrowable = JavaStackSanitizer.fingerprint(ex, ACCEPT_ALL);
+        long fromTrace = JavaStackSanitizer.fingerprintFromTrace(ex.getStackTrace(), ACCEPT_ALL, ex.getClass().getName(), stream);
+        long fromThrowable = JavaStackSanitizer.fingerprint(ex, ACCEPT_ALL, stream);
         assertEquals(fromThrowable, fromTrace);
     }
 
     @Test
     void fingerprintFromTrace_nullClassName_doesNotThrow() {
-        long h = JavaStackSanitizer.fingerprintFromTrace(TRACE, ACCEPT_ALL, null);
+        long h = JavaStackSanitizer.fingerprintFromTrace(TRACE, ACCEPT_ALL, null, stream);
         assertNotEquals(0L, h);
     }
 
@@ -69,13 +72,13 @@ class JavaStackSanitizerExtrasTest {
     void jsonOutputAndFingerprint_singlePass() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         long hash = JavaStackSanitizer.addFromTraceToOutputStreamJsonAndFingerprint(
-                TRACE, ACCEPT_ALL, out, "com.example.Ex");
+                TRACE, ACCEPT_ALL, out, "com.example.Ex", stream);
 
         String json = out.toString(StandardCharsets.UTF_8);
         assertEquals("com.example.Ex" + json, jsonWithHeader());
 
         // single-pass hash must equal fingerprintFromTrace over the same payload
-        long expected = JavaStackSanitizer.fingerprintFromTrace(TRACE, ACCEPT_ALL, "com.example.Ex");
+        long expected = JavaStackSanitizer.fingerprintFromTrace(TRACE, ACCEPT_ALL, "com.example.Ex", stream);
         assertEquals(expected, hash);
     }
 
@@ -99,7 +102,7 @@ class JavaStackSanitizerExtrasTest {
 
     @Test
     void fingerprint_emptyTrace_withFilter() {
-        long h = JavaStackSanitizer.fingerprintFromTrace(new StackTraceElement[0], REJECT_ALL, "clazz");
+        long h = JavaStackSanitizer.fingerprintFromTrace(new StackTraceElement[0], REJECT_ALL, "clazz", stream);
         assertNotEquals(0L, h);
     }
 }

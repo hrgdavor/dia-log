@@ -127,6 +127,29 @@ public static long addFromTraceToOutputStreamJsonAndFingerprint(
 }
 ```
 
+## 6) Caller-owned reusable fingerprint hasher (2026-08-18)
+
+The fingerprint entry points (`fingerprint(...)`, `fingerprintFromTrace(...)`,
+`addFromTraceToOutputStream*AndFingerprint(...)`) no longer allocate a fresh
+`Wyhash64.Streaming` in convenience overloads, and no hidden `ThreadLocal` state is
+used. They take a **caller-supplied reusable hasher** as a parameter and reset it
+internally (seed 0); the no-stream convenience overloads were removed. `JsonLogWriter`
+and `JsonLogWriterClassic` own their hasher as a plain field, exactly like the number
+buffers (project guideline: *prefer reusable objects as parameters over ThreadLocal*,
+see `AGENTS.md`).
+
+Measured effect (2026-08-18 rerun, JDK 25, AMD Ryzen 9 7945HX, `-prof gc`):
+
+- `fingerprint(Throwable, …)` with a reusable hasher: 88.004 B/op — exactly the
+  `Throwable.getStackTrace()` defensive copy (measured in isolation: 88.000 B/op);
+  the old convenience overload cost 224 B/op (136 hasher + 88 copy).
+- `fingerprintFromTrace(trace, …)` (prepared trace, caller-owned hasher): 0.004 B/op.
+- `JsonLogWriter` throwable event: 480 → 272 B/op; `JsonLogWriter` no-throwable:
+  344 → 272 B/op; `JsonLogWriterClassic` throwable: 1040 → 872 B/op;
+  `writeWithJsonLogWriter` fingerprint benchmark: 968 → 736 B/op.
+- The single-pass benchmark's separate-pass allocation outlier (32 B/op) is gone;
+  every write/fingerprint path now allocates ≤ 0.04 B/op.
+
 ## Historical gain highlights
 
 Numbers below compare earlier documented states to the latest rerun set.

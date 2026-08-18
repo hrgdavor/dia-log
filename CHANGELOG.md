@@ -25,6 +25,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in steady state — a drop-in replacement for the per-event
   `HashSet<String>` used for KV/MDC key dedup.
 
+### Changed
+
+- Fingerprint entry points in `JavaStackSanitizer`, `JavaStackTraceWriter`,
+  `JavaStackSanitizerLogback`, and `JavaStackWriterLogback`
+  (`fingerprint(...)`, `fingerprintFromTrace(...)`,
+  `addFromTraceToOutputStream*AndFingerprint(...)`) now take a
+  **caller-supplied reusable `Wyhash64.Streaming`** and reset it internally
+  (seed 0). The no-stream convenience overloads were removed: there is no
+  hidden `ThreadLocal` state, and the hasher is reused by the caller exactly
+  like the number buffers. `JsonLogWriter`/`JsonLogWriterClassic` own their
+  hasher as a plain field. This removes the per-call `Wyhash64.Streaming`
+  allocation (~136 B/op) from every fingerprint path; the only per-call
+  allocation left in `fingerprint(Throwable, …)` is the JDK-mandated
+  `Throwable.getStackTrace()` defensive copy.
+- Documented the project guideline *prefer reusable objects as parameters over
+  ThreadLocal* in `AGENTS.md` (applies to all future hot-path code).
+
 ## [1.0.0] - 2026-08-11
 
 ### Added

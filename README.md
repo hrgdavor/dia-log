@@ -63,7 +63,7 @@ Numeric fields are written with `JsonNumberWriter`, which converts `int`/`long`/
 ### Buffer and streaming-hash object reuse
 
 - **Reusable number buffers** — Each `JsonLogWriter` instance owns reusable `int`/`long` scratch buffers (`intNumberBuffer`, `longNumberBuffer`) that are filled and written per event, so no per-number buffer is allocated.
-- **Streaming hash reuse** — `Wyhash64.Streaming` is designed to be reset and reused (`reset(...)`) on the hot path instead of creating a fresh hasher per event, keeping hashing allocation-free.
+- **Streaming hash reuse** — `Wyhash64.Streaming` is designed to be reset and reused (`reset(...)`) on the hot path instead of creating a fresh hasher per event, keeping hashing allocation-free. The fingerprint entry points (`fingerprint(...)`, `addFromTraceToOutputStream*AndFingerprint(...)`) take a caller-supplied hasher as a parameter and reset it internally — there are no no-stream convenience overloads and no hidden `ThreadLocal` state. `JsonLogWriter` owns its hasher as a plain field, exactly like its number buffers.
 
 ### Single-pass hash + write
 
@@ -71,14 +71,14 @@ Stack-trace fingerprinting and writing used to be two separate passes (traverse 
 
 ### Measured impact
 
-These optimizations are validated with JMH benchmarks (`-prof gc`). On the latest run, `JsonLogWriter` beats the classic generator path in both latency and allocation:
+These optimizations are validated with JMH benchmarks (`-prof gc`). On the latest run (2026-08-18, JDK 25, AMD Ryzen 9 7945HX), `JsonLogWriter` beats the classic generator path in both latency and allocation:
 
 | Benchmark method                | includeThrowable | Avg time    | Alloc norm |
 | ------------------------------- | ---------------- | ----------- | ---------- |
-| `writeWithJsonLogWriter`        | false            | 0.540 us/op | 344 B/op   |
-| `writeWithJsonLogWriterClassic` | false            | 0.667 us/op | 784 B/op   |
-| `writeWithJsonLogWriter`        | true             | 1.898 us/op | 480 B/op   |
-| `writeWithJsonLogWriterClassic` | true             | 2.194 us/op | 1040 B/op  |
+| `writeWithJsonLogWriter`        | false            | 0.507 us/op | 272 B/op   |
+| `writeWithJsonLogWriterClassic` | false            | 0.610 us/op | 784 B/op   |
+| `writeWithJsonLogWriter`        | true             | 5.706 us/op | 272 B/op   |
+| `writeWithJsonLogWriterClassic` | true             | 6.218 us/op | 872 B/op   |
 
 Allocation summary of the dedicated allocation benchmark (`AllocationBenchmark` /
 `JsonLogWriterDevBenchmark`, `-prof gc`, fast paths with `--add-opens`):
@@ -91,7 +91,7 @@ Allocation summary of the dedicated allocation benchmark (`AllocationBenchmark` 
 | `JsonLogWriter` — no KV                                                    | 0 B/op        |
 | `JsonLogWriter` — with KV (no MDC)                                         | 0 B/op        |
 | `JsonLogWriter` — throwable event                                          | 0 B/op        |
-| `fingerprint(Throwable, …)` — new / reused hasher                          | 224 / 88 B/op |
+| `fingerprint(Throwable, …)` — caller-owned reusable hasher                 | 88 B/op        |
 | `JsonLogWriterDev` (missing-key reporting, dev-only)                       | 256–464 B/op  |
 
 In short, allocation is avoided across the hot path by:
@@ -99,10 +99,10 @@ In short, allocation is avoided across the hot path by:
 - **Pre-encoding** field names and JSON literals as `byte[]` constants — writing a field never builds a byte array.
 - **Direct string access** — `StringByteExtractor` / `EscapedJsonStringWriter` stream a `String`'s backing bytes straight to the output via `VarHandle` (with `--add-opens`), skipping `getBytes()`.
 - **Writing numbers without strings** — `JsonNumberWriter` (Ryu for float/double, digit-pair table for int/long) emits digits directly into reusable scratch buffers, never via `String.valueOf(...)`.
-- **Reusing stateful helpers** — `Wyhash64.Streaming` and the single-pass stack write+fingerprint compute `errHash` in one traversal with a per-thread reusable hasher; `StringHashSet` (a resettable key-dedup set) is cleared per event instead of reallocated.
+- **Reusing stateful helpers** — `Wyhash64.Streaming` and the single-pass stack write+fingerprint compute `errHash` in one traversal with a caller-owned reusable hasher (passed as a parameter, never hidden in a `ThreadLocal`); `StringHashSet` (a resettable key-dedup set) is cleared per event instead of reallocated.
 - **Lazy allocation** — the KV/MDC dedup set is created only when MDC is actually present, and disabled log levels route through a singleton no-op builder.
 
-Full results, the allocations found and removed (lazy `allKeys`, per-thread reusable
+Full results, the allocations found and removed (lazy `allKeys`, caller-owned reusable
 hasher), and the documented remaining allocations: [Allocation Benchmark Results](doc/allocation-benchmark-results.md).
 
 ### Current best effort, open to improvement

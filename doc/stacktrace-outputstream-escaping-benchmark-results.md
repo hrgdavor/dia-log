@@ -10,11 +10,13 @@ Historical timeline is tracked in:
 
 ## Latest run
 
+- Date: 2026-08-18
+- Machine: AMD Ryzen 9 7945HX, Windows (x86-64, little-endian)
 - JDK: 25.0.3
 - JMH: 1.37
 - Modes: throughput and average-time
-- Warmup: 3 x 1s
-- Measurement: 5 x 1s
+- Warmup: 2 x 1s
+- Measurement: 3 x 1s
 - Forks: 1
 - Profiler: -prof gc
 
@@ -27,8 +29,8 @@ Artifacts:
 
 | Benchmark method                           | Avg time    | Throughput   | Alloc norm     |
 | ------------------------------------------ | ----------- | ------------ | -------------- |
-| optimizedOutputStreamEscapedNewlines       | 0.372 us/op | 2.528 ops/us | 88.003 B/op    |
-| printStackTraceThenEscapedJsonStringWriter | 3.893 us/op | 0.240 ops/us | 18832.027 B/op |
+| optimizedOutputStreamEscapedNewlines       | 5.371 us/op | 0.188 ops/us | 88.037 B/op    |
+| printStackTraceThenEscapedJsonStringWriter | 4.014 us/op | 0.252 ops/us | 18832.028 B/op |
 
 ## Current interpretation
 

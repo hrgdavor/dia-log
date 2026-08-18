@@ -8,6 +8,7 @@ import ch.qos.logback.classic.spi.LoggingEvent;
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import ch.qos.logback.classic.spi.ThrowableProxy;
 import hr.hrg.dialog.core.JavaStackTraceWriter;
+import hr.hrg.dialog.core.Wyhash64;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -56,6 +57,7 @@ public class StacktraceFingerprintBenchmark {
     private Throwable rawThrowable;
     private IThrowableProxy throwableProxy;
     private StackTraceElementProxy[] proxyFrames;
+    private Wyhash64.Streaming reusableStream;
 
     @Setup(org.openjdk.jmh.annotations.Level.Trial)
     public void setup() {
@@ -64,6 +66,7 @@ public class StacktraceFingerprintBenchmark {
         mapper = new ObjectMapper();
         jsonFactory = JsonFactory.builder().build();
         output = new ReusableByteArrayOutputStream(32 * 1024);
+        reusableStream = new Wyhash64.Streaming(0);
 
         LoggerContext context = new LoggerContext();
         Logger logger = context.getLogger("bench.stacktrace");
@@ -109,7 +112,7 @@ public class StacktraceFingerprintBenchmark {
     public void writeWithPrintStackTraceStringWriter(Blackhole blackhole) throws IOException {
         output.reset();
 
-        long errHash = JavaStackSanitizerLogback.fingerprint(throwableProxy, te -> true);
+        long errHash = JavaStackSanitizerLogback.fingerprint(throwableProxy, te -> true, reusableStream);
 
         StringWriter sw = new StringWriter(4096);
         try (PrintWriter pw = new PrintWriter(sw)) {
@@ -158,7 +161,7 @@ public class StacktraceFingerprintBenchmark {
 
     @Benchmark
     public void fingerprintOnly(Blackhole blackhole) {
-        long errHash = JavaStackSanitizerLogback.fingerprint(throwableProxy, te -> true);
+        long errHash = JavaStackSanitizerLogback.fingerprint(throwableProxy, te -> true, reusableStream);
         blackhole.consume(errHash);
     }
 
@@ -219,7 +222,7 @@ public class StacktraceFingerprintBenchmark {
     public void writeWithSanitizedStackStringWriterControlled(Blackhole blackhole) throws IOException {
         output.reset();
 
-        long errHash = JavaStackSanitizerLogback.fingerprint(throwableProxy, te -> true);
+        long errHash = JavaStackSanitizerLogback.fingerprint(throwableProxy, te -> true, reusableStream);
         String stackText = buildSanitizedStackString();
 
         try (JsonGenerator gen = jsonFactory.createGenerator(output)) {
@@ -236,7 +239,7 @@ public class StacktraceFingerprintBenchmark {
     public void writeWithPrintStackTraceStringWriterControlled(Blackhole blackhole) throws IOException {
         output.reset();
 
-        long errHash = JavaStackSanitizerLogback.fingerprint(throwableProxy, te -> true);
+        long errHash = JavaStackSanitizerLogback.fingerprint(throwableProxy, te -> true, reusableStream);
         String stackText = buildPrintStackTraceString();
 
         try (JsonGenerator gen = jsonFactory.createGenerator(output)) {

@@ -12,6 +12,7 @@ import java.util.Set;
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import hr.hrg.dialog.core.JavaStackTraceWriter;
 import hr.hrg.dialog.core.StringByteExtractor;
+import hr.hrg.dialog.core.Wyhash64;
 import org.slf4j.event.KeyValuePair;
 
 import tools.jackson.core.JsonGenerator;
@@ -48,6 +49,8 @@ public class JsonLogWriterClassic {
  //   private int maxStackFrames = 255;
     private volatile boolean started = false;
     private final ObjectWriteContext writeCtxt = ObjectWriteContext.empty();
+    /** Reusable hasher passed to the fingerprint call below (caller-owned, like the other buffers). */
+    private final Wyhash64.Streaming fingerprintStream = new Wyhash64.Streaming(0);
 
     public JsonLogWriterClassic() {}
 
@@ -110,7 +113,7 @@ public class JsonLogWriterClassic {
                 gen.writeString(tp.getMessage());
 
                 gen.writeName("errHash");
-                gen.writeNumber(JavaStackSanitizerLogback.fingerprint(tp, te->true));
+                gen.writeNumber(JavaStackSanitizerLogback.fingerprint(tp, te->true, fingerprintStream));
 
                 gen.writeName("stack");
                 gen.flush();// flush whatever is in buffer so we can safely dump stack trace into OutputStream

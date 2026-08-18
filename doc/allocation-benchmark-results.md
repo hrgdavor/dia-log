@@ -1,7 +1,8 @@
 # Allocation Benchmark Results
 
-Measured 2026-08-18 with JMH `-prof gc` on JDK 25 (x86-64, little-endian), single fork,
-single thread, `-wi 2 -i 3`. All numbers are **`gc.alloc.rate.norm`** (bytes per operation).
+Measured 2026-08-18 with JMH `-prof gc` on JDK 25 (AMD Ryzen 9 7945HX, Windows,
+x86-64, little-endian), single fork, single thread, `-wi 2 -i 3`. All numbers are
+**`gc.alloc.rate.norm`** (bytes per operation).
 
 > **Fast paths require `--add-opens java.base/java.lang=ALL-UNNAMED`.** Without it the
 > String/escaping fallbacks allocate (`toCharArray()`, `getBytes()`). All numbers below are
@@ -63,10 +64,15 @@ allocations* with the reason it is not (and should not be) allocation-free.
 12. **Lazy KV/MDC dedup set** — the `allKeys` set is created **only** when MDC is
     non-empty and KV pairs exist. Previously it was a `new HashSet<>()` on every KV event
     (192 B/op even without MDC).
-13. **Per-thread reusable fingerprint hasher** — exception fingerprinting reuses a
-    `ThreadLocal<Wyhash64.Streaming>` (appenders are shared across threads) instead of
-    creating a hasher per exception event (~136 B/op removed); the single-pass methods
-    reset it internally.
+13. **Caller-owned reusable fingerprint hasher** — the fingerprint entry points
+    (`fingerprint(...)`, `addFromTraceToOutputStream*AndFingerprint(...)`) take a
+    caller-supplied `Wyhash64.Streaming` and reset it internally (seed 0). There are
+    deliberately **no** no-stream convenience overloads and no hidden `ThreadLocal`
+    state — project guideline: *prefer reusable objects as parameters over
+    ThreadLocal* (see `AGENTS.md`). `JsonLogWriter` owns its hasher as a plain field
+    like the number buffers (~136 B/op of per-event hasher allocation removed); the
+    only per-call allocation left in `fingerprint(Throwable, …)` is the `Throwable`
+    defensive copy (see the table below).
 14. **Single-pass stack write + fingerprint** — `addFromTraceToOutputStreamJsonAndFingerprint`
     and friends write the `stack` JSON *and* compute `errHash` in one traversal of the
     trace instead of two, cutting both CPU work and allocation.
@@ -125,6 +131,7 @@ JVM is not already started with the flag, since JMH forks do not inherit it.)
 | `escapedJsonString` — `EscapedJsonStringWriter` (VarHandle path) | 0.0 |
 | `stringBytes` — `StringByteExtractor` strategy write | 0.0 |
 | `floatWrite` / `doubleWrite` — `JsonNumberWriter` (Ryu) | 0.0 |
+| `fingerprintFromTraceReused` — prepared trace + caller-owned hasher | 0.0 |
 
 ## Production writer — now 0 B/op in every scenario
 
@@ -132,7 +139,7 @@ JVM is not already started with the flag, since JMH forks do not inherit it.)
 |---|---|---|
 | `plainWriter_noKv` — event without key/values | 0.0 | 0.0 |
 | `plainWriter_withKv` — event with key/value pairs, no MDC | 192 | **0.0** |
-| `plainWriter_exception` — throwable event | 296 | **0.1** |
+| `plainWriter_exception` — throwable event | 296 | **0.0** |
 
 ### What was removed
 
@@ -143,9 +150,10 @@ JVM is not already started with the flag, since JMH forks do not inherit it.)
    nothing.
 2. **A fresh `Wyhash64.Streaming` per exception event (~136 B/op).** The single-pass
    fingerprint (`addFromTraceToOutputStreamJsonAndFingerprint`) created a new hasher
-   internally. `JsonLogWriter` now holds a **per-thread reusable hasher** (`ThreadLocal`,
-   because appenders are shared across threads); the single-pass methods reset it
-   internally. Exception events now allocate ~0 B.
+   internally. The fingerprint entry points now take a **caller-owned reusable hasher**
+   as a parameter and reset it internally; `JsonLogWriter` holds its hasher as a plain
+   field like the number buffers (no hidden `ThreadLocal` state — the writer is
+   `@NotThreadSafe`). Exception events now allocate ~0 B.
 
 Both were introduced in 2026-08-18; `mvn clean verify` (JaCoCo line ≥80 % / branch ≥70 %)
 passes with the changes.
@@ -155,8 +163,7 @@ passes with the changes.
 | Benchmark | B/op | reason |
 |---|---|---|
 | `streamingNewPerCall` | 136 | `new Wyhash64.Streaming(0)` per call — the caller should reuse (`reset`); reusable overloads exist |
-| `fingerprintNewStream` | 224 | `JavaStackSanitizer.fingerprint(Throwable, filter)` creates a hasher per call — use the `(…, stream)` overload |
-| `fingerprintReusedStream` / `fingerprintConsume` | 88 | `Throwable.getStackTrace()` returns a **defensive copy** each call (JDK behavior, not ours); pass `StackTraceElement[]` directly via `fingerprintFromTrace` where possible |
+| `fingerprint(Throwable, …)` (reusable hasher) | 88 | `Throwable.getStackTrace()` returns a **defensive copy** each call (JDK behavior, not ours); pass `StackTraceElement[]` directly via `fingerprintFromTrace` where possible |
 | `devWriter_allPresent` / `devWriter_oneMissing` | 256 / 464 | `JsonLogWriterDev` missing-key reporting is a **dev/diagnostic tool** — by design it is excluded from zero-allocation efforts (see `AGENTS.md`); it uses a regex `Matcher` + small set/list per event |
 
 ## Dev variant policy
@@ -168,9 +175,16 @@ writer is the only zero-allocation target.
 
 ## Notes
 
-- The 88 B/op residual on the reused-stream fingerprint comes from
-  `Throwable.getStackTrace()`'s defensive copy — unavoidable from a `Throwable`, avoidable
-  by hashing an existing `StackTraceElement[]`.
+- The 88 B/op on `fingerprint(Throwable, …)` (with a reusable hasher) is exactly the
+  `Throwable.getStackTrace()` defensive copy — measured in isolation at 88.000 B/op, and the
+  whole fingerprint call at 88.004 B/op (verified 2026-08-18, JDK 25, `--add-opens`).
+  It is unavoidable from a `Throwable` (the JDK always returns a copy); the
+  zero-allocation alternative is `fingerprintFromTrace(trace, …)` over an already
+  materialized `StackTraceElement[]` (measured 0.004 B/op).
+- There are no convenience fingerprint overloads and no hidden `ThreadLocal` state: the
+  fingerprint entry points require a caller-owned reusable `Wyhash64.Streaming` (a field
+  of the logger/appender, like the number buffers). See `AGENTS.md` — *prefer reusable
+  objects as parameters over ThreadLocal*.
 - All hash paths are allocation-free on little-endian platforms; big-endian CPUs (outside
   the JDK-25 requirement) fall back to a `char[]` repack (allocates).
 - See [`doc/wyhash64-zero-allocation.md`](wyhash64-zero-allocation.md) for the design and
