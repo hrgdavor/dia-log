@@ -247,8 +247,11 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 - `RawJsonSelfWriter` and `RawJsonBytes` - no usage examples — class-level Javadoc added; `RawJsonBytes` documented via `JsonLogWriter`
 - `packCharsLow()` in Wyhash64 - should be removed or documented — removed (dead code)
 
-### 10.2 Comment Style Inconsistency — 🔶 PARTIAL
-- Some files use `///` C# style comments (not standard Java documentation) — `JsonLogWriterClassic` converted to standard Javadoc (2026-08-17); `JsonLogWriter` still uses `///` at the class level
+### 10.2 Comment Style Inconsistency — ✅ BY DESIGN (documented)
+- `///` is an intentional **"Java markdown" doc style** used for concise class-level notes
+  (e.g. the `JsonLogWriter` header) — documented in `AGENTS.md`; do **not** convert to
+  Javadoc. `JsonLogWriterClassic` was converted to standard Javadoc because it sits next to
+  Javadoc-documented code, but the `///` style itself is accepted.
 
 ---
 

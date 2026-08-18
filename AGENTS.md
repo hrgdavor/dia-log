@@ -35,10 +35,17 @@ mvn -pl project-automation compile exec:java \
 
 When adding new features, check these allocation hotspots:
 
-1. `Wyhash64.Streaming.finalHash()` line 1093 - allocates `byte[16]`
-2. `JsonLogWriter.writeJsonEvent()` line 96 - allocates `HashSet<String>`
-3. `StringByteExtractor.writeClassic()` - allocates `byte[]` per string
-4. `Float.toString()` / `Double.toString()` in JsonNumberWriter
+- `StringByteExtractor.writeClassic()` - allocates a `byte[]` per string (fallback path only;
+  the VarHandle fast path is allocation-free)
+
+Previously flagged and **already resolved — do not reintroduce**:
+
+- `Wyhash64.Streaming.finalHash()` - no longer allocates a scratch `byte[16]`; the final
+  16-byte window is read directly from `buf`
+- `JsonLogWriter.writeJsonEvent()` - `allKeys` is lazily allocated, only when KV pairs exist
+- `Float.toString()` / `Double.toString()` in `JsonNumberWriter` - replaced by Ryu
+  (`RyuFloat` / `RyuDouble`); also note `String.value` UTF-16 byte order is platform-native,
+  never assume it (Wyhash64 probes it once at class init)
 
 ### Thread Safety Requirements
 
@@ -53,6 +60,15 @@ All string keys passed to `writeFieldPrefixRawKey()` in `JsonLogWriter.java` are
 (quotes, backslash, control chars) via `EscapedJsonStringWriter`, because KV/MDC keys are user
 input. Raw unescaped bytes are written only where the caller explicitly requests raw JSON
 (`RawValue` / `RawJsonBytes` passthrough).
+
+### Java Markdown Comments (`///`)
+
+`///` line comments are an intentional lightweight **"Java markdown" doc style** used for
+concise class-level notes in this project (e.g. the `JsonLogWriter` header at
+`logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java`). They are **not** a
+C#-style inconsistency and must **not** be converted to `/** */` Javadoc. Treat them as the
+project's accepted short-form documentation; use standard Javadoc only where
+`@param`/`@return`/`{@code ...}` documentation is genuinely needed for API-facing members.
 
 ---
 
