@@ -4,6 +4,7 @@ import javax.annotation.concurrent.ThreadSafe;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.OutputStreamAppender;
+import ch.qos.logback.core.encoder.EncoderBase;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -27,6 +28,42 @@ public class JsonAppender extends OutputStreamAppender<ILoggingEvent> {
      */
     protected JsonLogWriter createJsonLogWriter() {
         return new JsonLogWriter();
+    }
+
+    /**
+     * Starts the appender. When no encoder is configured (logback.xml without
+     * {@code <encoder>}), installs a no-op encoder first: {@link #writeOut}
+     * writes JSON directly and never invokes the encoder, so one is only needed
+     * to satisfy {@code OutputStreamAppender.start()}. The no-op encoder's
+     * {@code headerBytes()} returns an empty array, so startup cost is zero.
+     */
+    @Override
+    public void start() {
+        if (getEncoder() == null) {
+            setEncoder(NoOpEncoder.INSTANCE);
+        }
+        super.start();
+    }
+
+    /** No-op {@link Encoder} used when logback.xml omits {@code <encoder>}. */
+    static final class NoOpEncoder extends EncoderBase<ILoggingEvent> {
+        static final NoOpEncoder INSTANCE = new NoOpEncoder();
+        private static final byte[] EMPTY = new byte[0];
+
+        @Override
+        public byte[] headerBytes() {
+            return EMPTY;
+        }
+
+        @Override
+        public byte[] footerBytes() {
+            return EMPTY;
+        }
+
+        @Override
+        public byte[] encode(ILoggingEvent event) {
+            return EMPTY;
+        }
     }
 
 

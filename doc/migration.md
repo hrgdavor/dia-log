@@ -96,12 +96,12 @@ Point logback at `JsonAppender` (console) or `JsonAppenderRolling` (file + XZ ro
         <maxHistory>30</maxHistory>
         <totalSizeCap>2GB</totalSizeCap>
     </rollingPolicy>
-    <!-- Dummy encoder: writeOut() writes JSON directly and never invokes it
-         (no per-event allocation); required only to satisfy start(). -->
-    <encoder><pattern>%msg%n</pattern></encoder>
 </appender>
 <root level="INFO"><appender-ref ref="JSON"/></root>
 ```
+
+No `<encoder>` is required — the appender writes JSON directly and installs a no-op
+encoder itself when none is configured.
 
 Each log event becomes one JSON line (`ts`, `level`, `logger`, `thread`, `msg`, flat KV
 and MDC fields, and for exceptions `errClass`, `errMessage`, `stack`, `errHash`).

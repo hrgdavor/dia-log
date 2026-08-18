@@ -159,15 +159,8 @@ public class Main {
         appender.setName("JSON_CONSOLE");
         appender.setOutputStream(System.out);
 
-        // JsonAppender overrides writeOut() to emit JSON directly, so this encoder
-        // is only required to satisfy OutputStreamAppender.start().
-        ch.qos.logback.classic.encoder.PatternLayoutEncoder encoder =
-                new ch.qos.logback.classic.encoder.PatternLayoutEncoder();
-        encoder.setContext(context);
-        encoder.setPattern("%msg%n");
-        encoder.start();
-        appender.setEncoder(encoder);
-
+        // No encoder needed: JsonAppender.writeOut() writes JSON directly and
+        // installs a no-op encoder itself when none is configured.
         appender.start();
         root.addAppender(appender);
     }

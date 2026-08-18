@@ -27,16 +27,13 @@ Configure logback to write JSON. Console:
 
 ```xml
 <appender name="JSON" class="hr.hrg.dialog.logback.JsonAppender">
-    <!-- Dummy encoder: JsonAppender.writeOut() writes JSON directly and never
-         invokes the encoder (so no per-event allocation). It is only required
-         to satisfy OutputStreamAppender.start(), which refuses to start
-         without one. -->
-    <encoder><pattern>%msg%n</pattern></encoder>
 </appender>
 <root level="INFO"><appender-ref ref="JSON"/></root>
 ```
 
-Rolling file with XZ-compressed archives (`JsonAppenderRolling`):
+No `<encoder>` is needed — `JsonAppender.writeOut()` writes JSON directly and installs a
+no-op encoder itself when none is configured. Rolling file with XZ-compressed archives
+(`JsonAppenderRolling`):
 
 ```xml
 <appender name="JSON" class="hr.hrg.dialog.logback.JsonAppenderRolling">
@@ -47,8 +44,6 @@ Rolling file with XZ-compressed archives (`JsonAppenderRolling`):
         <maxHistory>30</maxHistory>
         <totalSizeCap>2GB</totalSizeCap>
     </rollingPolicy>
-    <!-- Same dummy-encoder note as above: never invoked, required for start(). -->
-    <encoder><pattern>%msg%n</pattern></encoder>
 </appender>
 ```
 

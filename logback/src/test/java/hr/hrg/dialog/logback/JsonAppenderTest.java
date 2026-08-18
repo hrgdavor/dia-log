@@ -128,6 +128,23 @@ class JsonAppenderTest {
     }
 
     @Test
+    void startsWithoutEncoder_andWritesJson() {
+        // New appender with NO encoder configured — start() must install a no-op one.
+        JsonAppender noEncoderAppender = new JsonAppender();
+        noEncoderAppender.setContext(context);
+        ByteArrayOutputStream noEncOut = new ByteArrayOutputStream();
+        noEncoderAppender.setOutputStream(noEncOut);
+        noEncoderAppender.start();
+
+        assertTrue(noEncoderAppender.isStarted(), "appender must start without an <encoder>");
+        assertNotNull(noEncoderAppender.getEncoder(), "a no-op encoder must be installed");
+
+        noEncoderAppender.doAppend(event("no encoder needed"));
+        assertTrue(noEncOut.toString(StandardCharsets.UTF_8).contains("\"msg\":\"no encoder needed\""),
+                "events must be written without a configured encoder");
+    }
+
+    @Test
     void exceptionEvent_includesErrHash() {
         LoggingEvent event = event("boom");
         event.setThrowableProxy(new ch.qos.logback.classic.spi.ThrowableProxy(new RuntimeException("boom")));

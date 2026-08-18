@@ -61,6 +61,18 @@ class JsonAppenderRollingTest {
     }
 
     @Test
+    void start_withoutEncoder_installsNoOpEncoder() {
+        JsonAppenderRolling appender = new JsonAppenderRolling();
+        appender.setContext(new LoggerContext());
+        appender.start();
+
+        // start() must install a no-op encoder before delegating (a full start
+        // also needs a rolling policy, which is orthogonal to the encoder).
+        assertNotNull(appender.getEncoder(), "a no-op encoder must be installed when none is configured");
+        assertInstanceOf(JsonAppender.NoOpEncoder.class, appender.getEncoder());
+    }
+
+    @Test
     void stackTraceFilter_validPredicate_isAccepted() {
         JsonAppenderRolling appender = new JsonAppenderRolling();
         appender.setStackTraceFilter(JsonAppenderTest.AcceptAllFilter.class.getName());

@@ -30,12 +30,10 @@ For development, the writer overload `JsonLogWriterDev` (wired via `JsonAppender
 
 ```xml
 <appender name="JSON" class="hr.hrg.dialog.logback.JsonAppenderDev">
-    <!-- Dummy encoder: the appender's writeOut() bypasses the encoder entirely
-         (no per-event allocation); it is only required so
-         OutputStreamAppender.start() succeeds. -->
-    <encoder><pattern>%msg%n</pattern></encoder>
 </appender>
 ```
+
+(No `<encoder>` needed — the appender installs a no-op encoder itself.)
 
 ```json
 {"ts":1748765696789,"level":"INFO","logger":"com.example.MyClass","thread":"main",

@@ -148,11 +148,11 @@ extra dependency is needed when using this module. If you use Logback directly
         <maxHistory>30</maxHistory>
         <totalSizeCap>2GB</totalSizeCap>
     </rollingPolicy>
-    <encoder>
-        <pattern>%msg%n</pattern>
-    </encoder>
 </appender>
 ```
+
+No `<encoder>` is needed — the appenders write JSON directly and install a no-op encoder
+themselves when none is configured.
 
 ### Notes
 

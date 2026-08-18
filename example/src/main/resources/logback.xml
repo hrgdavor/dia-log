@@ -19,13 +19,8 @@
             <maxHistory>7</maxHistory>
             <totalSizeCap>100MB</totalSizeCap>
         </rollingPolicy>
-        <!--
-            JsonAppenderRolling overrides writeOut() to emit JSON directly, so the
-            encoder below is only required to satisfy OutputStreamAppender.start().
-        -->
-        <encoder>
-            <pattern>%msg%n</pattern>
-        </encoder>
+        <!-- No <encoder> needed: JsonAppenderRolling.writeOut() writes JSON
+             directly and installs a no-op encoder itself. -->
     </appender>
 
     <root level="DEBUG">

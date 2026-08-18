@@ -29,6 +29,18 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
         return new JsonLogWriter();
     }
 
+    /**
+     * Starts the appender, installing the shared no-op encoder when logback.xml
+     * omits {@code <encoder>} (see {@link JsonAppender#start()}).
+     */
+    @Override
+    public void start() {
+        if (getEncoder() == null) {
+            setEncoder(JsonAppender.NoOpEncoder.INSTANCE);
+        }
+        super.start();
+    }
+
     @Override
     public void setOutputStream(OutputStream outputStream) {
         this.activeStream = outputStream;
