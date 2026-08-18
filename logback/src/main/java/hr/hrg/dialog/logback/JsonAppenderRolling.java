@@ -9,6 +9,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.function.Predicate;
 
 @ThreadSafe
@@ -23,6 +24,8 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
      * {@code AppenderBase.doAppend} is {@code synchronized}.
      */
     private final ReusableByteArrayOutputStream eventBuffer = new ReusableByteArrayOutputStream();
+    /** Per-event JSON snapshot hook; defaults to {@link NoopEventSnapshotHandler#INSTANCE}. */
+    private EventSnapshotHandler eventSnapshotHandler = NoopEventSnapshotHandler.INSTANCE;
 
     public JsonAppenderRolling() {
         this.jsonLogWriter = createJsonLogWriter();
@@ -77,6 +80,31 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
     }
 
     /**
+     * Configures a handler that receives an owned copy of each serialized JSON
+     * event (see {@link EventSnapshotHandler}) — e.g. to forward events to an HTTP
+     * endpoint or a log-tracking UI. Pass {@link NoopEventSnapshotHandler#INSTANCE}
+     * to disable the hook.
+     * The handler runs on the logging thread under the appender's guard; hand the
+     * bytes off asynchronously (e.g. a bounded {@code BlockingQueue} drained by a
+     * dedicated writer thread) if you cannot afford that.
+     */
+    public void setEventSnapshotHandler(EventSnapshotHandler handler) {
+        this.eventSnapshotHandler = handler;
+    }
+
+    /**
+     * Same as {@link #setEventSnapshotHandler(EventSnapshotHandler)} but takes the
+     * fully-qualified class name of a no-arg-constructible
+     * {@link EventSnapshotHandler} implementation, for logback.xml (see
+     * {@link JsonAppender#setEventSnapshotHandler(String)} for the XML shape).
+     * A {@code null} or blank value disables the hook (resets to
+     * {@link NoopEventSnapshotHandler#INSTANCE}).
+     */
+    public void setEventSnapshotHandler(String handlerClassName) {
+        this.eventSnapshotHandler = JsonAppender.instantiateEventHandler(handlerClassName);
+    }
+
+    /**
      * Writes the logging event to the currently active output stream.
      * <p>
      * {@code activeStream} is intentionally non-volatile. The field is copied to a local variable
@@ -89,6 +117,12 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
         var activeStreamLoc = activeStream;
         eventBuffer.reset();
         jsonLogWriter.writeJsonEvent(objectMapper, event, eventBuffer);
+
+        EventSnapshotHandler handler = eventSnapshotHandler;
+        if (handler.isEnabled()) {
+            handler.onEvent(Arrays.copyOf(eventBuffer.buffer(), eventBuffer.size()));
+        }
+
         eventBuffer.write(JsonLogWriter.NL);
         // One bulk write of the whole event (buffer reuses its array across events).
         eventBuffer.writeTo(activeStreamLoc);

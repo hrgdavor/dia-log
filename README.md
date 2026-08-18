@@ -292,6 +292,43 @@ To see the expanded message when tailing/displaying with `jlx`, set `message_exp
 
 Placeholders that reference a key absent from a given line are left intact, so no data is lost. A runnable demo of this pattern (plus a ready-made `jlx.conf`) lives in the [`example`](example/) module.
 
+## Log Tracking Hook (HTTP / UI)
+
+To forward each serialized JSON event elsewhere — e.g. an HTTP endpoint or a log-tracking
+UI server — attach an `EventSnapshotHandler` to `JsonAppender` / `JsonAppenderRolling`.
+It is invoked once per event with an **owned, exact-size copy of the JSON** (no trailing
+newline). The handler may retain the array, write it to several outputs, or hand it to
+another thread — every snapshot is freshly allocated for exactly this reason. It runs on
+the logging thread under the appender's guard, so hand the bytes off asynchronously if
+the consumer must not block logging.
+
+Programmatic wiring with an async queue drained by a dedicated writer thread
+(the queue is your backpressure/buffer for the HTTP server or UI):
+
+```java
+BlockingQueue<byte[]> queue = new ArrayBlockingQueue<>(4096);
+appender.setEventSnapshotHandler(queue::add);
+
+// dedicated thread — drains to the HTTP endpoint / UI, possibly multiple outputs:
+while (true) {
+    byte[] event = queue.take();
+    /* write the JSON line to each output */
+}
+```
+
+Or configure it from `logback.xml` with the fully-qualified name of a no-arg-constructible
+`EventSnapshotHandler` implementation (same pattern as `<stackTraceFilter>`):
+
+```xml
+<appender name="JSON" class="hr.hrg.dialog.logback.JsonAppender">
+    <eventSnapshotHandler>com.example.MySnapshotCollector</eventSnapshotHandler>
+</appender>
+```
+
+See
+[`EventSnapshotHandler`](logback/src/main/java/hr/hrg/dialog/logback/EventSnapshotHandler.java)
+for the full contract.
+
 ## Build
 
 ```bash

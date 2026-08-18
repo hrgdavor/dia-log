@@ -55,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `write(byte[], off, len)` calls instead of per-byte `write(int)` (per-byte writes
   measured ≈51× slower). Traced events: optimized JSON 5.937 → 1.942 us/op (≈3.1×),
   Jackson encoder 6.430 → 2.264 us/op (≈2.8×).
+- `EventSnapshotHandler` — hook on `JsonAppender` / `JsonAppenderRolling` that
+  receives an owned, exact-size `byte[]` copy of each serialized JSON event, for
+  forwarding to an HTTP endpoint or a log-tracking UI. The snapshot is always a
+  fresh allocation (it may be retained, fanned out to multiple outputs, or handed
+  to another thread). Configurable programmatically or via
+  `<eventSnapshotHandler>` in logback.xml (no-arg class name, like
+  `<stackTraceFilter>`).
 
 ## [1.0.0] - 2026-08-11
 
