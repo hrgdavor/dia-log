@@ -105,6 +105,12 @@ In short, allocation is avoided across the hot path by:
 Full results, the allocations found and removed (lazy `allKeys`, caller-owned reusable
 hasher), and the documented remaining allocations: [Allocation Benchmark Results](doc/allocation-benchmark-results.md).
 
+A head-to-head of logback writing paths — stock pattern encoder vs the optimized JSON
+writer vs a Jackson-generator encoder, with and without traces — is in
+[Logback Writer Comparison](doc/logback-writer-comparison-benchmark-results.md): the
+optimized writer allocates a constant 208 B/op whether or not a throwable is attached,
+while the default pattern encoder jumps from 728 to ~12–15 KB/op when rendering a trace.
+
 ### Current best effort, open to improvement
 
 This is the **current best effort** — a set of practical trade-offs that favor the common logging hot path. It is not claimed to be optimal. The project is open to suggestions for further improvements, whether that means new allocation-avoidance techniques, different serialization strategies, or better benchmark methodology.

@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Throwable.getStackTrace()` defensive copy.
 - Documented the project guideline *prefer reusable objects as parameters over
   ThreadLocal* in `AGENTS.md` (applies to all future hot-path code).
+- Added `LogbackWriterComparisonBenchmark` and its results doc
+  (`doc/logback-writer-comparison-benchmark-results.md`): default logback pattern
+  encoder vs optimized JSON vs Jackson-based encoder, with and without traces.
+  Findings: the optimized writer allocates a constant 208 B/op regardless of
+  throwable presence; the default encoder's `%ex` trace rendering allocates
+  ~12–15 KB/op.
 
 ## [1.0.0] - 2026-08-11
 

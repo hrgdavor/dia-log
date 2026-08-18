@@ -9,6 +9,7 @@ Latest-state benchmark reports are intentionally kept separate and concise:
 - [doc/stacktrace-outputstream-escaping-benchmark-results.md](doc/stacktrace-outputstream-escaping-benchmark-results.md)
 - [doc/stacktrace-traversal-benchmark-results.md](doc/stacktrace-traversal-benchmark-results.md)
 - [doc/stacktrace-write-fingerprint-singlepass-benchmark-results.md](doc/stacktrace-write-fingerprint-singlepass-benchmark-results.md)
+- [doc/logback-writer-comparison-benchmark-results.md](doc/logback-writer-comparison-benchmark-results.md)
 
 ## Scope
 

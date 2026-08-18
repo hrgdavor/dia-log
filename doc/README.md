@@ -27,6 +27,9 @@ use strided reads, and `Streaming.finalHash()` allocates nothing.
   hashing avoids allocation.
 - [Allocation benchmark results](allocation-benchmark-results.md) — JMH `-prof gc`
   measurements, allocations found & removed, documented remaining allocations.
+- [Logback writer comparison](logback-writer-comparison-benchmark-results.md) — default
+  logback pattern encoder vs optimized JSON vs Jackson-based encoder, with and without
+  traces.
 
 ---
 
