@@ -125,12 +125,19 @@ public final class Wyhash64 {
             byte[] value = (byte[]) valueHandle.get(str);
             byte coder = (byte) coderHandle.get(str);
             if (coder == 0) {
+                // Latin-1: 1 byte per char — zero allocation
                 return Wyhash64.hash(seed, value, off, len);
+            } else if (utf16Le) {
+                if (sliceHasNonLatin1(value, off, len)) {
+                    // Genuinely UTF-16 slice: zero allocation via its LE bytes
+                    return hashUtf16LeBytes(seed, value, off * 2, len);
+                }
+                // All-Latin-1 slice: zero allocation via strided low-byte reads
+                // (a substring of this slice would compact to coder=0 and hash
+                // as 1 byte/char, which this matches exactly).
+                return hashLatin1LeBytes(seed, value, off, len);
             } else {
-                // A slice of a UTF-16 string may itself be all-Latin-1 (its
-                // substring compacts to coder=0 and hashes as 1 byte/char), so
-                // the slice must be hashed in its own encoding — consistent with
-                // hash(str.substring(...)) and the fallback hasher.
+                // Big-endian storage: repack via the char[] path
                 char[] chars = new char[len];
                 str.getChars(off, off + len, chars, 0);
                 return Wyhash64.hash(seed, chars);
@@ -215,8 +222,16 @@ public final class Wyhash64 {
             byte coder = (byte) coderHandle.get(str);
             if (coder == 0) {
                 streaming.update(value, off, len);
+            } else if (utf16Le) {
+                if (sliceHasNonLatin1(value, off, len)) {
+                    // Genuinely UTF-16 slice: feed its LE bytes directly (zero allocation)
+                    streaming.update(value, off * 2, len * 2);
+                } else {
+                    // All-Latin-1 slice: strided low-byte reads (zero allocation)
+                    streaming.updateLatin1LeBytes(value, off, len);
+                }
             } else {
-                // Same slice-encoding caveat as DirectStringHasher.hash(str, off, len)
+                // Big-endian storage: repack via the char[] path
                 char[] chars = new char[len];
                 str.getChars(off, off + len, chars, 0);
                 streaming.update(chars);
@@ -239,6 +254,23 @@ public final class Wyhash64 {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /**
+     * Returns true if the char slice {@code [charOff, charOff+charLen)} of a
+     * UTF-16 little-endian byte array contains any non-Latin-1 char (high byte
+     * non-zero). A slice that is all Latin-1 would compact to coder=0 when
+     * materialized as a substring, so it must be hashed as 1 byte/char to stay
+     * consistent with {@code hash(str.substring(...))}.
+     */
+    private static boolean sliceHasNonLatin1(byte[] utf16Le, int charOff, int charLen) {
+        int highByteEnd = (charOff + charLen) * 2;
+        for (int i = charOff * 2 + 1; i < highByteEnd; i += 2) {
+            if (utf16Le[i] != 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static final class FallbackStreamingStringUpdater implements StreamingStringUpdater {
@@ -682,6 +714,96 @@ public final class Wyhash64 {
     }
 
     // ==========================================================================
+    //  Internal — Latin-1 slice of a UTF-16LE byte[] (strided reads)
+    // ==========================================================================
+
+    /**
+     * Hashes an all-Latin-1 slice of a UTF-16 little-endian byte array with
+     * <b>zero allocation</b>. Each char's value is its low byte at the even
+     * index {@code 2*i} (the high byte is 0 for Latin-1 chars), so the slice's
+     * Latin-1 byte sequence is read strided and packed exactly like
+     * {@link #hashLatin1(char[], int, int)} — identical result, no copy.
+     */
+    private static long hashLatin1LeBytes(long seed, byte[] utf16Le, int charOff, int charLen) {
+        long s = initSeed(seed);
+        long secret1 = DEFAULT_SECRET[1];
+        long secret2 = DEFAULT_SECRET[2];
+        long secret3 = DEFAULT_SECRET[3];
+
+        long a, b;
+
+        if (charLen <= 16) {
+            if (charLen >= 4) {
+                a = ((long) charsToIntLe(utf16Le, charOff) << 32)
+                        | (charsToIntLe(utf16Le, charOff + ((charLen >> 3) << 2)) & 0xFFFFFFFFL);
+                b = ((long) charsToIntLe(utf16Le, charOff + charLen - 4) << 32)
+                        | (charsToIntLe(utf16Le, charOff + charLen - 4 - ((charLen >> 3) << 2)) & 0xFFFFFFFFL);
+            } else if (charLen > 0) {
+                a = charsToWyr3Le(utf16Le, charOff, charLen);
+                b = 0;
+            } else {
+                a = 0;
+                b = 0;
+            }
+        } else {
+            int i = charLen;
+            int p = charOff;
+            long see0 = s;
+            long see1 = s;
+            long see2 = s;
+
+            while (i > 48) {
+                see0 = mix(charsToLongLe(utf16Le, p) ^ secret1, charsToLongLe(utf16Le, p + 8) ^ see0);
+                see1 = mix(charsToLongLe(utf16Le, p + 16) ^ secret2, charsToLongLe(utf16Le, p + 24) ^ see1);
+                see2 = mix(charsToLongLe(utf16Le, p + 32) ^ secret3, charsToLongLe(utf16Le, p + 40) ^ see2);
+                p += 48;
+                i -= 48;
+            }
+            see0 ^= see1 ^ see2;
+            while (i > 16) {
+                see0 = mix(charsToLongLe(utf16Le, p) ^ secret1, charsToLongLe(utf16Le, p + 8) ^ see0);
+                i -= 16;
+                p += 16;
+            }
+            a = charsToLongLe(utf16Le, charOff + charLen - 16);
+            b = charsToLongLe(utf16Le, charOff + charLen - 8);
+            s = see0;
+        }
+
+        return finish(a, b, s, charLen);
+    }
+
+    /** Read 8 Latin-1 chars from a UTF-16LE byte[] (low byte of each char) as a little-endian long. */
+    private static long charsToLongLe(byte[] utf16Le, int charOff) {
+        int b = charOff << 1;
+        return ((long) (utf16Le[b] & 0xFF))
+             | ((long) (utf16Le[b + 2] & 0xFF) << 8)
+             | ((long) (utf16Le[b + 4] & 0xFF) << 16)
+             | ((long) (utf16Le[b + 6] & 0xFF) << 24)
+             | ((long) (utf16Le[b + 8] & 0xFF) << 32)
+             | ((long) (utf16Le[b + 10] & 0xFF) << 40)
+             | ((long) (utf16Le[b + 12] & 0xFF) << 48)
+             | ((long) (utf16Le[b + 14] & 0xFF) << 56);
+    }
+
+    /** Read 4 Latin-1 chars from a UTF-16LE byte[] (low byte of each char) as a little-endian int. */
+    private static int charsToIntLe(byte[] utf16Le, int charOff) {
+        int b = charOff << 1;
+        return (utf16Le[b] & 0xFF)
+             | ((utf16Le[b + 2] & 0xFF) << 8)
+             | ((utf16Le[b + 4] & 0xFF) << 16)
+             | ((utf16Le[b + 6] & 0xFF) << 24);
+    }
+
+    /** Read up to 3 Latin-1 chars from a UTF-16LE byte[] (low byte of each char), matching wyr3 layout. */
+    private static long charsToWyr3Le(byte[] utf16Le, int charOff, int k) {
+        int b = charOff << 1;
+        return ((long) (utf16Le[b] & 0xFF) << 16)
+             | ((long) (utf16Le[b + ((k >> 1) << 1)] & 0xFF) << 8)
+             | (long) (utf16Le[b + ((k - 1) << 1)] & 0xFF);
+    }
+
+    // ==========================================================================
     //  Internal helpers — CharSequence & char[] packing
     // ==========================================================================
 
@@ -1020,6 +1142,64 @@ public final class Wyhash64 {
                 }
                 bufLen = remaining;
             }
+        }
+
+        /**
+         * Latin-1 variant of {@link #updateLatin1(char[], int, int)} that reads
+         * an all-Latin-1 slice directly from a UTF-16LE byte array (the low byte
+         * of every char, at even indices) — zero allocation.
+         */
+        private void updateLatin1LeBytes(byte[] utf16Le, int charOff, int len) {
+            if (len == 0) return;
+            int charEnd = charOff + len;
+            totalLen += len; // Latin-1: 1 byte per char
+
+            // Drain existing buffer first
+            if (bufLen > 0) {
+                int bufAvail = 48 - bufLen;
+                int charsToBuf = Math.min(len, bufAvail);
+                for (int i = 0; i < charsToBuf; i++) {
+                    buf[bufLen + i] = utf16Le[(charOff + i) << 1];
+                }
+                bufLen += charsToBuf;
+                charOff += charsToBuf;
+                if (bufLen == 48 && charOff < charEnd) {
+                    round(buf, 0);
+                    bufLen = 0;
+                }
+                if (charOff >= charEnd) return;
+            }
+
+            // Process full 48-char blocks directly from the UTF-16LE bytes
+            while (charEnd - charOff > 48) {
+                roundLeBytes(utf16Le, charOff);
+                charOff += 48;
+            }
+
+            // Remaining chars go into the buffer
+            int remaining = charEnd - charOff;
+            if (remaining > 0) {
+                if (remaining < 16 && charOff >= 48) {
+                    // Copy the last 16 bytes of the last full block into buf[32..48]
+                    for (int i = 0; i < 16; i++) {
+                        buf[32 + i] = utf16Le[(charOff - 16 + i) << 1];
+                    }
+                }
+                for (int i = 0; i < remaining; i++) {
+                    buf[i] = utf16Le[(charOff + i) << 1];
+                }
+                bufLen = remaining;
+            }
+        }
+
+        /** 48-byte round from a UTF-16LE byte array (48 chars as their low bytes). */
+        private void roundLeBytes(byte[] utf16Le, int charOff) {
+            state[0] = mix(Wyhash64.charsToLongLe(utf16Le, charOff) ^ DEFAULT_SECRET[1],
+                    Wyhash64.charsToLongLe(utf16Le, charOff + 8) ^ state[0]);
+            state[1] = mix(Wyhash64.charsToLongLe(utf16Le, charOff + 16) ^ DEFAULT_SECRET[2],
+                    Wyhash64.charsToLongLe(utf16Le, charOff + 24) ^ state[1]);
+            state[2] = mix(Wyhash64.charsToLongLe(utf16Le, charOff + 32) ^ DEFAULT_SECRET[3],
+                    Wyhash64.charsToLongLe(utf16Le, charOff + 40) ^ state[2]);
         }
 
         private void updateUtf16(char[] chars, int off, int len) {

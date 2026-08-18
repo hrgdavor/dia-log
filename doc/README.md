@@ -4,6 +4,17 @@ This directory contains detailed documentation on key concepts, design decisions
 
 ---
 
+## Zero-Allocation Wyhash64
+
+Wyhash64 hashes `String`, `char[]`, `byte[]`, `ByteBuffer`, and `CharSequence` inputs
+without intermediate allocations: compact-string internals are read via `VarHandle`
+(`--add-opens`), UTF-16 byte order is probed once at class init (platform-native), slices
+use strided reads, and `Streaming.finalHash()` allocates nothing.
+
+[Full document](wyhash64-zero-allocation.md)
+
+---
+
 ## MDC vs Key-Value Pairs
 
 **MDC is thread-local** (`String→String`), applies to every log on that thread, requires manual cleanup. 

@@ -293,9 +293,14 @@ several latent bugs that only manifest when the fast paths are active — they a
      (`utf16StorageIsLittleEndian`: inspects the actual bytes of a known char, so it is
      correct on any CPU — LE on x86/ARM, BE on big-endian CPUs → char[] fallback there).
      Its 1-char tail was corrected to the wyr3 layout so it agrees with `hash(char[])`
-     and the streaming path at every byte length. The offset/slice variants hash via the
-     char[] path so `hash(str, off, len) == hash(str.substring(...))` even when a slice
-     of a UTF-16 string compacts back to Latin-1.
+     and the streaming path at every byte length. The offset/slice variants stay
+     **zero-allocation in every case**: a cheap high-byte scan (`sliceHasNonLatin1`)
+     picks the right strided reader — genuinely UTF-16 slices hash their LE bytes
+     directly, and all-Latin-1 slices (whose substring would compact to coder=0) hash
+     the low byte of each char via `hashLatin1LeBytes` / `updateLatin1LeBytes`, both
+     mirroring the existing Latin-1 paths without any copy. `hash(str, off, len)`
+     always equals `hash(str.substring(...))`; only big-endian CPUs (outside the
+     JDK-25 requirement) fall back to the char[] path.
    - `EscapedJsonStringWriter.writeEscapedUtf16` — removed; coder=1 now uses the
      JDK-version- and platform-independent char-scanning path
      (`writeEscapedJsonStringClassic`, no allocation).

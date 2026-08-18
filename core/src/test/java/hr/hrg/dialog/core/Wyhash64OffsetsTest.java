@@ -75,8 +75,45 @@ class Wyhash64OffsetsTest {
     @Test
     void unicodeSlice_equalsHashOfSubstring() {
         String unicode = "héllo wörld 🚀 Ñoño";
-        long slice = Wyhash64.hash(0, unicode, 6, 5);     // "wörld"
+        long slice = Wyhash64.hash(0, unicode, 6, 5);     // "wörld" (all Latin-1)
         long direct = Wyhash64.hash(0, unicode.substring(6, 11));
         assertEquals(direct, slice);
+    }
+
+    @Test
+    void unicodeSlice_containingNonLatin1_equalsHashOfSubstring() {
+        // slice keeps a non-Latin-1 char -> substring stays coder=1 (UTF-16)
+        String unicode = "héllo wörld 🚀 Ñoño";
+        long slice = Wyhash64.hash(0, unicode, 12, 3);    // "🚀 " (surrogate + space)
+        long direct = Wyhash64.hash(0, unicode.substring(12, 15));
+        assertEquals(direct, slice);
+    }
+
+    @Test
+    void streamingUnicodeSlice_equalsHashOfSubstring() {
+        String unicode = "héllo wörld 🚀 Ñoño";
+
+        Wyhash64.Streaming utf16Slice = new Wyhash64.Streaming(0);
+        utf16Slice.update(unicode, 12, 3);                 // "🚀 " — UTF-16 slice
+        assertEquals(Wyhash64.hash(0, unicode.substring(12, 15)), utf16Slice.finalHash());
+
+        Wyhash64.Streaming latin1Slice = new Wyhash64.Streaming(0);
+        latin1Slice.update(unicode, 6, 5);                 // "wörld" — Latin-1 slice
+        assertEquals(Wyhash64.hash(0, unicode.substring(6, 11)), latin1Slice.finalHash());
+    }
+
+    @Test
+    void longLatin1SliceOfUtf16String_equalsHashOfSubstring() {
+        // 🚀 (2 chars) + 70 Latin-1 chars + € -> the 70-char middle is an
+        // all-Latin-1 slice of a UTF-16 string (hits the 48-byte round paths)
+        String utf16 = "\uD83D\uDE80" + "a".repeat(70) + "\u20ac";
+
+        long slice = Wyhash64.hash(0, utf16, 2, 70);
+        long direct = Wyhash64.hash(0, utf16.substring(2, 72));
+        assertEquals(direct, slice, "hash(String,off,len) of a long Latin-1 slice must match substring");
+
+        Wyhash64.Streaming st = new Wyhash64.Streaming(0);
+        st.update(utf16, 2, 70);
+        assertEquals(direct, st.finalHash(), "Streaming.update(String,off,len) of a long Latin-1 slice must match substring");
     }
 }

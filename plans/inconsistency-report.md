@@ -570,9 +570,9 @@ Already covered in section 2.2, but worth noting again as it appears in both the
 
 ---
 
-## 33. LOW: `doc/zero-allocation-wyhash.md` Describes Unimplemented Features
+## 33. LOW: `doc/zero-allocation-wyhash.md` Describes Unimplemented Features — ✅ RESOLVED
 
-**File:** [`doc/zero-allocation-wyhash.md`](doc/zero-allocation-wyhash.md:76-88)
+**File:** ~~`doc/zero-allocation-wyhash.md`~~ — **removed 2026-08-18**
 
 **Describes:**
 - `MemorySegment.ofArray(char[])` for zero-copy char[] hashing
@@ -582,7 +582,11 @@ Already covered in section 2.2, but worth noting again as it appears in both the
 - [`Wyhash64.java`](core/src/main/java/hr/hrg/dialog/core/Wyhash64.java) uses `StringByteExtractor` with `VarHandle` for String access, not `MemorySegment`
 - The `Streaming` class uses a `byte[]` buffer, not `MemorySegment`
 
-**Issue:** The documentation describes a different implementation approach than what was actually built.
+**Issue:** The documentation described a different implementation approach than what was actually built.
+
+**Resolution:** The obsolete document was removed; the current implementation is documented
+in [`doc/wyhash64-zero-allocation.md`](doc/wyhash64-zero-allocation.md) (String byte-order
+probing, manual char[] packing, strided Latin-1 slices, allocation-free `finalHash()`).
 
 ---
 
