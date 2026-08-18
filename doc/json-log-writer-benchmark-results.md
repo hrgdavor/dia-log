@@ -42,6 +42,30 @@ writer's throwable path from 1040 → 872 B/op — the fingerprint entry points 
 reuse a caller-owned hasher (see `doc/allocation-benchmark-results.md`), so no
 `Wyhash64.Streaming` is allocated per event.
 
+### Why throwable costs ≈ 0 B/op here
+
+`writeWithJsonLogWriter` measures 272.004 B/op without a throwable and 272.039 B/op
+with one — the throwable branch adds nothing. This is by design, not a measurement
+artifact:
+
+- The benchmark builds the throwable and its `ThrowableProxy` **once in `@Setup`**,
+  outside the measured loop. The unavoidable trace costs (the `getStackTrace()`
+  defensive clone, proxy construction, the cached `StackTraceElementProxy[]`) are
+  paid exactly once per benchmark, not per event — exactly like production, where
+  the throwable and its proxy already exist when the appender writes the event.
+- Per measured event, `JsonLogWriter` reads the **cached** proxy array and streams it
+  through the single-pass write+fingerprint: no `getStackTrace()` call, no per-frame
+  `StackTraceElement[]` conversion, no hasher allocation (caller-owned field).
+- The 272 B/op floor is the shared MDC+KV processing (the `allKeys` dedup `HashSet`
+  built because MDC and KV pairs coexist, plus MDC `entrySet()` iteration) — identical
+  with or without a throwable.
+
+Contrast: `writeWithJsonLogWriterClassic` shows exactly **+88 B/op** for throwable
+(784.004 → 872.043) — its per-event `new StackTraceElement[18]` conversion array
+(16-byte header + 4 bytes/frame). The optimized writer avoids even that. The 88 B/op
+`getStackTrace()` clone only appears in the core `fingerprint(Throwable, …)` API,
+which `JsonLogWriter` never calls per event.
+
 ## Current interpretation
 
 1. JsonLogWriter is faster than JsonLogWriterClassic in both throwable and non-throwable cases.
