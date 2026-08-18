@@ -175,12 +175,23 @@ writer is the only zero-allocation target.
 
 ## Notes
 
-- The 88 B/op on `fingerprint(Throwable, …)` (with a reusable hasher) is exactly the
-  `Throwable.getStackTrace()` defensive copy — measured in isolation at 88.000 B/op, and the
-  whole fingerprint call at 88.004 B/op (verified 2026-08-18, JDK 25, `--add-opens`).
-  It is unavoidable from a `Throwable` (the JDK always returns a copy); the
-  zero-allocation alternative is `fingerprintFromTrace(trace, …)` over an already
-  materialized `StackTraceElement[]` (measured 0.004 B/op).
+- **Where the 88 B/op on `fingerprint(Throwable, …)` comes from (verified):** it is one
+  single allocation — the defensive clone inside `Throwable.getStackTrace()`. The JDK 25
+  implementation is `return getOurStackTrace().clone();` on every call. The benchmark's
+  throwable has a ~17–18 frame trace, and one cloned `StackTraceElement[18]` is
+  16 bytes (array header) + 4 bytes per reference, aligned to 8 → **88 bytes**. The
+  isolation rows prove the whole fingerprint pipeline adds nothing on top:
+  `getStackTrace()` alone = 88.000 B/op, `fingerprint(Throwable, …, stream)` =
+  88.004 B/op, `fingerprintFromTrace(trace, …)` = 0.004 B/op.
+- **Is the 88 avoidable?** Per call, *from a bare `Throwable`: no* — the JDK mandates the
+  defensive copy (internal array is private; subclasses may override `getStackTrace()`).
+  A `VarHandle` read of `Throwable.stackTrace` (with `--add-opens`) is possible but
+  rejected: the field is null until first materialization, the read bypasses overrides,
+  and it breaks the documented defensive-copy contract. **Structurally: yes** — materialize
+  the trace once and fingerprint the prepared array: `fingerprintFromTrace(trace, …)`
+  (0.004 B/op), or the logback path, where `ThrowableProxy` caches
+  `StackTraceElementProxy[]` once at construction and `JsonLogWriter` (0 B/op on
+  throwable events) never calls `getStackTrace()` per event.
 - There are no convenience fingerprint overloads and no hidden `ThreadLocal` state: the
   fingerprint entry points require a caller-owned reusable `Wyhash64.Streaming` (a field
   of the logger/appender, like the number buffers). See `AGENTS.md` — *prefer reusable
