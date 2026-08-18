@@ -64,6 +64,8 @@ Numeric fields are written with `JsonNumberWriter`, which converts `int`/`long`/
 
 - **Reusable number buffers** — Each `JsonLogWriter` instance owns reusable `int`/`long` scratch buffers (`intNumberBuffer`, `longNumberBuffer`) that are filled and written per event, so no per-number buffer is allocated.
 - **Streaming hash reuse** — `Wyhash64.Streaming` is designed to be reset and reused (`reset(...)`) on the hot path instead of creating a fresh hasher per event, keeping hashing allocation-free. The fingerprint entry points (`fingerprint(...)`, `addFromTraceToOutputStream*AndFingerprint(...)`) take a caller-supplied hasher as a parameter and reset it internally — there are no no-stream convenience overloads and no hidden `ThreadLocal` state. `JsonLogWriter` owns its hasher as a plain field, exactly like its number buffers.
+- **Reusable event buffer** — `JsonAppender` / `JsonAppenderRolling` assemble each event in a shared `ReusableByteArrayOutputStream` (1 MiB, grows only to the longest event ever written) and flush the whole event to the real stream with one bulk write, avoiding hundreds of tiny writes to file/network streams per event.
+- **Batched string emission** — `StringByteExtractor.writeLatin1` writes contiguous ASCII runs with bulk `write(byte[], off, len)` calls (per-byte `write(int)` is measured ≈51× slower); this removed the dominant stack-trace-write cost (traced JSON events ≈3.1× faster).
 
 ### Single-pass hash + write
 
@@ -110,6 +112,8 @@ writer vs a Jackson-generator encoder, with and without traces — is in
 [Logback Writer Comparison](doc/logback-writer-comparison-benchmark-results.md): the
 optimized writer allocates a constant 208 B/op whether or not a throwable is attached,
 while the default pattern encoder jumps from 728 to ~12–15 KB/op when rendering a trace.
+With the `writeLatin1` batching fix, traced events run at 1.942 us/op — within ~1.3× of
+the pattern encoder's 1.488 us/op.
 
 ### Current best effort, open to improvement
 

@@ -29,13 +29,17 @@ comparison isolates the serialization strategy.
 
 ## Latest results
 
+Measured after the 2026-08-18 `writeLatin1` batching fix (ASCII runs are written with
+one bulk `write(byte[], off, len)` each instead of per-byte `write(int)`; see
+"Where the time goes" below).
+
 ### Average time (`avgt`, us/op) and throughput (`thrpt`, ops/us)
 
 | Variant | without trace | with trace |
 |---|---|---|
-| `defaultPatternLog` | 0.125 us/op — 7.564 ops/us | 1.566 us/op — 0.955 ops/us |
-| `optimizedJsonLog` | 0.490 us/op — 2.034 ops/us | 5.937 us/op — 0.162 ops/us |
-| `jacksonEncoderLog` | 0.632 us/op — 1.431 ops/us | 6.430 us/op — 0.156 ops/us |
+| `defaultPatternLog` | 0.131 us/op — 7.696 ops/us | 1.488 us/op — 1.008 ops/us |
+| `optimizedJsonLog` | 0.493 us/op — 2.048 ops/us | 1.942 us/op — 0.508 ops/us |
+| `jacksonEncoderLog` | 0.553 us/op — 1.582 ops/us | 2.264 us/op — 0.423 ops/us |
 
 ### Allocation (`gc.alloc.rate.norm`, B/op)
 
@@ -43,7 +47,19 @@ comparison isolates the serialization strategy.
 |---|---|---|
 | `defaultPatternLog` | 728 B/op | 11264–15392 B/op (thrpt/avgt runs) |
 | `optimizedJsonLog` | 208 B/op | 208 B/op |
-| `jacksonEncoderLog` | 696 B/op | 784 B/op |
+| `jacksonEncoderLog` | 728 B/op | 816 B/op |
+
+### Effect of the batching fix on traced events
+
+| Variant, with trace | before fix | after fix | speedup |
+|---|---|---|---|
+| `optimizedJsonLog` | 5.937 us/op | **1.942 us/op** | ≈3.1× |
+| `jacksonEncoderLog` | 6.430 us/op | 2.264 us/op | ≈2.8× |
+| `defaultPatternLog` | 1.566 us/op | 1.488 us/op | (reference) |
+
+The optimized writer is now within ~1.3× of the pattern encoder on traced events while
+allocating **54–74× less** (208 vs 11264–15392 B/op). The no-trace gap is unchanged, as
+expected: that path does not use `writeLatin1`.
 
 ## Conclusions
 
@@ -62,16 +78,16 @@ comparison isolates the serialization strategy.
    encoder costs ≈ 12–15 KB of garbage.
 
 3. **Speed vs. allocation trade-off is inverted between the default encoder and the JSON
-   writers.** Without a trace the default pattern encoder is the fastest (0.125 us/op —
+   writers.** Without a trace the default pattern encoder is the fastest (0.131 us/op —
    it only formats ~75 chars) while allocating 3.5× more than the optimized writer.
-   With a trace the default encoder is also faster than both JSON writers (1.566 vs
-   5.937/6.430 us/op) but allocates **50–70× more**. The JSON writers spend CPU on
-   escaping and direct byte emission; the default encoder spends allocation on string
-   building.
+   With a trace the default encoder remains the fastest (1.488 vs 1.942/2.264 us/op)
+   but allocates **54–74× more**. After the `writeLatin1` batching fix the optimized
+   writer is within ~1.3× of the default encoder on traced events — a 3.1× improvement
+   over its pre-fix 5.937 us/op.
 
 4. **The optimized writer beats the Jackson-based encoder in both dimensions:** 208 vs
-   696–784 B/op (3–4× less) at comparable CPU cost with traces (5.937 vs 6.430 us/op),
-   and 0.490 vs 0.632 us/op without. The Jackson `JsonGenerator` path pays for generator
+   728–816 B/op (3.5–3.9× less) at slightly better CPU with traces (1.942 vs 2.264 us/op),
+   and 0.493 vs 0.553 us/op without. The Jackson `JsonGenerator` path pays for generator
    state, intermediate buffers, and per-field machinery.
 
 ## Where the time goes — why `optimizedJsonLog` is slower than `defaultPatternLog`
@@ -120,20 +136,22 @@ same JDK/machine; trace = 4 frames in the micro-shape):
    **one** bulk `getBytes()` + **one** bulk write, appending the trace to its
    `StringBuilder` in bulk too — at the price of the 728 → ~12–15 KB/op allocation.
 
-### Implication
+### Implication (implemented 2026-08-18)
 
-Batching the ASCII segments in `StringByteExtractor.writeLatin1` the same way
-`EscapedJsonStringWriter.writeEscapedLatin1` already does (write a contiguous run with
-one `write(byte[], off, len)` call instead of per-byte `write(int)`) would remove the
-dominant trace-path cost: class/method names are effectively always ASCII, so each frame's
-string becomes a single bulk write. The trace event cost should then drop toward the
-no-trace + hash/write-remainder budget rather than the current per-byte-write multiple.
+`StringByteExtractor.writeLatin1` now batches contiguous ASCII runs the same way
+`EscapedJsonStringWriter.writeEscapedLatin1` already does (one `write(byte[], off, len)`
+per run instead of per-byte `write(int)`). Class/method names are effectively always
+ASCII, so each frame's string became a single bulk write. Result: traced events dropped
+from 5.937 → 1.942 us/op for `optimizedJsonLog` (≈3.1×) and 6.430 → 2.264 us/op for
+`jacksonEncoderLog` (≈2.8×), putting the optimized writer within ~1.3× of the default
+pattern encoder while keeping its 208 B/op allocation.
 
 ## Current recommendation
 
 - For low-allocation, low-GC-pressure paths (high throughput servers, structured logs),
   use `optimizedJsonLog` — its per-event allocation is constant and small (208 B/op)
-  regardless of whether a throwable is attached.
+  regardless of whether a throwable is attached, and with the batching fix its traced
+  events are within ~1.3× of the pattern encoder's CPU cost.
 - The default pattern encoder is the right choice only where raw single-event latency
   matters more than allocation, and traced events are rare; note that every traced event
   through the default encoder emits ~12–15 KB of garbage.

@@ -102,20 +102,30 @@ public final class StringByteExtractor {
      * Writes a Latin-1 compact-string byte array to the output stream, encoding it to UTF-8 in a
      * single pass (no intermediate allocation). Latin-1 bytes are identical to UTF-8 only for ASCII
      * (0x00-0x7F); Latin-1 extended chars (0x80-0xFF) are expanded to 2-byte UTF-8 sequences.
+     * <p>
+     * Contiguous ASCII runs are written with one bulk {@code write(byte[], off, len)} call each,
+     * not per byte — measured ~50x cheaper than per-byte {@code write(int)} for the class/method
+     * names that dominate stack-trace output (see {@code doc/logback-writer-comparison-benchmark-results.md}).
      *
      * @param out target stream
      * @param latin1Bytes the internal {@code byte[]} of a Latin-1 compact string (coder == 0)
      * @throws IOException if writing fails
      */
     public static void writeLatin1(OutputStream out, byte[] latin1Bytes) throws IOException {
-        for (byte b : latin1Bytes) {
-            int v = b & 0xFF;
-            if (v < 0x80) {
-                out.write(v);
-            } else {
+        int segmentStart = 0;
+        for (int i = 0; i < latin1Bytes.length; i++) {
+            int v = latin1Bytes[i] & 0xFF;
+            if (v >= 0x80) {
+                if (i > segmentStart) {
+                    out.write(latin1Bytes, segmentStart, i - segmentStart);
+                }
                 out.write(0xC0 | (v >> 6));       // 110xxxxx
                 out.write(0x80 | (v & 0x3F));     // 10xxxxxx
+                segmentStart = i + 1;
             }
+        }
+        if (segmentStart < latin1Bytes.length) {
+            out.write(latin1Bytes, segmentStart, latin1Bytes.length - segmentStart);
         }
     }
 

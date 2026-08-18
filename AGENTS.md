@@ -53,6 +53,13 @@ Previously flagged and **already resolved — do not reintroduce**:
 - `Float.toString()` / `Double.toString()` in `JsonNumberWriter` - replaced by Ryu
   (`RyuFloat` / `RyuDouble`); also note `String.value` UTF-16 byte order is platform-native,
   never assume it (Wyhash64 probes it once at class init)
+- `StringByteExtractor.writeLatin1()` - must batch contiguous ASCII runs into bulk
+  `write(byte[], off, len)` calls; per-byte `write(int)` is measured ≈51× slower and was
+  the dominant stack-trace-path cost (see `doc/logback-writer-comparison-benchmark-results.md`)
+- `JsonAppender` / `JsonAppenderRolling` - events are assembled in a reusable
+  `ReusableByteArrayOutputStream` (1 MiB, grows only to the longest event) and flushed to
+  the real stream with one bulk write per event; do not reintroduce per-event buffers or
+  direct per-byte writes to file/network streams
 
 ### Prefer Reusable Objects as Parameters over ThreadLocal
 

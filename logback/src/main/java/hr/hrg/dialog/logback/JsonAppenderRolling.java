@@ -4,6 +4,7 @@ import javax.annotation.concurrent.ThreadSafe;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.rolling.RollingFileAppender;
+import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -15,6 +16,13 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private OutputStream activeStream;
     private final JsonLogWriter jsonLogWriter;
+    /**
+     * Event buffer: the event JSON is assembled here (reusing the array across
+     * events, growing only to the longest event) and flushed to the real stream
+     * with one bulk write per event. Safe to share because logback 1.5.x
+     * {@code AppenderBase.doAppend} is {@code synchronized}.
+     */
+    private final ReusableByteArrayOutputStream eventBuffer = new ReusableByteArrayOutputStream();
 
     public JsonAppenderRolling() {
         this.jsonLogWriter = createJsonLogWriter();
@@ -79,8 +87,11 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
     @Override
     protected void writeOut(ILoggingEvent event) throws IOException {
         var activeStreamLoc = activeStream;
-        jsonLogWriter.writeJsonEvent(objectMapper, event, activeStreamLoc);
-        activeStreamLoc.write(JsonLogWriter.NL);
+        eventBuffer.reset();
+        jsonLogWriter.writeJsonEvent(objectMapper, event, eventBuffer);
+        eventBuffer.write(JsonLogWriter.NL);
+        // One bulk write of the whole event (buffer reuses its array across events).
+        eventBuffer.writeTo(activeStreamLoc);
     }
 
 }

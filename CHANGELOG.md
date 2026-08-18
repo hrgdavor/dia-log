@@ -47,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Findings: the optimized writer allocates a constant 208 B/op regardless of
   throwable presence; the default encoder's `%ex` trace rendering allocates
   ~12–15 KB/op.
+- `ReusableByteArrayOutputStream` (core) — reusable, grow-only in-memory buffer
+  (default 1 MiB, grows only to the longest event). `JsonAppender` and
+  `JsonAppenderRolling` now assemble each event in it and flush the whole event to
+  the real stream with one bulk write instead of hundreds of tiny writes.
+- `StringByteExtractor.writeLatin1` now batches contiguous ASCII runs into bulk
+  `write(byte[], off, len)` calls instead of per-byte `write(int)` (per-byte writes
+  measured ≈51× slower). Traced events: optimized JSON 5.937 → 1.942 us/op (≈3.1×),
+  Jackson encoder 6.430 → 2.264 us/op (≈2.8×).
 
 ## [1.0.0] - 2026-08-11
 
