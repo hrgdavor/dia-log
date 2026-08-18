@@ -283,16 +283,25 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 Enabling `--add-opens` in the surefire JVM (to cover the VarHandle fast paths) exposed
 several latent bugs that only manifest when the fast paths are active — they are now fixed:
 
-1. **JDK 25 stores compact UTF-16 `String.value` bytes little-endian** (verified by dumping
-   the raw bytes: `"🚀"` = `3D D8 80 DE`). The VarHandle fast paths that read raw UTF-16
-   bytes assuming big-endian produced *different* results with vs without `--add-opens`:
-   - `Wyhash64.DirectStringHasher` / `DirectStreamingStringUpdater` — fixed: coder=1 now
-     routes through the char-based (LE) paths, so `hash(String)` no longer depends on
-     `--add-opens`.
+1. **Compact UTF-16 `String.value` byte order is platform-native, not version-fixed**
+   (verified by dumping the raw bytes on x86-64: `"🚀"` = `3D D8 80 DE`, little-endian).
+   The VarHandle fast paths that read raw UTF-16 bytes assuming a fixed byte order
+   produced *different* results with vs without `--add-opens`:
+   - `Wyhash64` direct String hashers — fixed **without breaking the zero-allocation
+     promise**: restored a byte-based UTF-16 hasher (`hashUtf16LeBytes`) that reads the
+     raw LE bytes directly, gated by a one-time **runtime probe**
+     (`utf16StorageIsLittleEndian`: inspects the actual bytes of a known char, so it is
+     correct on any CPU — LE on x86/ARM, BE on big-endian CPUs → char[] fallback there).
+     Its 1-char tail was corrected to the wyr3 layout so it agrees with `hash(char[])`
+     and the streaming path at every byte length. The offset/slice variants hash via the
+     char[] path so `hash(str, off, len) == hash(str.substring(...))` even when a slice
+     of a UTF-16 string compacts back to Latin-1.
    - `EscapedJsonStringWriter.writeEscapedUtf16` — removed; coder=1 now uses the
-     JDK-version-independent char-scanning path (`writeEscapedJsonStringClassic`).
+     JDK-version- and platform-independent char-scanning path
+     (`writeEscapedJsonStringClassic`, no allocation).
    - **Lesson**: never read `String.value` bytes directly for UTF-16 (coder=1) — the byte
-     order is JDK-version-dependent.
+     order is a platform property (native endianness on recent JDKs), so detect it from
+     the actual bytes once at class init, never assume.
 2. **`JsonLogWriterClassic` emitted `"stack"` without a colon** — `gen.writeName("stack")`
    writes the name but Jackson emits the colon with the *value*; the stack content bypasses
    the generator via raw stream writes. Fixed by writing the colon explicitly.

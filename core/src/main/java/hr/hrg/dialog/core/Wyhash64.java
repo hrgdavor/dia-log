@@ -92,10 +92,15 @@ public final class Wyhash64 {
     private static final class DirectStringHasher implements StringHasher {
         private final VarHandle valueHandle;
         private final VarHandle coderHandle;
+        /** Whether compact UTF-16 {@code String.value} is stored little-endian
+         *  (matches the platform's native byte order; LE on x86/ARM, BE on
+         *  big-endian CPUs). Detected once from the actual bytes — never assumed. */
+        private final boolean utf16Le;
 
         DirectStringHasher(VarHandle valueHandle, VarHandle coderHandle) {
             this.valueHandle = valueHandle;
             this.coderHandle = coderHandle;
+            this.utf16Le = utf16StorageIsLittleEndian(valueHandle);
         }
 
         @Override
@@ -105,10 +110,12 @@ public final class Wyhash64 {
             int len = str.length();
             if (coder == 0) {
                 return Wyhash64.hash(seed, value, 0, len);
+            } else if (utf16Le) {
+                // Zero allocation: String.value is already UTF-16 little-endian
+                // on this platform, so hash the raw bytes directly (matches hash(char[])).
+                return hashUtf16LeBytes(seed, value, 0, len);
             } else {
-                // String.value is big-endian UTF-16; the char[] path packs
-                // little-endian, so delegate to stay consistent with the
-                // fallback hasher (hash(String) must not depend on add-opens).
+                // Big-endian storage (big-endian CPUs): must repack to little-endian.
                 return Wyhash64.hash(seed, str.toCharArray());
             }
         }
@@ -120,6 +127,10 @@ public final class Wyhash64 {
             if (coder == 0) {
                 return Wyhash64.hash(seed, value, off, len);
             } else {
+                // A slice of a UTF-16 string may itself be all-Latin-1 (its
+                // substring compacts to coder=0 and hashes as 1 byte/char), so
+                // the slice must be hashed in its own encoding — consistent with
+                // hash(str.substring(...)) and the fallback hasher.
                 char[] chars = new char[len];
                 str.getChars(off, off + len, chars, 0);
                 return Wyhash64.hash(seed, chars);
@@ -171,10 +182,15 @@ public final class Wyhash64 {
     private static final class DirectStreamingStringUpdater implements StreamingStringUpdater {
         private final VarHandle valueHandle;
         private final VarHandle coderHandle;
+        /** Whether compact UTF-16 {@code String.value} is stored little-endian
+         *  (matches the platform's native byte order; LE on x86/ARM, BE on
+         *  big-endian CPUs). Detected once from the actual bytes — never assumed. */
+        private final boolean utf16Le;
 
         DirectStreamingStringUpdater(VarHandle valueHandle, VarHandle coderHandle) {
             this.valueHandle = valueHandle;
             this.coderHandle = coderHandle;
+            this.utf16Le = utf16StorageIsLittleEndian(valueHandle);
         }
 
         @Override
@@ -184,8 +200,11 @@ public final class Wyhash64 {
             int len = str.length();
             if (coder == 0) {
                 streaming.update(value, 0, len);
+            } else if (utf16Le) {
+                // Zero allocation: feed the UTF-16 little-endian bytes directly
+                // (identical byte stream and totalLen as the char[] path).
+                streaming.update(value, 0, len * 2);
             } else {
-                // big-endian String.value must not be fed to the LE char path
                 streaming.update(str.toCharArray());
             }
         }
@@ -197,10 +216,28 @@ public final class Wyhash64 {
             if (coder == 0) {
                 streaming.update(value, off, len);
             } else {
+                // Same slice-encoding caveat as DirectStringHasher.hash(str, off, len)
                 char[] chars = new char[len];
                 str.getChars(off, off + len, chars, 0);
                 streaming.update(chars);
             }
+        }
+    }
+
+    /**
+     * Detects, once per strategy, whether the JVM stores compact UTF-16
+     * {@code String.value} little-endian (little-endian CPUs) or big-endian
+     * (big-endian CPUs). Probes the 2 raw bytes of a single non-Latin-1 char:
+     * {@code "€"} is {@code AC 20} little-endian and {@code 20 AC} big-endian.
+     * The byte order is a platform property, not a Java version property, so
+     * it is read from the actual bytes at class-init time.
+     */
+    private static boolean utf16StorageIsLittleEndian(VarHandle valueHandle) {
+        try {
+            byte[] probe = (byte[]) valueHandle.get("\u20ac");
+            return probe != null && probe.length >= 2 && (probe[0] & 0xFF) == 0xAC;
+        } catch (Throwable t) {
+            return false;
         }
     }
 
@@ -574,6 +611,74 @@ public final class Wyhash64 {
             s = seed0;
         }
         return finish(a, b, s, len);
+    }
+
+    // ==========================================================================
+    //  Internal — UTF-16 little-endian byte hashing
+    // ==========================================================================
+
+    /**
+     * Hashes UTF-16 <b>little-endian</b> bytes (2 bytes per char) so the result
+     * matches {@link #hash(long, char[])} of the same chars. Used by the
+     * zero-allocation String fast path on platforms where compact UTF-16
+     * {@code String.value} is stored little-endian (the platform-native order
+     * on x86/ARM; detected at class-init, never assumed).
+     * <p>
+     * The {@code <= 16} tail formulas (including the 1-char wyr3 layout) mirror
+     * {@code hashUtf16(char[])} exactly.
+     */
+    private static long hashUtf16LeBytes(long seed, byte[] data, int byteOff, int charLen) {
+        long s = initSeed(seed);
+        long secret1 = DEFAULT_SECRET[1];
+        long secret2 = DEFAULT_SECRET[2];
+        long secret3 = DEFAULT_SECRET[3];
+
+        int byteLen = charLen * 2;
+        long a, b;
+
+        if (byteLen <= 16) {
+            if (byteLen >= 4) {
+                a = ((long) getInt(data, byteOff) << 32)
+                        | (getInt(data, byteOff + ((byteLen >> 3) << 2)) & 0xFFFFFFFFL);
+                b = ((long) getInt(data, byteOff + byteLen - 4) << 32)
+                        | (getInt(data, byteOff + byteLen - 4 - ((byteLen >> 3) << 2)) & 0xFFFFFFFFL);
+            } else if (byteLen > 0) {
+                // 1 char: same wyr3 layout as the byte[]/Latin-1 paths so this
+                // agrees with hash(char[]) and the streaming path.
+                a = ((data[byteOff] & 0xFFL) << 16)
+                  | ((data[byteOff + 1] & 0xFFL) << 8)
+                  | (data[byteOff + 1] & 0xFFL);
+                b = 0;
+            } else {
+                a = 0;
+                b = 0;
+            }
+        } else {
+            int i = byteLen;
+            int p = byteOff;
+            long see0 = s;
+            long see1 = s;
+            long see2 = s;
+
+            while (i > 48) {
+                see0 = mix(getLong(data, p) ^ secret1, getLong(data, p + 8) ^ see0);
+                see1 = mix(getLong(data, p + 16) ^ secret2, getLong(data, p + 24) ^ see1);
+                see2 = mix(getLong(data, p + 32) ^ secret3, getLong(data, p + 40) ^ see2);
+                p += 48;
+                i -= 48;
+            }
+            see0 ^= see1 ^ see2;
+            while (i > 16) {
+                see0 = mix(getLong(data, p) ^ secret1, getLong(data, p + 8) ^ see0);
+                i -= 16;
+                p += 16;
+            }
+            a = getLong(data, byteOff + byteLen - 16);
+            b = getLong(data, byteOff + byteLen - 8);
+            s = see0;
+        }
+
+        return finish(a, b, s, byteLen);
     }
 
     // ==========================================================================
