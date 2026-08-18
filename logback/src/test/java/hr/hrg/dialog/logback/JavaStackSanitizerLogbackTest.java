@@ -13,6 +13,8 @@ import java.util.HexFormat;
 import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JavaStackSanitizerLogbackTest {
 
@@ -130,5 +132,39 @@ class JavaStackSanitizerLogbackTest {
 
         assertEquals(twoPassOut.toString(StandardCharsets.UTF_8), singlePassOut.toString(StandardCharsets.UTF_8));
         assertEquals(twoPassHash, singlePassHash);
+    }
+
+    @Test
+    void fingerprint_withRejectAllFilter_usesFallback() {
+        IThrowableProxy proxy = new ThrowableProxy(sampleThrowable());
+        long hash = JavaStackSanitizerLogback.fingerprint(proxy, cls -> false);
+        assertNotEquals(0L, hash, "fallback must still produce a hash");
+    }
+
+    @Test
+    void fingerprint_withSelectiveFilter_differsFromAcceptAll() {
+        IThrowableProxy proxy = new ThrowableProxy(sampleThrowable());
+        // rejects the lambda frame, keeps the two plain com.example.MyClass frames
+        long selective = JavaStackSanitizerLogback.fingerprint(proxy, cls -> !cls.contains("Lambda"));
+        long all = JavaStackSanitizerLogback.fingerprint(proxy, ACCEPT_ALL);
+        assertNotEquals(all, selective, "different filters must produce different fingerprints");
+    }
+
+    @Test
+    void fingerprint_withRejectAllFilter_matchesCoreFallback() {
+        Throwable throwable = sampleThrowable();
+        IThrowableProxy proxy = new ThrowableProxy(throwable);
+        long fromProxy = JavaStackSanitizerLogback.fingerprint(proxy, cls -> false);
+        long fromCore = JavaStackSanitizer.fingerprint(throwable, cls -> false);
+        assertEquals(fromCore, fromProxy, "logback fallback must match core fallback");
+    }
+
+    @Test
+    void addFromTraceToOutputStreamJson_withRejectAll_writesFallback() throws IOException {
+        IThrowableProxy proxy = new ThrowableProxy(sampleThrowable());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        JavaStackSanitizerLogback.addFromTraceToOutputStreamJson(proxy.getStackTraceElementProxyArray(), cls -> false, out);
+        String json = out.toString(StandardCharsets.UTF_8);
+        assertTrue(json.contains("com.example.MyClass"), "fallback must write raw frames: " + json);
     }
 }

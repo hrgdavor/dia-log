@@ -4,7 +4,6 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -115,6 +114,10 @@ public class JsonLogWriterClassic {
 
                 gen.writeName("stack");
                 gen.flush();// flush whatever is in buffer so we can safely dump stack trace into OutputStream
+                // writeName() does not emit the colon (Jackson writes it with the
+                // value); since the stack content is written directly to the stream,
+                // the colon must be written here explicitly.
+                out.write(':');
                 out.write('"');
                 STRING_STRATEGY.write(out, tp.getClassName());
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
@@ -129,8 +132,8 @@ public class JsonLogWriterClassic {
 
             gen.writeEndObject();
         } catch (IOException e) {
-            System.err.println(Instant.now() + " Failed to write JSON log event for logger: " + event.getLoggerName());
-            e.printStackTrace(System.err);
+            // Error reporting is the caller's job: logback appenders report write
+            // failures through their StatusManager (AppenderBase.doAppend -> addError).
             throw e;
         }
     }

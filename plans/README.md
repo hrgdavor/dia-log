@@ -34,8 +34,9 @@ JaCoCo report + check, 300+ tests).
 - Code: `prefix` volatile, lazy `allKeys`, JSON-key escaping, `System.err` removal,
   `addKeyValues()` validation, `packChars`/`packCharsLow` removal, `@FunctionalInterface`
   on `LogFiller`, `@ThreadSafe`/`@NotThreadSafe` annotations, class Javadoc completed
-- Build/docs: Maven Enforcer, JaCoCo (floor check line ≥55% / branch ≥40%; 80/70 target
-  documented), `.github/workflows/ci.yml`, `CONTRIBUTING.md`, `SECURITY.md`
+- Build/docs: Maven Enforcer, JaCoCo (enforced check: line ≥80% / branch ≥70%;
+  actual core 91.7%/82.4%, logback 92.1%/81.2%), `.github/workflows/ci.yml`,
+  `CONTRIBUTING.md`, `SECURITY.md`
 
 Non-blocking observations that remain open (see `critical-analysis.md`): the
 `StringByteExtractor.writeClassic()` and `Float/Double.toString()` allocation hotspots

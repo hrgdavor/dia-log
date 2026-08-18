@@ -22,7 +22,7 @@ Updated: 2026-08-17 — every item annotated with its current implementation sta
 | P2.13 Javadoc | ✅ RESOLVED (2026-08-17) — class-level Javadoc added to all remaining public classes (JsonNumberWriter, StringByteExtractor, EscapedJsonStringWriter, RawJsonSelfWriter, LoggingEventBuilderWrapper, LoggingEventBuilderWrapperNoop, LogFiller, JsonLogWriterClassic, ZeroCopyDirectAppender) |
 | P2.14 repo docs | ✅ RESOLVED (2026-08-17) — `LICENSE` + `CHANGELOG.md` existed; `CONTRIBUTING.md` + `SECURITY.md` added |
 | P2.15 Maven Enforcer | ✅ RESOLVED (2026-08-17) — enforcer 3.5.0: Java 25, Maven 3.9+, banned `commons-logging`/`log4j-over-slf4j`/`log4j` |
-| P2.16 JaCoCo | ✅ RESOLVED (2026-08-17) — JaCoCo 0.8.14 agent + report + floor check (line ≥55%, branch ≥40%; 80/70 target documented); example module skipped |
+| P2.16 JaCoCo | ✅ RESOLVED (2026-08-17) — JaCoCo 0.8.14 agent + report + enforced check: **line ≥80%, branch ≥70%** (achieved: core 91.7%/82.4%, logback 92.1%/81.2%); example module skipped via `jacoco.skip` |
 | P2.17 CI pipeline | ✅ RESOLVED (2026-08-17) — `.github/workflows/ci.yml` (push/PR → `mvn clean verify -Dgpg.skip=true`, JaCoCo reports as artifacts); `publish.yml` unchanged |
 | P2.18 `TraceId` `String.format` | ✅ RESOLVED — `padHex()` with `Long.toHexString` (`TraceId.java:53-57`) |
 | P2.19 empty `usage.brainstorm.md` | ✅ RESOLVED — file has content |

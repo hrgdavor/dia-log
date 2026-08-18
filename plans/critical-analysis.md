@@ -275,3 +275,30 @@ public static long fingerprint(IThrowableProxy rootCause, Predicate<String> filt
 1. **Code duplication is intentional** - Modify `JavaStackSanitizer.java` only, then regenerate — ✅ still the rule
 2. **Generator preserves comments** - Commented code in derivatives is intentional scaffolding for debugging — ✅ still the rule
 3. **Java 25 + --add-opens required** - Document requirement clearly for users — ✅ documented in README (`--add-opens java.base/java.lang=ALL-UNNAMED` for `StringByteExtractor`)
+
+---
+
+## Addendum — bugs found while pushing coverage to 80% (2026-08-17)
+
+Enabling `--add-opens` in the surefire JVM (to cover the VarHandle fast paths) exposed
+several latent bugs that only manifest when the fast paths are active — they are now fixed:
+
+1. **JDK 25 stores compact UTF-16 `String.value` bytes little-endian** (verified by dumping
+   the raw bytes: `"🚀"` = `3D D8 80 DE`). The VarHandle fast paths that read raw UTF-16
+   bytes assuming big-endian produced *different* results with vs without `--add-opens`:
+   - `Wyhash64.DirectStringHasher` / `DirectStreamingStringUpdater` — fixed: coder=1 now
+     routes through the char-based (LE) paths, so `hash(String)` no longer depends on
+     `--add-opens`.
+   - `EscapedJsonStringWriter.writeEscapedUtf16` — removed; coder=1 now uses the
+     JDK-version-independent char-scanning path (`writeEscapedJsonStringClassic`).
+   - **Lesson**: never read `String.value` bytes directly for UTF-16 (coder=1) — the byte
+     order is JDK-version-dependent.
+2. **`JsonLogWriterClassic` emitted `"stack"` without a colon** — `gen.writeName("stack")`
+   writes the name but Jackson emits the colon with the *value*; the stack content bypasses
+   the generator via raw stream writes. Fixed by writing the colon explicitly.
+3. **`ZeroCopyDirectAppender.setOutputStream()` never called `super.setOutputStream()`** —
+   the base `outputStream` stayed null, so `start()` failed and the appender could never
+   append. Fixed.
+4. Tests building `LoggingEvent`s with a bare `new LoggerContext()` hit an NPE in logback's
+   `prepareForDeferredProcessing()` (`mdcAdapter` null) — appender tests now use the
+   SLF4J-bound context (`LoggerFactory.getILoggerFactory()`).

@@ -72,23 +72,27 @@ public final class EscapedJsonStringWriter {
     }
 
     private static void writeEscapedJsonStringVarHandle(OutputStream out, String value, VarHandle valueHandle, VarHandle coderHandle) throws IOException {
-        out.write('"');
-
         byte coder = (byte) coderHandle.get(value);
         byte[] internal = (byte[]) valueHandle.get(value);
 
         if (internal == null) {
             out.write('"');
+            out.write('"');
             return;
         }
 
         if (coder == 0) {
+            // Latin-1 is 1 byte per char — byte-order independent, safe on all JDKs.
+            out.write('"');
             writeEscapedLatin1(out, internal);
+            out.write('"');
         } else {
-            writeEscapedUtf16(out, internal);
+            // The internal UTF-16 byte order changed across JDK versions (big-endian
+            // before 25, little-endian on 25+), so reading the raw bytes is not
+            // portable. Use the JDK-version-independent char-scanning path instead
+            // (it writes its own surrounding quotes).
+            writeEscapedJsonStringClassic(out, value);
         }
-
-        out.write('"');
     }
 
     private static void writeEscapedJsonStringClassic(OutputStream out, String value) throws IOException {
@@ -170,58 +174,6 @@ public final class EscapedJsonStringWriter {
 
         if (segmentStart < internal.length) {
             out.write(internal, segmentStart, internal.length - segmentStart);
-        }
-    }
-
-    private static void writeEscapedUtf16(OutputStream out, byte[] internal) throws IOException {
-        int charLen = internal.length >>> 1;
-
-        for (int i = 0; i < charLen; i++) {
-            int pos = i << 1;
-            char ch = (char) (((internal[pos] & 0xFF) << 8) | (internal[pos + 1] & 0xFF));
-
-            byte[] escape = escapeBytesForAsciiControl(ch);
-            if (escape != null) {
-                out.write(escape);
-                continue;
-            }
-
-            if (ch < 0x20) {
-                out.write('\\');
-                out.write('u');
-                out.write('0');
-                out.write('0');
-                writeHexNibble(out, (ch >>> 4) & 0x0F);
-                writeHexNibble(out, ch & 0x0F);
-                continue;
-            }
-
-            if (ch <= 0x7F) {
-                out.write(ch);
-                continue;
-            }
-
-            if (Character.isHighSurrogate(ch)) {
-                if (i + 1 < charLen) {
-                    int lowPos = (i + 1) << 1;
-                    char low = (char) (((internal[lowPos] & 0xFF) << 8) | (internal[lowPos + 1] & 0xFF));
-                    if (Character.isLowSurrogate(low)) {
-                        int codePoint = Character.toCodePoint(ch, low);
-                        writeUtf8CodePoint(out, codePoint);
-                        i++;
-                        continue;
-                    }
-                }
-                writeReplacementChar(out);
-                continue;
-            }
-
-            if (Character.isLowSurrogate(ch)) {
-                writeReplacementChar(out);
-                continue;
-            }
-
-            writeUtf8CodePoint(out, ch);
         }
     }
 

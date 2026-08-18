@@ -32,6 +32,9 @@ public class ZeroCopyDirectAppender extends OutputStreamAppender<ILoggingEvent> 
         if(g != null) g.close();
         this.targetOutputStream = os;
         this.g = jsonFactory.createGenerator(writeCtxt,os);
+        // must also update the base field, otherwise start() fails with
+        // "No output stream set" and the appender never starts
+        super.setOutputStream(os);
     }
 
     @Override

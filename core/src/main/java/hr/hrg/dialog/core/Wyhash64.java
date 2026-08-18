@@ -106,7 +106,10 @@ public final class Wyhash64 {
             if (coder == 0) {
                 return Wyhash64.hash(seed, value, 0, len);
             } else {
-                return hashUtf16(seed, value, 0, len);
+                // String.value is big-endian UTF-16; the char[] path packs
+                // little-endian, so delegate to stay consistent with the
+                // fallback hasher (hash(String) must not depend on add-opens).
+                return Wyhash64.hash(seed, str.toCharArray());
             }
         }
 
@@ -117,7 +120,9 @@ public final class Wyhash64 {
             if (coder == 0) {
                 return Wyhash64.hash(seed, value, off, len);
             } else {
-                return hashUtf16(seed, value, off * 2, len);
+                char[] chars = new char[len];
+                str.getChars(off, off + len, chars, 0);
+                return Wyhash64.hash(seed, chars);
             }
         }
     }
@@ -180,7 +185,8 @@ public final class Wyhash64 {
             if (coder == 0) {
                 streaming.update(value, 0, len);
             } else {
-                streaming.update(value, 0, len * 2);
+                // big-endian String.value must not be fed to the LE char path
+                streaming.update(str.toCharArray());
             }
         }
 
@@ -191,7 +197,9 @@ public final class Wyhash64 {
             if (coder == 0) {
                 streaming.update(value, off, len);
             } else {
-                streaming.update(value, off * 2, len * 2);
+                char[] chars = new char[len];
+                str.getChars(off, off + len, chars, 0);
+                streaming.update(chars);
             }
         }
     }
@@ -566,60 +574,6 @@ public final class Wyhash64 {
             s = seed0;
         }
         return finish(a, b, s, len);
-    }
-
-    // ==========================================================================
-    //  Internal — UTF-16 string hashing
-    // ==========================================================================
-
-    private static long hashUtf16(long seed, byte[] data, int byteOff, int charLen) {
-        long s = initSeed(seed);
-        long secret1 = DEFAULT_SECRET[1];
-        long secret2 = DEFAULT_SECRET[2];
-        long secret3 = DEFAULT_SECRET[3];
-
-        int byteLen = charLen * 2;
-        long a, b;
-
-        if (byteLen <= 16) {
-            if (byteLen >= 4) {
-                a = ((long) getInt(data, byteOff) << 32)
-                        | (getInt(data, byteOff + ((byteLen >> 3) << 2)) & 0xFFFFFFFFL);
-                b = ((long) getInt(data, byteOff + byteLen - 4) << 32)
-                        | (getInt(data, byteOff + byteLen - 4 - ((byteLen >> 3) << 2)) & 0xFFFFFFFFL);
-            } else if (byteLen > 0) {
-                a = ((data[byteOff] & 0xFFL)) | ((data[byteOff + 1] & 0xFFL) << 8);
-                b = 0;
-            } else {
-                a = 0;
-                b = 0;
-            }
-        } else {
-            int i = byteLen;
-            int p = byteOff;
-            long see0 = s;
-            long see1 = s;
-            long see2 = s;
-
-            while (i > 48) {
-                see0 = mix(getLong(data, p) ^ secret1, getLong(data, p + 8) ^ see0);
-                see1 = mix(getLong(data, p + 16) ^ secret2, getLong(data, p + 24) ^ see1);
-                see2 = mix(getLong(data, p + 32) ^ secret3, getLong(data, p + 40) ^ see2);
-                p += 48;
-                i -= 48;
-            }
-            see0 ^= see1 ^ see2;
-            while (i > 16) {
-                see0 = mix(getLong(data, p) ^ secret1, getLong(data, p + 8) ^ see0);
-                i -= 16;
-                p += 16;
-            }
-            a = getLong(data, byteOff + byteLen - 16);
-            b = getLong(data, byteOff + byteLen - 8);
-            s = see0;
-        }
-
-        return finish(a, b, s, byteLen);
     }
 
     // ==========================================================================
