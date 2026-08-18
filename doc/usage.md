@@ -27,6 +27,10 @@ Configure logback to write JSON. Console:
 
 ```xml
 <appender name="JSON" class="hr.hrg.dialog.logback.JsonAppender">
+    <!-- Dummy encoder: JsonAppender.writeOut() writes JSON directly and never
+         invokes the encoder (so no per-event allocation). It is only required
+         to satisfy OutputStreamAppender.start(), which refuses to start
+         without one. -->
     <encoder><pattern>%msg%n</pattern></encoder>
 </appender>
 <root level="INFO"><appender-ref ref="JSON"/></root>
@@ -43,6 +47,7 @@ Rolling file with XZ-compressed archives (`JsonAppenderRolling`):
         <maxHistory>30</maxHistory>
         <totalSizeCap>2GB</totalSizeCap>
     </rollingPolicy>
+    <!-- Same dummy-encoder note as above: never invoked, required for start(). -->
     <encoder><pattern>%msg%n</pattern></encoder>
 </appender>
 ```
@@ -136,8 +141,11 @@ for the event.
 
 ## 8. Missing keys
 
-Dia-Log does **not** implement `warnOnMissingKeys` — an unresolvable `{key}` placeholder
-simply stays literal in the message (see `cookbook/missing-keys-warn.md`).
+An unresolvable `{key}` placeholder stays **literal** in the message in every writer. For
+development, the writer overload `JsonLogWriterDev` (via `JsonAppenderDev` /
+`JsonAppenderRollingDev`) additionally emits a `"missingKeys":["ip"]` field — no boolean
+config, the class is the switch; `{}` positionals and `{{escaped}}` braces are ignored and
+`null` values count as present. See `cookbook/missing-keys-warn.md`.
 
 ## 9. Reading the logs
 

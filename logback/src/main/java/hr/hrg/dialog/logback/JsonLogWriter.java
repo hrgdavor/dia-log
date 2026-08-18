@@ -166,12 +166,31 @@ public class JsonLogWriter {
 
             }
 
+            // Dev/diagnostic extension point — no-op in this production writer.
+            writeExtraFields(event, out, allKeys, mdcMap);
+
             out.write('}');
         } catch (IOException e) {
             // Error reporting is the caller's job: logback appenders report write
             // failures through their StatusManager (AppenderBase.doAppend -> addError).
             throw e;
         }
+    }
+
+    /**
+     * Extension point for diagnostic/dev writer variants (e.g. missing-key
+     * warnings). Called after all regular fields but before the closing brace.
+     * The default implementation writes nothing, so production output is
+     * unaffected; implementations must write a complete field including its own
+     * leading comma (like {@code writeFieldPrefix}) when they want to add data.
+     *
+     * @param event   the event being serialized
+     * @param out     the target stream, positioned after the last regular field
+     * @param allKeys statement key/value keys, or {@code null} if none were present
+     * @param mdcMap  MDC map, or {@code null} if none was available
+     */
+    protected void writeExtraFields(ILoggingEvent event, OutputStream out, Set<String> allKeys, Map<String, String> mdcMap) throws IOException {
+        // no-op in the production writer
     }
 
     private boolean isReserved(String key) {

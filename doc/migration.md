@@ -96,6 +96,8 @@ Point logback at `JsonAppender` (console) or `JsonAppenderRolling` (file + XZ ro
         <maxHistory>30</maxHistory>
         <totalSizeCap>2GB</totalSizeCap>
     </rollingPolicy>
+    <!-- Dummy encoder: writeOut() writes JSON directly and never invokes it
+         (no per-event allocation); required only to satisfy start(). -->
     <encoder><pattern>%msg%n</pattern></encoder>
 </appender>
 <root level="INFO"><appender-ref ref="JSON"/></root>

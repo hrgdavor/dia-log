@@ -14,7 +14,20 @@ import java.util.function.Predicate;
 public class JsonAppender extends OutputStreamAppender<ILoggingEvent> {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private OutputStream activeStream;
-    private JsonLogWriter jsonLogWriter = new JsonLogWriter();
+    private final JsonLogWriter jsonLogWriter;
+
+    public JsonAppender() {
+        this.jsonLogWriter = createJsonLogWriter();
+    }
+
+    /**
+     * Factory hook so diagnostic variants (e.g. {@link JsonAppenderDev}) can
+     * swap in a writer that adds dev-only fields. Production behavior is
+     * unaffected — the base returns the plain {@link JsonLogWriter}.
+     */
+    protected JsonLogWriter createJsonLogWriter() {
+        return new JsonLogWriter();
+    }
 
 
     @Override
