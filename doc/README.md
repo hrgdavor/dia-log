@@ -21,6 +21,13 @@ use strided reads, and `Streaming.finalHash()` allocates nothing.
   exceptions, MDC, schema.
 - [Migration guide](migration.md) — step-by-step from plain SLF4J to Dia-Log.
 
+## Performance
+
+- [Wyhash64 zero-allocation design](wyhash64-zero-allocation.md) — how String/char[]/byte[]
+  hashing avoids allocation.
+- [Allocation benchmark results](allocation-benchmark-results.md) — JMH `-prof gc`
+  measurements, allocations found & removed, documented remaining allocations.
+
 ---
 
 ## MDC vs Key-Value Pairs

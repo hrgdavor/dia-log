@@ -4,11 +4,11 @@ A diagnostic logging library for SLF4J 2.x and Java 25+. It provides structured 
 
 ## Modules
 
-| Module | Artifact | Description |
-|--------|----------|-------------|
-| [`core`](core/) | `dia-log-core` | `DiaLogger`, `LoggingEventBuilderWrapperBase`, `LoggingEventBuilderWrapperNoop`, `JavaStackSanitizer`, `Wyhash64` |
-| [`logback`](logback/) | `dia-log-logback` | `JsonAppender`, `JsonAppenderRolling`, `JsonLogWriter`, `JsonLogWriterClassic` |
-| [`example`](example/) | `dia-log-example` | Runnable demo with a sample Logback configuration |
+| Module                | Artifact          | Description                                                                                                       |
+| --------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [`core`](core/)       | `dia-log-core`    | `DiaLogger`, `LoggingEventBuilderWrapperBase`, `LoggingEventBuilderWrapperNoop`, `JavaStackSanitizer`, `Wyhash64` |
+| [`logback`](logback/) | `dia-log-logback` | `JsonAppender`, `JsonAppenderRolling`, `JsonLogWriter`, `JsonLogWriterClassic`                                    |
+| [`example`](example/) | `dia-log-example` | Runnable demo with a sample Logback configuration                                                                 |
 
 ## Quick Start
 
@@ -73,12 +73,37 @@ Stack-trace fingerprinting and writing used to be two separate passes (traverse 
 
 These optimizations are validated with JMH benchmarks (`-prof gc`). On the latest run, `JsonLogWriter` beats the classic generator path in both latency and allocation:
 
-| Benchmark method              | includeThrowable | Avg time    | Alloc norm   |
-| ----------------------------- | ---------------- | ----------- | ------------ |
-| `writeWithJsonLogWriter`        | false            | 0.540 us/op | 344 B/op     |
-| `writeWithJsonLogWriterClassic` | false            | 0.667 us/op | 784 B/op     |
-| `writeWithJsonLogWriter`        | true             | 1.898 us/op | 480 B/op     |
-| `writeWithJsonLogWriterClassic` | true             | 2.194 us/op | 1040 B/op    |
+| Benchmark method                | includeThrowable | Avg time    | Alloc norm |
+| ------------------------------- | ---------------- | ----------- | ---------- |
+| `writeWithJsonLogWriter`        | false            | 0.540 us/op | 344 B/op   |
+| `writeWithJsonLogWriterClassic` | false            | 0.667 us/op | 784 B/op   |
+| `writeWithJsonLogWriter`        | true             | 1.898 us/op | 480 B/op   |
+| `writeWithJsonLogWriterClassic` | true             | 2.194 us/op | 1040 B/op  |
+
+Allocation summary of the dedicated allocation benchmark (`AllocationBenchmark` /
+`JsonLogWriterDevBenchmark`, `-prof gc`, fast paths with `--add-opens`):
+
+| Path                                                                       | Alloc norm    |
+| -------------------------------------------------------------------------- | ------------- |
+| `Wyhash64.hash` — String (Latin-1/UTF-16), char[], byte[]                  | 0 B/op        |
+| `Wyhash64.Streaming` — reused hasher, `finalHash()`                        | 0 B/op        |
+| `EscapedJsonStringWriter`, `StringByteExtractor`, `JsonNumberWriter` (Ryu) | 0 B/op        |
+| `JsonLogWriter` — no KV                                                    | 0 B/op        |
+| `JsonLogWriter` — with KV (no MDC)                                         | 0 B/op        |
+| `JsonLogWriter` — throwable event                                          | 0 B/op        |
+| `fingerprint(Throwable, …)` — new / reused hasher                          | 224 / 88 B/op |
+| `JsonLogWriterDev` (missing-key reporting, dev-only)                       | 256–464 B/op  |
+
+In short, allocation is avoided across the hot path by:
+
+- **Pre-encoding** field names and JSON literals as `byte[]` constants — writing a field never builds a byte array.
+- **Direct string access** — `StringByteExtractor` / `EscapedJsonStringWriter` stream a `String`'s backing bytes straight to the output via `VarHandle` (with `--add-opens`), skipping `getBytes()`.
+- **Writing numbers without strings** — `JsonNumberWriter` (Ryu for float/double, digit-pair table for int/long) emits digits directly into reusable scratch buffers, never via `String.valueOf(...)`.
+- **Reusing stateful helpers** — `Wyhash64.Streaming` and the single-pass stack write+fingerprint compute `errHash` in one traversal with a per-thread reusable hasher; `StringHashSet` (a resettable key-dedup set) is cleared per event instead of reallocated.
+- **Lazy allocation** — the KV/MDC dedup set is created only when MDC is actually present, and disabled log levels route through a singleton no-op builder.
+
+Full results, the allocations found and removed (lazy `allKeys`, per-thread reusable
+hasher), and the documented remaining allocations: [Allocation Benchmark Results](doc/allocation-benchmark-results.md).
 
 ### Current best effort, open to improvement
 

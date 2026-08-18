@@ -2,6 +2,7 @@ package hr.hrg.dialog.logback;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import hr.hrg.dialog.core.EscapedJsonStringWriter;
+import org.slf4j.event.KeyValuePair;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -37,8 +38,8 @@ public class JsonLogWriterDev extends JsonLogWriter {
     private static final Pattern NAMED_PLACEHOLDER = Pattern.compile("(?<!\\{)\\{([^{}]+)\\}(?!\\})");
 
     @Override
-    protected void writeExtraFields(ILoggingEvent event, OutputStream out, Set<String> allKeys, Map<String, String> mdcMap) throws IOException {
-        List<String> missing = findMissingKeys(event, allKeys, mdcMap);
+    protected void writeExtraFields(ILoggingEvent event, OutputStream out, List<KeyValuePair> pairs, Map<String, String> mdcMap) throws IOException {
+        List<String> missing = findMissingKeys(event, pairs, mdcMap);
         if (missing.isEmpty()) {
             return;
         }
@@ -58,10 +59,12 @@ public class JsonLogWriterDev extends JsonLogWriter {
 
     /**
      * Returns the named placeholders ({@code {name}}) present in the event's
-     * message that are missing from {@code allKeys} ∪ {@code mdcMap}, in
+     * message that are missing from the statement KV keys ∪ MDC keys, in
      * first-occurrence order, deduplicated.
+     * <p>
+     * This is a dev/diagnostic path: no zero-allocation effort is applied here.
      */
-    static List<String> findMissingKeys(ILoggingEvent event, Set<String> allKeys, Map<String, String> mdcMap) {
+    static List<String> findMissingKeys(ILoggingEvent event, List<KeyValuePair> pairs, Map<String, String> mdcMap) {
         if (event == null || event.getFormattedMessage() == null) {
             return List.of();
         }
@@ -69,7 +72,7 @@ public class JsonLogWriterDev extends JsonLogWriter {
         Matcher m = NAMED_PLACEHOLDER.matcher(event.getFormattedMessage());
         while (m.find()) {
             String name = m.group(1);
-            if (allKeys != null && allKeys.contains(name)) {
+            if (hasKey(pairs, name)) {
                 continue;
             }
             if (mdcMap != null && mdcMap.containsKey(name)) {
@@ -78,5 +81,17 @@ public class JsonLogWriterDev extends JsonLogWriter {
             missing.add(name);
         }
         return List.copyOf(missing);
+    }
+
+    private static boolean hasKey(List<KeyValuePair> pairs, String name) {
+        if (pairs == null) {
+            return false;
+        }
+        for (KeyValuePair p : pairs) {
+            if (p.key != null && p.key.equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

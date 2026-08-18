@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`XZCompressionStrategy`) is available. Using a `fileNamePattern` ending in
   `.xz` on a `TimeBasedRollingPolicy` or `SizeAndTimeBasedRollingPolicy` to
   compress rotated files with XZ.
+- `StringHashSet` — resettable, allocation-minimizing open-addressing set for
+  `String` key deduplication (`add` returns whether the key was new; `clear()`
+  reuses the table; capacity only grows, never shrinks). Implements no
+  `java.util` interfaces and allocates nothing per `add`/`contains`/`clear`
+  in steady state — a drop-in replacement for the per-event
+  `HashSet<String>` used for KV/MDC key dedup.
 
 ## [1.0.0] - 2026-08-11
 

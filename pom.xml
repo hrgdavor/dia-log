@@ -153,6 +153,11 @@
                     <!-- @{argLine} expands the JaCoCo agent property at runtime;
                          the add-opens flag unlocks the VarHandle String paths. -->
                     <argLine>@{argLine} --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+                    <!-- JMH-generated harness classes are not unit tests; they must
+                         never be picked up by surefire. -->
+                    <excludes>
+                        <exclude>**/jmh_generated/**</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
             <plugin>

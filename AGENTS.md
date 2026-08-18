@@ -38,11 +38,18 @@ When adding new features, check these allocation hotspots:
 - `StringByteExtractor.writeClassic()` - allocates a `byte[]` per string (fallback path only;
   the VarHandle fast path is allocation-free)
 
+**Dev/diagnostic variants are excluded from zero-allocation efforts.** Classes such as
+`JsonLogWriterDev` (missing-key reporting), `JsonLogWriterClassic`, and benchmark fixtures
+are tools, not hot paths — do **not** add micro-optimizations (guard scans, strided reads,
+buffer reuse) to them; keep them straightforward and correct. Allocating in a dev variant
+to avoid a scan that costs more than the allocation is the wrong trade.
+
 Previously flagged and **already resolved — do not reintroduce**:
 
 - `Wyhash64.Streaming.finalHash()` - no longer allocates a scratch `byte[16]`; the final
   16-byte window is read directly from `buf`
 - `JsonLogWriter.writeJsonEvent()` - `allKeys` is lazily allocated, only when KV pairs exist
+  **and** MDC is present (dedup against MDC is the only use)
 - `Float.toString()` / `Double.toString()` in `JsonNumberWriter` - replaced by Ryu
   (`RyuFloat` / `RyuDouble`); also note `String.value` UTF-16 byte order is platform-native,
   never assume it (Wyhash64 probes it once at class init)

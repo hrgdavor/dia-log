@@ -16,6 +16,7 @@ import hr.hrg.dialog.core.EscapedJsonStringWriter;
 import hr.hrg.dialog.core.JsonNumberWriter;
 import hr.hrg.dialog.core.RawJsonSelfWriter;
 import hr.hrg.dialog.core.StringByteExtractor;
+import hr.hrg.dialog.core.Wyhash64;
 import org.slf4j.event.KeyValuePair;
 
 import tools.jackson.databind.ObjectMapper;
@@ -64,6 +65,10 @@ public class JsonLogWriter {
     /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
     private Predicate<String> stackTraceFilter = null;
 
+    /** Reusable per-thread hasher for the single-pass stack-trace fingerprint (appenders are shared across threads). */
+    private final ThreadLocal<Wyhash64.Streaming> fingerprintStream =
+            ThreadLocal.withInitial(() -> new Wyhash64.Streaming(0));
+
     public JsonLogWriter() {}
 
     /**
@@ -97,25 +102,29 @@ public class JsonLogWriter {
             writeFieldPrefix(out, KEY_MSG);
             writeJsonStringOrNull(out, event.getFormattedMessage());
 
-            Set<String> allKeys = null;
-
-            // Structured key-value pairs
-            List<KeyValuePair> pairs = event.getKeyValuePairs();
-            if (pairs != null && !pairs.isEmpty()) {
-                allKeys = new HashSet<>();
-                for (KeyValuePair kvPair : pairs) {
-                    if (kvPair.key != null) {
-                        allKeys.add(kvPair.key);
-                        addKey(out, kvPair.key, kvPair.value, mapper);
-                    }
-                }
-            }
-
-            // MDC context
+            // MDC is fetched first: the KV key-tracking set below is only needed
+            // when MDC keys could collide with statement keys, so it is skipped
+            // entirely (no allocation) when there is no MDC.
             Map<String, String> mdcMap = null;
             try {
                 mdcMap = event.getMDCPropertyMap();
             } catch (Exception ignored) {}
+
+            // Structured key-value pairs
+            Set<String> allKeys = null;
+            List<KeyValuePair> pairs = event.getKeyValuePairs();
+            if (pairs != null && !pairs.isEmpty()) {
+                boolean trackForMdcDedup = mdcMap != null && !mdcMap.isEmpty();
+                for (KeyValuePair kvPair : pairs) {
+                    if (kvPair.key != null) {
+                        if (trackForMdcDedup) {
+                            if (allKeys == null) allKeys = new HashSet<>();
+                            allKeys.add(kvPair.key);
+                        }
+                        addKey(out, kvPair.key, kvPair.value, mapper);
+                    }
+                }
+            }
 
             if (mdcMap != null && !mdcMap.isEmpty()) {
                 for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
@@ -146,18 +155,23 @@ public class JsonLogWriter {
                     STRING_STRATEGY.write(out, throwableClassName);
                 }
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
+                // Reuse a per-thread hasher so exception events allocate nothing
+                // (the single-pass methods reset the stream internally).
+                Wyhash64.Streaming stream = fingerprintStream.get();
                 // micro optimization to call variant without filter
                 long fingerPrint = stackTraceFilter == null ?
                 JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                     arrProxy,
                     out,
-                    throwableClassName
+                    throwableClassName,
+                    stream
                 ) : 
                 JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
                     arrProxy,
                     stackTraceFilter,
                     out,
-                    throwableClassName
+                    throwableClassName,
+                    stream
                 );
                 out.write('"');
 
@@ -167,7 +181,7 @@ public class JsonLogWriter {
             }
 
             // Dev/diagnostic extension point — no-op in this production writer.
-            writeExtraFields(event, out, allKeys, mdcMap);
+            writeExtraFields(event, out, pairs, mdcMap);
 
             out.write('}');
         } catch (IOException e) {
@@ -184,12 +198,12 @@ public class JsonLogWriter {
      * unaffected; implementations must write a complete field including its own
      * leading comma (like {@code writeFieldPrefix}) when they want to add data.
      *
-     * @param event   the event being serialized
-     * @param out     the target stream, positioned after the last regular field
-     * @param allKeys statement key/value keys, or {@code null} if none were present
-     * @param mdcMap  MDC map, or {@code null} if none was available
+     * @param event  the event being serialized
+     * @param out    the target stream, positioned after the last regular field
+     * @param pairs  the event's statement key/value pairs, or {@code null}
+     * @param mdcMap MDC map, or {@code null} if none was available
      */
-    protected void writeExtraFields(ILoggingEvent event, OutputStream out, Set<String> allKeys, Map<String, String> mdcMap) throws IOException {
+    protected void writeExtraFields(ILoggingEvent event, OutputStream out, List<KeyValuePair> pairs, Map<String, String> mdcMap) throws IOException {
         // no-op in the production writer
     }
 
