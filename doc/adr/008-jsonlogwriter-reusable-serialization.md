@@ -52,7 +52,7 @@ Each event produces a single JSON object with fields:
 - `msg`: Formatted message
 - `kv`: Structured key-value pairs (if `includeKeys` is true)
 - MDC keys (if `includeMDC` is true, with kv taking priority)
-- `err`: Exception info with `class`, `msg`, `hash`, and `cause` (if present)
+- `errHash`: Wyhash64 fingerprint (flat top-level field, not nested under an `err` object) — concept kept; documented as `err.hash`, renamed to avoid collision with reserved JSON key name `hash`
 - `source`: Caller data (if `includeSource` is true and no exception)
 - Custom static fields from `customFields` configuration
 

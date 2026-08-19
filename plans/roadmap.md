@@ -50,7 +50,7 @@ Multi-module Maven library (`hr.hrg.dialog:dia-log-root`) targeting Java 21, bui
 
 - [x] **CustomJsonEncoder** — Logback encoder that outputs JSON via `JsonLogWriter`. Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`, `maxStackFrames`. Use with standard `ConsoleAppender` or `RollingFileAppender`.
   - `HISTORICAL`: `CustomJsonEncoder` was later **removed**; replaced by `JsonAppender` / `JsonAppenderRolling` (direct `OutputStream` writers).
-- [x] **JsonLogWriter** — Shared JSON serializer. Output schema: `ts` (epoch millis), `level`, `logger`, `thread`, `msg`, `kv`, `ctx`, `source`, `err` (with sanitized `stack`, `hash`, `cause`), `msgTpl`, custom fields. Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`, `maxStackFrames`.
+- [x] **JsonLogWriter** — Shared JSON serializer. Output schema: `ts` (epoch millis), `level`, `logger`, `thread`, `msg`, `kv`, `ctx`, `source`, top-level `errClass`, `errMessage`, `stack` (JSON string of sanitized frames, or empty if no throwable), and top-level `"errHash"` (fingerprint). Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`, `maxStackFrames`.
   - `HISTORICAL` schema: the nested `kv`/`ctx`/`err`/`msgTpl` schema was **replaced** by flat top-level fields — see the JSON schema section below.
 - [ ] **2.1 Unit tests** — Cover: JSON structure for all log levels, key-value inclusion/exclusion, MDC inclusion/exclusion, exception serialization, special character escaping, encoder lifecycle.
   - 🔶 Still open: `JsonLogWriterTest`, `ConsoleAppenderJsonTest`, `RollingFileAppenderJsonTest` do not exist (the appender classes were renamed). `JavaStackSanitizerLogbackTest` exists.
@@ -92,21 +92,18 @@ Multi-module Maven library (`hr.hrg.dialog:dia-log-root`) targeting Java 21, bui
   "msg": "Change state to {state}",
   "kv": {"state": "PAID"},
   "ctx": {"requestId": "abc-123"},
-  "err": {
-    "class": "java.lang.RuntimeException",
-    "msg": "something broke",
-    "stack": ["com.example.MyClass.method", "com.example.Main.main"],
-    "hash": 1234567890,
-    "cause": {"class": "java.io.IOException", "msg": "connection refused"}
-  },
-  "msgTpl": "Change state to {state}"
+  "errClass": "java.lang.RuntimeException",
+  "errMessage": "something broke",
+  "stack": "",
+  "errHash": 1234567890,
+
 }
 ```
 
-Key design decisions (as written — HISTORICAL):
+Key design decisions (actual — post-roadmap):
 - `ts` is epoch millis (not ISO-8601) for parsing efficiency — ✅ still true
-- `err.stack` contains sanitized frames (no line numbers, no lambda IDs) for deterministic dedup — ✅ concept kept; emitted as a JSON string
-- `err.hash` is Wyhash64 of pipe-joined sanitized frames for fast grouping — ✅ concept kept; field renamed `errHash`
+- `stack` is a JSON string of sanitized frames (no line numbers, no lambda IDs) for deterministic dedup; empty string when no throwable is present — ✅ concept kept; emitted as a JSON string at top level
+- `"errHash"` is Wyhash64 fingerprint of pipe-joined sanitized frames — ✅ emitted as a flat top-level key (not nested under err); documented as `err.hash`, renamed to avoid collision with the reserved JSON key name `hash`
 - `msgTpl` preserves the original message template for structured analysis — ❌ dropped; not emitted
 - Named placeholders (`{name}`) in `msg` are kept literal (not expanded) for downstream tools — ❌ dropped; `msg` is the formatted message
 

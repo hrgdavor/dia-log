@@ -41,6 +41,12 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

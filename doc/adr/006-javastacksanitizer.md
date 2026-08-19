@@ -45,7 +45,7 @@ Implement [`JavaStackSanitizer`](../core/src/main/java/hr/hrg/dialog/core/JavaSt
 
 ## Consequences
 
-* **Positive:** Same logical error produces the same `err.hash` across builds and deployments; stack trace deduplication works reliably in Elasticsearch/Loki; lambda and synthetic frame normalization reduces noise; fallback logic ensures a hash is always produced, even for system-level exceptions.
+* **Positive:** Same logical error produces the same `errHash` (top-level JSON field) across builds and deployments; stack trace deduplication works reliably in Elasticsearch/Loki; lambda and synthetic frame normalization reduces noise; fallback logic ensures a hash is always produced, even for system-level exceptions.
 * **Negative:** Line numbers are lost in the fingerprint (they are still available in the raw stack trace if needed); the filter must be carefully configured to avoid including too many framework frames; sanitization adds CPU overhead during exception logging (mitigated by Wyhash64's speed).
 
 ## References

@@ -36,7 +36,7 @@ Implement a standalone port of Wyhash64, a fast non-cryptographic hash function 
 - **Little-endian reads**: Uses `VarHandle` with `ByteOrder.LITTLE_ENDIAN` for efficient byte-to-long conversion
 - **Default secret constants**: Matches Zig 0.15 `std.hash.Wyhash` constants for cross-language compatibility
 
-The hash is used in [`JavaStackSanitizer.fingerprint()`](../core/src/main/java/hr/hrg/dialog/core/JavaStackSanitizer.java#L36) to produce a 16-character hex string (`err.hash`) for each exception.
+The hash is used in [`JsonLogWriter.writeJsonEvent()`](../logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java#L230) to produce a 16-character hex value written as `"errHash"` (a top-level JSON field) for each exception. The fingerprint itself comes from `JavaStackSanitizer.fingerprint()`.
 
 ## Consequences
 
