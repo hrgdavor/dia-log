@@ -17,15 +17,10 @@ This report identifies inconsistencies between documentation, ADRs, plans, and a
 
 ### 1.1 `err.hash` field is missing from `JsonLogWriter`
 
-**Documentation claims:**
-- [`roadmap.md`](roadmap.md) (original JSON schema) shows `"hash": 1234567890`
-- [`doc/adr/008-jsonlogwriter-reusable-serialization.md`](doc/adr/008-jsonlogwriter-reusable-serialization.md:54) lists `hash` as part of `err` object
-- [`cookbook/stackWhenTrace.md`](cookbook/stackWhenTrace.md:114) documents `err.hash` as Wyhash64 of sanitized stack
-
 **Actual code:**
-- [`JsonLogWriter.writeJsonEvent()`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:119-148) writes `err.class`, `err.msg`, `err.stack`, and **`errHash`** — but the field is named **`"errHash"`**, not `"hash"`. The current code emits a nested field named `"errHash"` alongside `err.class`/`err.message`/`stack`, consistent with how these are written.
+- [`JsonLogWriter.writeJsonEvent()`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:119-148) writes flat top-level fields: `err.class`, `err.msg`, `stack` (JSON string), and **`errHash`** — but the field is named **`"errHash"`**, not `"hash"`.
 
-**Impact:** Documentation references `"hash"` at top level; actual code uses `"errHash"` as a nested key. Consumers expecting the documented schema will not find it under the expected path. The deduplication strategy depends on this field being emitted, and while it *is* emitted — just under a different name than documented.
+**Impact:** Consumers expecting the documented schema will not find it at the expected path. The deduplication strategy depends on this field being emitted, and while it *is* emitted — just with a different name than documented.
 
 ### 1.2 `err.stack` is an empty string, not an array
 
@@ -41,13 +36,9 @@ This report identifies inconsistencies between documentation, ADRs, plans, and a
 
 ### 1.3 `msgTpl` field writes formatted message, not template
 
-**Documentation claims:**
-- [`roadmap.md`](roadmap.md) states: "`msgTpl` preserves the original message template for structured analysis"
-- [`roadmap.md`](roadmap.md) states: "Named placeholders (`{name}`) in `msg` are kept literal (not expanded)"
-
 **Actual code:**
-- [`JsonLogWriter.java:83`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:83) writes `event.getFormattedMessage()` — this is the **already-formatted** message with placeholders replaced
-- [`JsonLogWriter.java:151`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:151) writes `event.getMessage()` for `msgTpl` — but `getMessage()` on `ILoggingEvent` returns the formatted message, not the template
+- [`JsonLogWriter.java:83`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:83) writes `event.getFormattedMessage()` — this is the **already-formatted** message with placeholders replaced.
+- [`JsonLogWriter.java:151`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:151) writes `event.getMessage()` for `msgTpl` — but `getMessage()` on `ILoggingEvent` returns the formatted message, not the template.
 
 **Impact:** Both `msg` and `msgTpl` contain the same formatted message. The template with literal `{name}` placeholders is lost.
 
