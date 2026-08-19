@@ -50,8 +50,8 @@ Multi-module Maven library (`hr.hrg.dialog:dia-log-root`) targeting Java 21, bui
 
 - [x] **CustomJsonEncoder** — Logback encoder that outputs JSON via `JsonLogWriter`. Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`, `maxStackFrames`. Use with standard `ConsoleAppender` or `RollingFileAppender`.
   - `HISTORICAL`: `CustomJsonEncoder` was later **removed**; replaced by `JsonAppender` / `JsonAppenderRolling` (direct `OutputStream` writers).
-- [x] **JsonLogWriter** — Shared JSON serializer. Output schema: `ts` (epoch millis), `level`, `logger`, `thread`, `msg`, `kv`, `ctx`, `source`, top-level `errClass`, `errMessage`, `stack` (JSON string of sanitized frames, or empty if no throwable), and top-level `"errHash"` (fingerprint). Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`, `maxStackFrames`.
-  - `HISTORICAL` schema: the nested `kv`/`ctx`/`err`/`msgTpl` schema was **replaced** by flat top-level fields — see the JSON schema section below.
+- [x] **JsonLogWriter** — Shared JSON serializer. Output schema: `ts` (epoch millis), `level`, `logger`, `thread`, `msg`, `kv`, `ctx`, `source`, and flat top-level fields `errClass`, `errMessage`, `stack`, and `"errHash"` (fingerprint). Config: `includeMDC`, `includeKeys`, `includeSource`, `prettyPrint`, `customFields`, `maxStackFrames`.
+  - The nested `kv`/`ctx` schema below is historical; the actual writer emits them flat.
 - [ ] **2.1 Unit tests** — Cover: JSON structure for all log levels, key-value inclusion/exclusion, MDC inclusion/exclusion, exception serialization, special character escaping, encoder lifecycle.
   - 🔶 Still open: `JsonLogWriterTest`, `ConsoleAppenderJsonTest`, `RollingFileAppenderJsonTest` do not exist (the appender classes were renamed). `JavaStackSanitizerLogbackTest` exists.
 
