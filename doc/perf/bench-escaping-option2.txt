@@ -1,0 +1,597 @@
+﻿java.exe : WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+At line:1 char:176
++ ... va\jdk-25'; & 'C:\Program Files\Java\jdk-25\bin\java' --add-opens jav ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: A term...has been called:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 7 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingClassic
+
+# Run progress: 0.00% complete, ETA 00:01:17
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 47.862 ns/op
+# Warmup Iteration   2: 47.536 ns/op
+# Warmup Iteration   3: 48.764 ns/op
+# Warmup Iteration   4: 53.000 ns/op
+Iteration   1: 52.363 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: ≈ 10⁻³ B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 55.443 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: ≈ 10⁻³ B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 52.356 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: ≈ 10⁻³ B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 51.593 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: ≈ 10⁻³ B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 52.058 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: ≈ 10⁻³ B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 63.973 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: ≈ 10⁻³ B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 51.321 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: ≈ 10⁻³ B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingClassic":
+  54.158 ±(99.9%) 10.218 ns/op [Average]
+  (min, avg, max) = (51.321, 54.158, 63.973), stdev = 4.537
+  CI (99.9%): [43.940, 64.376] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingClassic:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingClassic:gc.alloc.rate.norm":
+  ≈ 10⁻³ B/op
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingClassic:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 7 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyClassic
+
+# Run progress: 14.29% complete, ETA 00:01:08
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 533.146 ns/op
+# Warmup Iteration   2: 529.934 ns/op
+# Warmup Iteration   3: 534.489 ns/op
+# Warmup Iteration   4: 558.754 ns/op
+Iteration   1: 557.566 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 561.142 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 559.273 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 559.107 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 585.503 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 562.882 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 564.302 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyClassic":
+  564.253 ±(99.9%) 21.741 ns/op [Average]
+  (min, avg, max) = (557.566, 564.253, 585.503), stdev = 9.653
+  CI (99.9%): [542.512, 585.995] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyClassic:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyClassic:gc.alloc.rate.norm":
+  0.004 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.004, 0.004, 0.004), stdev = 0.001
+  CI (99.9%): [0.004, 0.004] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyClassic:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 7 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewDirect
+
+# Run progress: 28.57% complete, ETA 00:00:56
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 212.217 ns/op
+# Warmup Iteration   2: 216.176 ns/op
+# Warmup Iteration   3: 141.930 ns/op
+# Warmup Iteration   4: 150.653 ns/op
+Iteration   1: 151.466 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 150.555 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 150.781 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 151.180 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 151.176 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 152.963 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 150.634 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewDirect":
+  151.251 ±(99.9%) 1.856 ns/op [Average]
+  (min, avg, max) = (150.555, 151.251, 152.963), stdev = 0.824
+  CI (99.9%): [149.395, 153.107] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewDirect:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewDirect:gc.alloc.rate.norm":
+  0.001 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.001, 0.001, 0.001), stdev = 0.001
+  CI (99.9%): [0.001, 0.001] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewDirect:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 7 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewStream
+
+# Run progress: 42.86% complete, ETA 00:00:45
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 567.134 ns/op
+# Warmup Iteration   2: 560.915 ns/op
+# Warmup Iteration   3: 562.137 ns/op
+# Warmup Iteration   4: 587.384 ns/op
+Iteration   1: 586.546 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 628.051 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 591.095 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 585.373 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 583.934 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 588.358 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 588.114 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.004 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewStream":
+  593.067 ±(99.9%) 35.128 ns/op [Average]
+  (min, avg, max) = (583.934, 593.067, 628.051), stdev = 15.597
+  CI (99.9%): [557.939, 628.195] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewStream:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewStream:gc.alloc.rate.norm":
+  0.004 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.004, 0.004, 0.004), stdev = 0.001
+  CI (99.9%): [0.004, 0.004] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewStream:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 7 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingLongNewDirect
+
+# Run progress: 57.14% complete, ETA 00:00:33
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 519.653 ns/op
+# Warmup Iteration   2: 495.291 ns/op
+# Warmup Iteration   3: 322.850 ns/op
+# Warmup Iteration   4: 343.527 ns/op
+Iteration   1: 345.865 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.002 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 345.897 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.002 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 336.633 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.002 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 338.641 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.002 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 371.324 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.003 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 382.065 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.003 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 363.896 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.003 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingLongNewDirect":
+  354.903 ±(99.9%) 39.541 ns/op [Average]
+  (min, avg, max) = (336.633, 354.903, 382.065), stdev = 17.556
+  CI (99.9%): [315.362, 394.444] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingLongNewDirect:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingLongNewDirect:gc.alloc.rate.norm":
+  0.002 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.002, 0.002, 0.003), stdev = 0.001
+  CI (99.9%): [0.002, 0.003] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingLongNewDirect:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 7 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewDirect
+
+# Run progress: 71.43% complete, ETA 00:00:22
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 69.512 ns/op
+# Warmup Iteration   2: 68.425 ns/op
+# Warmup Iteration   3: 70.334 ns/op
+# Warmup Iteration   4: 73.899 ns/op
+Iteration   1: 74.301 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 83.661 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 74.521 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 78.050 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 73.971 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 74.089 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 74.425 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewDirect":
+  76.145 ±(99.9%) 8.124 ns/op [Average]
+  (min, avg, max) = (73.971, 76.145, 83.661), stdev = 3.607
+  CI (99.9%): [68.021, 84.269] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewDirect:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewDirect:gc.alloc.rate.norm":
+  0.001 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.001, 0.001, 0.001), stdev = 0.001
+  CI (99.9%): [≈ 10⁻³, 0.001] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewDirect:gc.count":
+  ≈ 0 counts
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 7 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewStream
+
+# Run progress: 85.71% complete, ETA 00:00:11
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 154.574 ns/op
+# Warmup Iteration   2: 154.915 ns/op
+# Warmup Iteration   3: 159.398 ns/op
+# Warmup Iteration   4: 169.204 ns/op
+Iteration   1: 163.803 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 160.548 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 164.869 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 164.633 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 162.453 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 164.319 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 163.006 ns/op
+                 gc.alloc.rate:      0.007 MB/sec
+                 gc.alloc.rate.norm: 0.001 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewStream":
+  163.376 ±(99.9%) 3.424 ns/op [Average]
+  (min, avg, max) = (160.548, 163.376, 164.869), stdev = 1.520
+  CI (99.9%): [159.952, 166.800] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewStream:gc.alloc.rate":
+  0.007 ±(99.9%) 0.001 MB/sec [Average]
+  (min, avg, max) = (0.007, 0.007, 0.007), stdev = 0.001
+  CI (99.9%): [0.007, 0.007] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewStream:gc.alloc.rate.norm":
+  0.001 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (0.001, 0.001, 0.001), stdev = 0.001
+  CI (99.9%): [0.001, 0.001] (assumes normal distribution)
+
+Secondary result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewStream:gc.count":
+  ≈ 0 counts
+
+
+# Run complete. Total time: 00:01:19
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                              Mode  Cnt    Score    Error   Units
+ForyPerfComparisonBenchmark.escapingClassic                            avgt    7   54.158 ± 10.218   ns/op
+ForyPerfComparisonBenchmark.escapingClassic:gc.alloc.rate              avgt    7    0.007 ±  0.001  MB/sec
+ForyPerfComparisonBenchmark.escapingClassic:gc.alloc.rate.norm         avgt    7   ≈ 10⁻³             B/op
+ForyPerfComparisonBenchmark.escapingClassic:gc.count                   avgt    7      ≈ 0           counts
+ForyPerfComparisonBenchmark.escapingHeavyClassic                       avgt    7  564.253 ± 21.741   ns/op
+ForyPerfComparisonBenchmark.escapingHeavyClassic:gc.alloc.rate         avgt    7    0.007 ±  0.001  MB/sec
+ForyPerfComparisonBenchmark.escapingHeavyClassic:gc.alloc.rate.norm    avgt    7    0.004 ±  0.001    B/op
+ForyPerfComparisonBenchmark.escapingHeavyClassic:gc.count              avgt    7      ≈ 0           counts
+ForyPerfComparisonBenchmark.escapingHeavyNewDirect                     avgt    7  151.251 ±  1.856   ns/op
+ForyPerfComparisonBenchmark.escapingHeavyNewDirect:gc.alloc.rate       avgt    7    0.007 ±  0.001  MB/sec
+ForyPerfComparisonBenchmark.escapingHeavyNewDirect:gc.alloc.rate.norm  avgt    7    0.001 ±  0.001    B/op
+ForyPerfComparisonBenchmark.escapingHeavyNewDirect:gc.count            avgt    7      ≈ 0           counts
+ForyPerfComparisonBenchmark.escapingHeavyNewStream                     avgt    7  593.067 ± 35.128   ns/op
+ForyPerfComparisonBenchmark.escapingHeavyNewStream:gc.alloc.rate       avgt    7    0.007 ±  0.001  MB/sec
+ForyPerfComparisonBenchmark.escapingHeavyNewStream:gc.alloc.rate.norm  avgt    7    0.004 ±  0.001    B/op
+ForyPerfComparisonBenchmark.escapingHeavyNewStream:gc.count            avgt    7      ≈ 0           counts
+ForyPerfComparisonBenchmark.escapingLongNewDirect                      avgt    7  354.903 ± 39.541   ns/op
+ForyPerfComparisonBenchmark.escapingLongNewDirect:gc.alloc.rate        avgt    7    0.007 ±  0.001  MB/sec
+ForyPerfComparisonBenchmark.escapingLongNewDirect:gc.alloc.rate.norm   avgt    7    0.002 ±  0.001    B/op
+ForyPerfComparisonBenchmark.escapingLongNewDirect:gc.count             avgt    7      ≈ 0           counts
+ForyPerfComparisonBenchmark.escapingNewDirect                          avgt    7   76.145 ±  8.124   ns/op
+ForyPerfComparisonBenchmark.escapingNewDirect:gc.alloc.rate            avgt    7    0.007 ±  0.001  MB/sec
+ForyPerfComparisonBenchmark.escapingNewDirect:gc.alloc.rate.norm       avgt    7    0.001 ±  0.001    B/op
+ForyPerfComparisonBenchmark.escapingNewDirect:gc.count                 avgt    7      ≈ 0           counts
+ForyPerfComparisonBenchmark.escapingNewStream                          avgt    7  163.376 ±  3.424   ns/op
+ForyPerfComparisonBenchmark.escapingNewStream:gc.alloc.rate            avgt    7    0.007 ±  0.001  MB/sec
+ForyPerfComparisonBenchmark.escapingNewStream:gc.alloc.rate.norm       avgt    7    0.001 ±  0.001    B/op
+ForyPerfComparisonBenchmark.escapingNewStream:gc.count                 avgt    7      ≈ 0           counts

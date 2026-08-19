@@ -80,12 +80,22 @@ public final class JsonNumberWriter {
     }
 
     public static void writeInt(OutputStream out, byte[] intBuffer, int value) throws IOException {
-        if (value == Integer.MIN_VALUE) {
-            out.write(MIN_INT_BYTES);
-            return;
-        }
         if (intBuffer.length < MAX_INT_BYTES) {
             throw new IllegalArgumentException("Buffer too small, must be at least " + MAX_INT_BYTES);
+        }
+        int len = buildInt(intBuffer, value);
+        out.write(intBuffer, MAX_INT_BYTES - len, len);
+    }
+
+    /**
+     * Builds the decimal digits of {@code value} into {@code intBuffer} in the
+     * end-aligned layout, returning the number of significant bytes. The digits
+     * occupy {@code intBuffer[MAX_INT_BYTES - len .. MAX_INT_BYTES)}.
+     */
+    public static int buildInt(byte[] intBuffer, int value) {
+        if (value == Integer.MIN_VALUE) {
+            System.arraycopy(MIN_INT_BYTES, 0, intBuffer, MAX_INT_BYTES - MIN_INT_BYTES.length, MIN_INT_BYTES.length);
+            return MIN_INT_BYTES.length;
         }
 
         int cursor = MAX_INT_BYTES;
@@ -106,17 +116,32 @@ public final class JsonNumberWriter {
         if (negative) {
             intBuffer[--cursor] = (byte) '-';
         }
+        return MAX_INT_BYTES - cursor;
+    }
 
-        out.write(intBuffer, cursor, MAX_INT_BYTES - cursor);
+    /** Writes {@code value} into the direct-buffer cursor (T4 option 2). */
+    public static void writeInt(DirectJsonBuffer c, byte[] intBuffer, int value) {
+        int len = buildInt(intBuffer, value);
+        c.writeRaw(intBuffer, MAX_INT_BYTES - len, len);
     }
 
     public static void writeLong(OutputStream out, byte[] longBuffer, long value) throws IOException {
-        if (value == Long.MIN_VALUE) {
-            out.write(MIN_LONG_BYTES);
-            return;
-        }
         if (longBuffer.length < MAX_LONG_BYTES) {
             throw new IllegalArgumentException("Buffer too small, must be at least " + MAX_LONG_BYTES);
+        }
+        int len = buildLong(longBuffer, value);
+        out.write(longBuffer, MAX_LONG_BYTES - len, len);
+    }
+
+    /**
+     * Builds the decimal digits of {@code value} into {@code longBuffer} in the
+     * end-aligned layout, returning the number of significant bytes. The digits
+     * occupy {@code longBuffer[MAX_LONG_BYTES - len .. MAX_LONG_BYTES)}.
+     */
+    public static int buildLong(byte[] longBuffer, long value) {
+        if (value == Long.MIN_VALUE) {
+            System.arraycopy(MIN_LONG_BYTES, 0, longBuffer, MAX_LONG_BYTES - MIN_LONG_BYTES.length, MIN_LONG_BYTES.length);
+            return MIN_LONG_BYTES.length;
         }
 
         int cursor = MAX_LONG_BYTES;
@@ -142,8 +167,13 @@ public final class JsonNumberWriter {
         if (negative) {
             longBuffer[--cursor] = (byte) '-';
         }
+        return MAX_LONG_BYTES - cursor;
+    }
 
-        out.write(longBuffer, cursor, MAX_LONG_BYTES - cursor);
+    /** Writes {@code value} into the direct-buffer cursor (T4 option 2). */
+    public static void writeLong(DirectJsonBuffer c, byte[] longBuffer, long value) {
+        int len = buildLong(longBuffer, value);
+        c.writeRaw(longBuffer, MAX_LONG_BYTES - len, len);
     }
 
     /**

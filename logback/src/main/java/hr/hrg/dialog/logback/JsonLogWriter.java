@@ -12,12 +12,16 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
+import hr.hrg.dialog.core.DirectJsonBuffer;
+import hr.hrg.dialog.core.DirectJsonStringWriter;
 import hr.hrg.dialog.core.EscapedJsonStringWriter;
 import hr.hrg.dialog.core.JsonNumberWriter;
 import hr.hrg.dialog.core.RawJsonSelfWriter;
 import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
 import hr.hrg.dialog.core.StringByteExtractor;
 import hr.hrg.dialog.core.Wyhash64;
+import hr.hrg.dialog.ryu.RyuDouble;
+import hr.hrg.dialog.ryu.RyuFloat;
 import org.slf4j.event.KeyValuePair;
 
 import tools.jackson.databind.ObjectMapper;
@@ -69,6 +73,13 @@ public class JsonLogWriter {
     private final byte[] floatNumberBuffer = JsonNumberWriter.makeFloatBuffer();
     private final byte[] doubleNumberBuffer = JsonNumberWriter.makeDoubleBuffer();
 
+    /**
+     * Reusable direct-assembly cursor (T4 option 2) â€” one per writer, re-pointed
+     * at the event buffer on every {@code writeJsonEvent} call; no per-event
+     * allocation, exactly like the number buffers above.
+     */
+    private final DirectJsonBuffer directBuffer = new DirectJsonBuffer();
+
     /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
     private Predicate<String> stackTraceFilter = null;
 
@@ -76,7 +87,7 @@ public class JsonLogWriter {
      * Reusable hasher for the single-pass stack-trace fingerprint, owned by this
      * writer like the number buffers below and passed as a parameter to the
      * single-pass methods (which reset it internally). No hidden ThreadLocal
-     * state — the writer is {@link NotThreadSafe}, so an instance must not be
+     * state â€” the writer is {@link NotThreadSafe}, so an instance must not be
      * used from several threads at once, exactly like the number buffers.
      */
     private final Wyhash64.Streaming fingerprintStream = new Wyhash64.Streaming(0);
@@ -96,6 +107,140 @@ public class JsonLogWriter {
     }
 
     public void writeJsonEvent(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
+        if (out instanceof ReusableByteArrayOutputStream rbo) {
+            writeJsonEventDirect(mapper, event, rbo);
+        } else {
+            writeJsonEventStream(mapper, event, out);
+        }
+    }
+
+    /**
+     * T4 option 2: full "writer owns the buffer" assembly (ported from Apache
+     * Fory commit 585eb16f, Utf8JsonWriter's getBuffer/getPosition/setPosition
+     * design). One reusable {@link DirectJsonBuffer} cursor keeps {@code byte[]
+     * buf} and {@code int pos} live for the whole event: fixed prefixes are
+     * packed-long stores, strings are escaped straight into the buffer, numbers
+     * are built and copied with one bulk write â€” all with inlined capacity
+     * checks. Only stream-only delegations (jackson, raw values, the generated
+     * stack-trace writers, dev {@code writeExtraFields}) publish the cursor,
+     * write through the stream, then resync.
+     */
+    private void writeJsonEventDirect(ObjectMapper mapper, ILoggingEvent event, ReusableByteArrayOutputStream rbo) throws IOException {
+        DirectJsonBuffer c = directBuffer;
+        c.reset(rbo);
+
+        c.writeByte('{');
+        writePackedKey(c, KEY_TS);
+        JsonNumberWriter.writeLong(c, longNumberBuffer, event.getTimeStamp());
+
+        writePackedField(c, KEY_LEVEL);
+        writeJsonStringDirect(c, event.getLevel() != null ? event.getLevel().toString() : null);
+
+        writePackedField(c, KEY_LOGGER);
+        writeJsonStringDirect(c, event.getLoggerName());
+
+        writePackedField(c, KEY_THREAD);
+        writeJsonStringDirect(c, event.getThreadName());
+
+        writePackedField(c, KEY_MSG);
+        writeJsonStringDirect(c, event.getFormattedMessage());
+
+        // MDC is fetched first: the KV key-tracking set below is only needed
+        // when MDC keys could collide with statement keys, so it is skipped
+        // entirely (no allocation) when there is no MDC.
+        Map<String, String> mdcMap = null;
+        try {
+            mdcMap = event.getMDCPropertyMap();
+        } catch (Exception ignored) {}
+
+        // Structured key-value pairs
+        Set<String> allKeys = null;
+        List<KeyValuePair> pairs = event.getKeyValuePairs();
+        if (pairs != null && !pairs.isEmpty()) {
+            boolean trackForMdcDedup = mdcMap != null && !mdcMap.isEmpty();
+            for (KeyValuePair kvPair : pairs) {
+                if (kvPair.key != null) {
+                    if (trackForMdcDedup) {
+                        if (allKeys == null) allKeys = new HashSet<>();
+                        allKeys.add(kvPair.key);
+                    }
+                    addKeyDirect(c, kvPair.key, kvPair.value, mapper);
+                }
+            }
+        }
+
+        if (mdcMap != null && !mdcMap.isEmpty()) {
+            for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
+                if (entry.getKey() != null
+                        && !isReserved(entry.getKey())
+                        && (allKeys == null || !allKeys.contains(entry.getKey()))) {
+                    c.writeByte(',');
+                    // Keys are user input â€” JSON-escape them (quotes, backslash, control chars).
+                    DirectJsonStringWriter.writeJsonString(c, entry.getKey());
+                    c.writeByte(':');
+                    writeJsonStringDirect(c, entry.getValue());
+                }
+            }
+        }
+
+        // Exception info
+        IThrowableProxy tp = event.getThrowableProxy();
+        if (tp != null) {
+            String throwableClassName = tp.getClassName();
+            String throwableMessage = tp.getMessage();
+
+            writePackedField(c, KEY_ERR_CLASS);
+            writeJsonStringDirect(c, throwableClassName);
+
+            writePackedField(c, KEY_ERR_MESSAGE);
+            writeJsonStringDirect(c, throwableMessage);
+
+            // The stack-trace writers are OutputStream-based (generated
+            // sanitizer derivatives â€” see AGENTS.md); publish the cursor, write
+            // the stack through the stream, then resync.
+            c.publish();
+            writeFieldPrefix(rbo, KEY_STACK);
+            rbo.write('"');
+            if (throwableClassName != null) {
+                STRING_STRATEGY.write(rbo, throwableClassName);
+            }
+            StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
+            // Reuse this writer's hasher (owned like the number buffers) so
+            // exception events allocate nothing â€” the single-pass methods
+            // reset the stream internally.
+            Wyhash64.Streaming stream = fingerprintStream;
+            // micro optimization to call variant without filter
+            long fingerPrint = stackTraceFilter == null ?
+            JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                arrProxy,
+                rbo,
+                throwableClassName,
+                stream
+            ) : 
+            JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                arrProxy,
+                stackTraceFilter,
+                rbo,
+                throwableClassName,
+                stream
+            );
+            rbo.write('"');
+            c.resync();
+
+            writePackedField(c, KEY_ERR_HASH);
+            JsonNumberWriter.writeLong(c, longNumberBuffer, fingerPrint);
+        }
+
+        // Dev/diagnostic extension point â€” OutputStream-based, publish + resync.
+        c.publish();
+        writeExtraFields(event, rbo, pairs, mdcMap);
+        c.resync();
+
+        c.writeByte('}');
+        c.publish();
+    }
+
+    private void writeJsonEventStream(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
         try {
             writeObjectStartAndField(out, KEY_TS);
             JsonNumberWriter.writeLong(out, longNumberBuffer, event.getTimeStamp());
@@ -166,7 +311,7 @@ public class JsonLogWriter {
                 }
                 StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
                 // Reuse this writer's hasher (owned like the number buffers) so
-                // exception events allocate nothing — the single-pass methods
+                // exception events allocate nothing â€” the single-pass methods
                 // reset the stream internally.
                 Wyhash64.Streaming stream = fingerprintStream;
                 // micro optimization to call variant without filter
@@ -191,7 +336,7 @@ public class JsonLogWriter {
 
             }
 
-            // Dev/diagnostic extension point — no-op in this production writer.
+            // Dev/diagnostic extension point â€” no-op in this production writer.
             writeExtraFields(event, out, pairs, mdcMap);
 
             out.write('}');
@@ -248,7 +393,7 @@ public class JsonLogWriter {
 
     private static void writeFieldPrefixRawKey(OutputStream out, String key) throws IOException {
         out.write(',');
-        // Keys are user input — JSON-escape them (quotes, backslash, control chars).
+        // Keys are user input â€” JSON-escape them (quotes, backslash, control chars).
         EscapedJsonStringWriter.writeJsonStringOrNull(out, key);
         out.write(':');
     }
@@ -297,6 +442,114 @@ public class JsonLogWriter {
 
     private static void writeJsonStringOrNull(OutputStream out, String value) throws IOException {
         EscapedJsonStringWriter.writeJsonStringOrNull(out, value);
+    }
+
+    // =========================================================================
+    // T4 option 2 â€” direct-buffer helpers
+    // =========================================================================
+
+    private static void writeJsonStringDirect(DirectJsonBuffer c, String value) {
+        DirectJsonStringWriter.writeJsonStringOrNull(c, value);
+    }
+
+    private static void writePackedKey(DirectJsonBuffer c, PackedKey key) {
+        c.writePackedLE(key.word0(), Math.min(8, key.bytes().length));
+        if (key.bytes().length > 8) {
+            c.writePackedLE(key.word1(), key.bytes().length - 8);
+        }
+    }
+
+    private static void writePackedField(DirectJsonBuffer c, PackedKey key) {
+        c.writeByte(',');
+        writePackedKey(c, key);
+    }
+
+    private void addKeyDirect(DirectJsonBuffer c, String key, Object value, ObjectMapper mapper) throws IOException {
+        if (value == null) return;
+
+        c.writeByte(',');
+        // Keys are user input â€” JSON-escape them (quotes, backslash, control chars).
+        DirectJsonStringWriter.writeJsonString(c, key);
+        c.writeByte(':');
+
+        writeValueDirect(c, value, mapper);
+    }
+
+    private void writeValueDirect(DirectJsonBuffer c, Object value, ObjectMapper mapper) throws IOException {
+        switch (value) {
+            case String s -> DirectJsonStringWriter.writeJsonString(c, s);
+            case CharSequence cs -> DirectJsonStringWriter.writeJsonString(c, cs.toString());
+            case Character ch -> DirectJsonStringWriter.writeJsonString(c, ch.toString());
+            case Enum<?> e -> DirectJsonStringWriter.writeJsonString(c, e.name());
+            case RawValue raw -> writeRawValueDirect(c, raw, mapper);
+            case Long l -> JsonNumberWriter.writeLong(c, longNumberBuffer, l);
+            case Integer i -> JsonNumberWriter.writeInt(c, intNumberBuffer, i);
+            case Short s -> JsonNumberWriter.writeInt(c, intNumberBuffer, s.intValue());
+            case Byte b -> JsonNumberWriter.writeInt(c, intNumberBuffer, b.intValue());
+            case Float f -> writeFloatDirect(c, f);
+            case Double d -> writeDoubleDirect(c, d);
+            case Number n -> writeNumberDirect(c, n);
+            case Boolean b -> c.writeRaw(b ? JSON_TRUE : JSON_FALSE, 0, b ? 4 : 5);
+            case RawJsonSelfWriter w -> {
+                c.publish();
+                w.writeJson(c.target());
+                c.resync();
+            }
+            case RawJsonBytes b -> c.writeRaw(b.bytes(), 0, b.bytes().length);
+            default -> {
+                c.publish();
+                mapper.writeValue(c.target(), value);
+                c.resync();
+            }
+        }
+    }
+
+    private void writeRawValueDirect(DirectJsonBuffer c, RawValue raw, ObjectMapper mapper) throws IOException {
+        Object backing = raw.rawValue();
+        if (backing == null) {
+            c.writeRaw(JSON_NULL, 0, JSON_NULL.length);
+            return;
+        }
+        // Raw strings go through the stream strategy (raw bytes, no escaping);
+        // anything else is delegated to jackson.
+        c.publish();
+        writeRawValue(c.target(), raw, mapper);
+        c.resync();
+    }
+
+    private void writeNumberDirect(DirectJsonBuffer c, Number n) throws IOException {
+        switch (n) {
+            case Integer i -> JsonNumberWriter.writeInt(c, intNumberBuffer, i);
+            case Long l -> JsonNumberWriter.writeLong(c, longNumberBuffer, l);
+            case Short s -> JsonNumberWriter.writeInt(c, intNumberBuffer, s.intValue());
+            case Byte b -> JsonNumberWriter.writeInt(c, intNumberBuffer, b.intValue());
+            case Float f -> writeFloatDirect(c, f);
+            case Double d -> writeDoubleDirect(c, d);
+            default -> {
+                // Exotic Number (BigDecimal etc.): keep the existing stream semantics.
+                c.publish();
+                JsonNumberWriter.writeNumber(c.target(), intNumberBuffer, longNumberBuffer, floatNumberBuffer, doubleNumberBuffer, n);
+                c.resync();
+            }
+        }
+    }
+
+    private void writeFloatDirect(DirectJsonBuffer c, float value) {
+        if (!Float.isFinite(value)) {
+            c.writeRaw(JSON_NULL, 0, JSON_NULL.length);
+            return;
+        }
+        int len = RyuFloat.writeFloat(value, floatNumberBuffer, 0);
+        c.writeRaw(floatNumberBuffer, 0, len);
+    }
+
+    private void writeDoubleDirect(DirectJsonBuffer c, double value) {
+        if (!Double.isFinite(value)) {
+            c.writeRaw(JSON_NULL, 0, JSON_NULL.length);
+            return;
+        }
+        int len = RyuDouble.writeDouble(value, doubleNumberBuffer, 0);
+        c.writeRaw(doubleNumberBuffer, 0, len);
     }
 
     /**

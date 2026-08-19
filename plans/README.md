@@ -43,3 +43,7 @@ Non-blocking observations that remain open (see `critical-analysis.md`): the
 `StringByteExtractor.writeClassic()` and `Float/Double.toString()` allocation hotspots
 (3.2/3.3), the silent MDC-suppression catch (5.2), and per-byte buffering in
 `writeLatin1()` (7.3).
+
+## errHash Field Emission Note
+
+The `errHash` field is emitted as **`"errHash"`** — a single JSON key named *errHash* under the exception info object, with its value being the Wyhash64 fingerprint of the sanitized stack trace. It is not named `"hash"`, `"error hash"`, or placed under an `"errors"`/`"exception"` container; it is written directly as `KEY_ERR_HASH` (line 65, JsonLogWriter.java) alongside `errClass` and `errMessage`. This differs from the original roadmap schema that documented `"hash": <value>` at top level — the current code emits a nested field named `"errHash"`, consistent with how `err.class`/`err.message`/`stack` are written.

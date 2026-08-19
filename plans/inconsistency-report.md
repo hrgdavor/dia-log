@@ -23,10 +23,9 @@ This report identifies inconsistencies between documentation, ADRs, plans, and a
 - [`cookbook/stackWhenTrace.md`](cookbook/stackWhenTrace.md:114) documents `err.hash` as Wyhash64 of sanitized stack
 
 **Actual code:**
-- [`JsonLogWriter.writeJsonEvent()`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:119-148) writes `err.class`, `err.msg`, `err.stack` (empty string), and `err.cause` — but **never writes `err.hash`**
-- The commented-out code at lines 232-237 was supposed to write the hash but is disabled
+- [`JsonLogWriter.writeJsonEvent()`](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:119-148) writes `err.class`, `err.msg`, `err.stack`, and **`errHash`** — but the field is named **`"errHash"`**, not `"hash"`. The current code emits a nested field named `"errHash"` alongside `err.class`/`err.message`/`stack`, consistent with how these are written.
 
-**Impact:** The `err.hash` field that the entire deduplication strategy depends on is not being emitted. Consumers cannot group errors by hash.
+**Impact:** Documentation references `"hash"` at top level; actual code uses `"errHash"` as a nested key. Consumers expecting the documented schema will not find it under the expected path. The deduplication strategy depends on this field being emitted, and while it *is* emitted — just under a different name than documented.
 
 ### 1.2 `err.stack` is an empty string, not an array
 

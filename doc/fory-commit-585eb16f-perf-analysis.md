@@ -273,17 +273,23 @@ event assembly into: capacity check (local compare), direct stores, one
 Fory-shaped. The missing piece is that `JsonLogWriter.writeJsonEvent` writes
 through the `OutputStream` interface. Two options:
 
-1. **Minimal (recommended first):** add a direct-write fast path to
+1. **Minimal (implemented):** add a direct-write fast path to
    `ReusableByteArrayOutputStream` — e.g. `writeWord(long)` / `writeInt(int)`
    little-endian stores with an inlined capacity check, plus a
    `writeRaw(byte[], int, int)` that inlines the check + `System.arraycopy`.
    `EscapedJsonStringWriter` / `StringByteExtractor` / `JsonNumberWriter` get
    overloads that take the buffer object. Keeps the public `OutputStream`
    API (jackson still needs it) while the known hot fields bypass dispatch.
-2. **Full:** give `JsonLogWriter` a direct `byte[] + position` assembly mode
+2. **Full (implemented — see [perf/t4-writer-owns-buffer.md](perf/t4-writer-owns-buffer.md)):**
+   give `JsonLogWriter` a direct `byte[] + position` assembly mode
    (like Fory's `getBuffer/getPosition/setPosition`), falling back to the
-   stream only for `mapper.writeValue` and `RawValue` delegation. This is the
-   biggest win but the largest change; benchmark against option 1 first.
+   stream only for `mapper.writeValue`, `RawValue`, the generated stack-trace
+   writers and the dev `writeExtraFields`. Measured 108 → 95 ns/op on the
+   event benchmark (≈1.14× over option 1, ≈2.3× over the pre-Fory baseline).
+   The cursor machinery lives in `DirectJsonBuffer` / `DirectJsonStringWriter`
+   — keeping `EscapedJsonStringWriter` small was required: adding the cursor
+   methods to it silently regressed the per-string hot path 4–6× through
+   changed C2 inlining (see the results doc).
 
 Keep the AGENTS.md invariants: one bulk `writeTo(activeStream)` per event,
 `activeStream` snapshot semantics, no per-event buffers, and the dev/diagnostic
@@ -471,15 +477,14 @@ per-call helpers "for cleanliness", and verify with
 
 ## Suggested work order
 
-| # | Item | Effort | Expected impact | Notes |
-|---|------|--------|-----------------|-------|
-| 1 | T1 in `StringByteExtractor.writeLatin1` (0x80 word test) | S | High on stack-trace path | Pure win; complements existing bulk-write rule |
-| 1 | T1 in `EscapedJsonStringWriter.writeEscapedLatin1` (SWAR escape scan) | S–M | High on all string fields | Preserve escaping semantics exactly; keep classic UTF-16 path |
-| 2 | T5 in `JsonNumberWriter.writeLong` (quads + int fast path) | S | Medium (ts, errHash, counters) | 4-digit chunking, little-endian stores |
-| 3 | T4 option 1 (direct-write helpers on `ReusableByteArrayOutputStream`) | M | High end-to-end | Benchmark before/after per `benchmark-optimization-history.md` |
-| 4 | T6 packed key prefixes | M | Medium | Only after T4 |
-| 5 | T2 length bands, T3 everywhere, T4 option 2 | M–L | Incremental | Measure each step; keep dev variants unoptimized |
-
+| #   | Item                                                                  | Effort | Expected impact                | Notes                                                          |
+| --- | --------------------------------------------------------------------- | ------ | ------------------------------ | -------------------------------------------------------------- |
+| 1   | T1 in `StringByteExtractor.writeLatin1` (0x80 word test)              | S      | High on stack-trace path       | Pure win; complements existing bulk-write rule                 |
+| 1   | T1 in `EscapedJsonStringWriter.writeEscapedLatin1` (SWAR escape scan) | S–M    | High on all string fields      | Preserve escaping semantics exactly; keep classic UTF-16 path  |
+| 2   | T5 in `JsonNumberWriter.writeLong` (quads + int fast path)            | S      | Medium (ts, errHash, counters) | 4-digit chunking, little-endian stores                         |
+| 3   | T4 option 1 (direct-write helpers on `ReusableByteArrayOutputStream`) | M      | High end-to-end                | Benchmark before/after per `benchmark-optimization-history.md` |
+| 4   | T6 packed key prefixes                                                | M      | Medium                         | Only after T4                                                  |
+| 5   | T2 length bands, T3 everywhere, T4 option 2                           | M–L    | Incremental                    | Measure each step; keep dev variants unoptimized               |
 Verification: extend the existing benchmark classes
 (`logback-writer-comparison-benchmark-results.md`, `allocation-benchmark-results.md`)
 so each item lands with a measured before/after; respect the dev-variant

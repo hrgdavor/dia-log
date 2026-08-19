@@ -62,11 +62,11 @@ All other `atXxx(Level, LogFiller)` methods use `isEnabledForLevel(level)` (the 
 
 **File:** `logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:232-237`
 
-The `err.stack` field (sanitized frame array) is entirely commented out. The JSON output only includes `err.hash` but not `err.stack`. This defeats the purpose of having deterministic stack trace sanitization — consumers cannot see the actual sanitized frames, only a hash. The schema documented in the original roadmap (`plans/roadmap.md`) includes `stack`, but the implementation omits it.
+The `"stack"` field (sanitized frame array) is entirely commented out. The JSON output includes **`"errHash"`**, but not **`"stack"`**. This defeats the purpose of having deterministic stack trace sanitization — consumers cannot see the actual sanitized frames, only a hash. The schema documented in the original roadmap (`plans/roadmap.md`) includes `stack`, but the implementation omits it.
 
-Meanwhile, `writeTraceString()` (lines 312-343) is dead code that already implements streaming stack trace serialization directly to the JSON generator — no intermediate string allocation. It should be integrated into `writeJsonEvent()` to produce the `err.stack` field.
+Meanwhile, `writeTraceString()` (lines 312-343) is dead code that already implements streaming stack trace serialization directly to the JSON generator — no intermediate string allocation. It should be integrated into `writeJsonEvent()` to produce the **`"stack"`** field.
 
-**Fix:** Remove the commented-out `stack` array code (lines 232-237), integrate `writeTraceString()` into `writeJsonEvent()` to write `err.stack` as a JSON string, and remove the now-unused `writeTraceString()` method from the class.
+**Fix:** Remove the commented-out `stack` array code (lines 232-237), integrate `writeTraceString()` into `writeJsonEvent()` to write **`"stack"`** as a JSON string, and remove the now-unused `writeTraceString()` method from the class.
 
 ---
 
@@ -165,7 +165,7 @@ The `prependPrefix()` method is `synchronized`, but prefix is typically set once
 **File:** `logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java:240`
 
 ```java
-gen.writeStringField("hash", JavaStackSanitizerLogback.fingerprint(tp, elem -> true));
+gen.writeStringField("errHash", JavaStackSanitizerLogback.fingerprint(tp, elem -> true));
 ```
 
 This creates a dependency from the logback module to a logback-specific sanitizer class, when it should use the core `JavaStackSanitizer`. This also means the hash computation is tied to the logback module's implementation rather than the core module's.

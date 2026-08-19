@@ -65,14 +65,33 @@ surface, all with T3 inlined checks):
   direct equivalent of `write(byte[], off, len)` minus the virtual call).
 - `grow(int)` is package-private so same-package writers can grow in place.
 
-Consumers:
+**Option 1 (per-operation direct paths):** `EscapedJsonStringWriter` and
+`StringByteExtractor` detect a `ReusableByteArrayOutputStream` target
+(`instanceof`) and use the direct-buffer path per string/segment: clean SWAR
+words are stored straight into the backing array, escapes stored inline,
+cursor published once per string (T1/T2). `JsonLogWriter`'s fixed prefixes use
+the packed path (T6) when the target is the reusable buffer.
 
-- `EscapedJsonStringWriter` and `StringByteExtractor` detect a
-  `ReusableByteArrayOutputStream` target (`instanceof`) and use the
-  direct-buffer path: clean SWAR words are stored straight into the backing
-  array, escapes are stored inline, cursor published once (T1/T2).
-- `JsonLogWriter` uses the packed-prefix path (T6) when the target is the
-  reusable buffer.
+**Option 2 (full writer-owns-buffer assembly — implemented):**
+`core/src/main/java/hr/hrg/dialog/core/DirectJsonBuffer.java` is a reusable
+cursor (one per `JsonLogWriter` instance, no per-event allocation) holding
+`byte[] buf` + `int pos` for the **whole event**. `JsonLogWriter.writeJsonEvent`
+dispatches on the target:
+
+- `ReusableByteArrayOutputStream` → `writeJsonEventDirect`: the entire event —
+  `{`, packed prefixes (T6), the four fixed strings escaped straight into the
+  buffer (SWAR bands + escape emitters writing via the cursor,
+  `EscapedJsonStringWriter.writeJsonString(DirectJsonBuffer, String)`),
+  numbers built once and bulk-copied (`JsonNumberWriter.buildLong/buildInt` +
+  `writeLong/writeInt(DirectJsonBuffer, ...)`), KV/MDC keys and values, the
+  closing `}` — is assembled with `buf`/`pos` live in registers and inlined
+  capacity checks; the cursor is published once with `publish()`.
+- Stream-only delegations — jackson (`mapper.writeValue`), `RawValue`,
+  `RawJsonSelfWriter`, the generated stack-trace writers, dev
+  `writeExtraFields` — publish the cursor, write through the underlying
+  stream, then `resync()`.
+- Any other `OutputStream` → `writeJsonEventStream`, the unchanged
+  per-operation path (option 1 + stream fallbacks).
 
 The `OutputStream` API and the stream fallback are unchanged, so the writer
 still works with any stream (and with jackson delegation).
@@ -80,12 +99,11 @@ still works with any stream (and with jackson delegation).
 ## Scope note
 
 Fory's full pattern also lets *generated* codecs hold buffer+cursor across a
-whole object graph. dia-log's writer is handwritten, so this commit implements
-the per-string and per-field direct paths; a future step could give
-`JsonLogWriter` a direct assembly mode that keeps the buffer local across the
-whole event (the analysis in
-[`doc/fory-commit-585eb16f-perf-analysis.md`](../fory-commit-585eb16f-perf-analysis.md)
-labels that "option 2").
+whole object graph. dia-log's writer is handwritten, so option 2 implements
+the equivalent at the event level: one cursor owned by `JsonLogWriter`,
+spanning all fixed fields, KV/MDC and errHash, with only the stream-bound
+delegations (stack trace writers are generated sanitizer derivatives per
+AGENTS.md and must not be rewritten) crossing the cursor boundary.
 
 ## Verification
 
