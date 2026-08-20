@@ -43,14 +43,15 @@ public void writeMessage(Message m, CursorBuffer cb) throws IOException {
     }
 
     // --- Hot path: pure straight-line stores, zero method calls ---
-    buf[pos++] = (byte) (m.id >> 24);
-    buf[pos++] = (byte) (m.id >> 16);
-    buf[pos++] = (byte) (m.id >> 8);
-    buf[pos++] = (byte) m.id;
+    // Use existing optimized writers via WriteOps or inline equivalents.
+    // Numbers use JsonNumberWriter.buildInt/buildLong into caller-owned buffers,
+    // then bulk-copy at the cursor position (no per-byte shift stores).
+    pos = WriteOps.writeInt(buf, pos, m.id, intBuffer);
+    pos = WriteOps.writeLong(buf, pos, m.timestamp, longBuffer);
 
-    byte[] utf8 = m.nameBytes;
-    System.arraycopy(utf8, 0, buf, pos, utf8.length);
-    pos += utf8.length;
+    // Strings use the SWAR + length-band writers (EscapedJsonStringWriter /
+    // StringByteExtractor) writing straight into the backing array.
+    pos = WriteOps.writeEscapedJsonString(buf, pos, m.name);
 
     // --- Publish cursor ONCE at the end ---
     cb.pos = pos;
@@ -82,46 +83,69 @@ The correct alternatives:
    primitive `int` — zero allocation, zero alias risk, stays in a register. C2
    treats the enclosing branch as uncommon and keeps locals resident.
 
+## Reusing existing optimized implementations
+
+The dia-log codebase already contains highly optimized primitives that fit the
+cursor-locality pattern. A generalized `WriteOps` facade should delegate to
+them, not replace them:
+
+### Number writing — `JsonNumberWriter`
+
+`JsonNumberWriter.buildInt` / `buildLong` already pack digits using
+`DIGIT_QUADS` (4 digits per store) and `DIGIT_TRIPLES` (1–3 digits with a
+leading-zero skip) into caller-owned reusable buffers. The output is end-aligned
+(`buf[MAX_BYTES - len .. MAX_BYTES)`). A `WriteOps` wrapper bulk-copies the
+result into the writer's backing array at the current cursor position:
+
+```java
+public static int writeInt(byte[] buf, int pos, int value, byte[] intBuf) {
+    int len = JsonNumberWriter.buildInt(intBuf, value);
+    System.arraycopy(intBuf, MAX_INT_BYTES - len, buf, pos, len);
+    return pos + len;
+}
+```
+
+Float/double formatting delegates to `RyuFloat` / `RyuDouble` (already used by
+`JsonNumberWriter.writeFloat` / `writeDouble`).
+
+### Packed little-endian stores — `DirectJsonBuffer` / `ReusableByteArrayOutputStream`
+
+`DirectJsonBuffer.writePackedLE(long, int)` and `ReusableByteArrayOutputStream.writeLongPrefixLE`
+already perform an inlined capacity check + switch-based fall-through stores.
+For absolute-offset stores (T2 overlapping-store trick), `DirectJsonBuffer.putPackedLE`
+writes at a given offset without moving the cursor.
+
+### String writing — `EscapedJsonStringWriter` / `StringByteExtractor`
+
+Both classes already have direct-buffer modes that use SWAR word scans and
+length-band dispatch, writing straight into a caller-provided `byte[]`. A
+`WriteOps` wrapper supplies the current cursor position and updates it after
+validation.
+
 ## Composable utilities without breaking locality
 
 Utility methods can be used if they accept **only primitives** (`byte[]`, `int`,
-`long`) and return a primitive `int` (the new position). They must never accept a
-`CursorBuffer` object or write to heap state:
+`long`) plus caller-owned reusable buffers, and return a primitive `int` (the
+new position). They must never accept a `CursorBuffer` object or write to heap
+state:
 
 ```java
 public final class WriteOps {
     private WriteOps() {}
 
-    public static int writeInt(byte[] buf, int pos, int v) {
-        buf[pos]   = (byte)(v >> 24);
-        buf[pos+1] = (byte)(v >> 16);
-        buf[pos+2] = (byte)(v >> 8);
-        buf[pos+3] = (byte)v;
-        return pos + 4;
-    }
-
-    public static int writeLong(byte[] buf, int pos, long v) {
-        buf[pos]   = (byte)(v >> 56);
-        buf[pos+1] = (byte)(v >> 48);
-        buf[pos+2] = (byte)(v >> 40);
-        buf[pos+3] = (byte)(v >> 32);
-        buf[pos+4] = (byte)(v >> 24);
-        buf[pos+5] = (byte)(v >> 16);
-        buf[pos+6] = (byte)(v >> 8);
-        buf[pos+7] = (byte)v;
-        return pos + 8;
-    }
-
-    public static int writeUTF8(byte[] buf, int pos, byte[] utf8) {
-        System.arraycopy(utf8, 0, buf, pos, utf8.length);
-        return pos + utf8.length;
-    }
+    public static int writeInt(byte[] buf, int pos, int v, byte[] intBuf) { ... }
+    public static int writeLong(byte[] buf, int pos, long v, byte[] longBuf) { ... }
+    public static int writeFloat(byte[] buf, int pos, float v, byte[] floatBuf) { ... }
+    public static int writeDouble(byte[] buf, int pos, double v, byte[] doubleBuf) { ... }
+    public static int writeEscapedJsonString(byte[] buf, int pos, String s) { ... }
+    public static int writeLatin1(byte[] buf, int pos, String s) { ... }
+    public static int writeRaw(byte[] buf, int pos, byte[] src, int off, int len) { ... }
 }
 ```
 
-Because these are tiny (`< 35 bytecodes`), C2 inlines them unconditionally. The
-caller compiles to the same machine code as hand-written stores, while the source
-remains composable.
+Because these are thin wrappers around already-inlined backends, C2 inlines the
+`WriteOps` calls too. The caller compiles to the same machine code as calling
+the backends directly, while the source remains composable.
 
 ## Flushing strategy: lazy flush with cursor locality
 
@@ -147,11 +171,11 @@ amortized. After flushing, the caller continues with the refreshed locals.
 
 ## Why it is faster
 
-| Approach                              | Cursor location   | Calls per field | Flush interaction                         |
-| ------------------------------------- | ----------------- | --------------- | ----------------------------------------- |
-| `DataOutputStream.writeInt()`         | heap object field | 1 virtual call  | immediate, no batching                    |
-| `BufferedOutputStream` + `DataOutput` | heap object field | 2 virtual calls | flush only at boundary                    |
-| **Cursor-locality writer**            | **stack local**   | **0 (inlined)** | flush only on demand, cursor not reloaded |
+| Approach | Cursor location | Calls per field | Flush interaction |
+|---|---|---|---|
+| `DataOutputStream.writeInt()` | heap object field | 1 virtual call | immediate, no batching |
+| `BufferedOutputStream` + `DataOutput` | heap object field | 2 virtual calls | flush only at boundary |
+| **Cursor-locality writer** | **stack local** | **0 (inlined)** | flush only on demand, cursor not reloaded |
 
 The counter-intuitive part: in `OutputStream`, the cursor is hidden inside the
 stream object. Every `write` forces a load of that field (cache-miss potential)
@@ -165,12 +189,15 @@ assembly (T4) via `DirectJsonBuffer` — a reusable cursor spanning the whole
 event. Fixed prefixes, numbers, and strings are assembled with `buf`/`pos` live
 in registers. However, the codebase lacked a general-purpose, composable utility
 layer for the underlying primitive stores; each writer duplicated the shift-and-
-store pattern inline.
+store pattern inline or called the JSON-specific `DirectJsonBuffer` methods
+directly.
 
 **Now:** The generalized pattern is documented and ready for extraction into a
-shared `WriteOps` utility. New hot-path writers (e.g., stack-trace sanitizers,
-future binary protocol writers) can compose from the same primitives while
-preserving the local-cursor discipline already proven in T4.
+shared `WriteOps` utility that wraps the existing optimized backends
+(`JsonNumberWriter`, `DirectJsonBuffer`, `ReusableByteArrayOutputStream`,
+`EscapedJsonStringWriter`, `StringByteExtractor`). New hot-path writers (e.g.,
+stack-trace sanitizers, future binary protocol writers) can compose from the same
+primitives while preserving the local-cursor discipline already proven in T4.
 
 ## Verification principles
 
@@ -178,7 +205,8 @@ preserving the local-cursor discipline already proven in T4.
   for all input combinations (clean ASCII, control chars, non-ASCII, empty,
   max-length).
 - **Zero allocation:** the hot path must not allocate per field or per message.
-  Allocation should remain at the cold-path boundary only (grow/flush).
+  Allocation should remain at the cold-path boundary only (grow/flush). The
+  caller-owned digit buffers are reused across calls.
 - **Benchmark isolation:** micro benchmarks for each primitive store, plus an
   end-to-end event benchmark, to confirm that adding composable utilities does
   not regress the inline shape.
