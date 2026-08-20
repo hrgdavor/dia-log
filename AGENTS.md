@@ -117,6 +117,27 @@ project's accepted short-form documentation; use standard Javadoc only where
 
 ---
 
+## Build Commands (Maven)
+
+The `gpg` sign-artifacts plugin (`sign-artifacts` execution in the release profile)
+can stall on interactive GPG passphrase entry when running `install`/`deploy` (no TTY),
+hanging the build indefinitely. **Always pass `-Dgpg.skip=true`** to any `mvn install`
+or `mvn deploy` invocation to avoid the stall:
+
+```bash
+mvn -o -pl core install -DskipTests -Dgpg.skip=true
+```
+
+For ordinary compile/test validation, prefer the reactor (no install needed) so the
+gpg plugin never runs:
+
+```bash
+mvn -o -pl core,logback test -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+PowerShell note: unquoted `-Dkey=value` flags are sometimes mangled by the shell
+(dropping the `-D` prefix); quote each one, e.g. `"-Dtest=MyTest"`.
+
 ## File Locations Reference
 
 **Core classes**:
