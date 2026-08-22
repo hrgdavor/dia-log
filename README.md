@@ -73,14 +73,16 @@ Stack-trace fingerprinting and writing used to be two separate passes (traverse 
 
 ### Measured impact
 
-These optimizations are validated with JMH benchmarks (`-prof gc`). On the latest run (2026-08-18, JDK 25, AMD Ryzen 9 7945HX), `JsonLogWriter` beats the classic generator path in both latency and allocation:
+These optimizations are validated with JMH benchmarks (`-prof gc`). On the latest run (2026-08-22, JDK 25.0.3, AMD Ryzen 9 7945HX), `JsonLogWriter` and the classic Jackson generator path were compared over a representative event carrying both MDC and statement key/value pairs, with and without a throwable:
 
 | Benchmark method                | includeThrowable | Avg time    | Alloc norm |
 | ------------------------------- | ---------------- | ----------- | ---------- |
-| `writeWithJsonLogWriter`        | false            | 0.507 us/op | 272 B/op   |
-| `writeWithJsonLogWriterClassic` | false            | 0.610 us/op | 784 B/op   |
-| `writeWithJsonLogWriter`        | true             | 5.706 us/op | 272 B/op   |
-| `writeWithJsonLogWriterClassic` | true             | 6.218 us/op | 872 B/op   |
+| `writeWithJsonLogWriter`        | false            | 0.563 us/op | 456 B/op   |
+| `writeWithJsonLogWriterClassic` | false            | 0.612 us/op | 816 B/op   |
+| `writeWithJsonLogWriter`        | true             | 2.159 us/op | 592 B/op   |
+| `writeWithJsonLogWriterClassic` | true             | 2.093 us/op | 904 B/op   |
+
+Versus the 2026-08-18 baseline: the **throwable path is ≈2.6–3.0× faster for both writers** (shared stack-trace writer improvements) — `JsonLogWriter` 5.706 → 2.159 us/op. Relative to the classic generator, `JsonLogWriter` is ~8% faster without a throwable and within ~3% with one, while allocating substantially less in both cases (~44% less without, ~34% less with a throwable). Note on allocation: these `writeWithJsonLogWriter` numbers come from `JsonLogWriter.writeJsonEventStream` — the **stream fallback** path (the benchmark calls it directly). The production path used by `JsonAppender`, `writeJsonEventDirect`, allocates **≈330 B/op** for the same MDC+KV event — essentially unchanged from the 2026-08-18 baseline of 272 B/op. The higher stream-fallback numbers are per-event `String.getBytes` field-prefix encoding plus bufferless number writes (see the re-run record). Focused no-MDC paths remain ≈0 B/op (see [Allocation Benchmark Results](doc/allocation-benchmark-results.md)).
 
 Allocation summary of the dedicated allocation benchmark (`AllocationBenchmark` /
 `JsonLogWriterDevBenchmark`, `-prof gc`, fast paths with `--add-opens`):

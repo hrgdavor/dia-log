@@ -1,0 +1,21 @@
+"Benchmark","Mode","Threads","Samples","Score","Score Error (99.9%)","Unit","Param: includeThrowable"
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter","avgt",1,10,0.563001,0.019277,"us/op",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter:gc.alloc.rate","avgt",1,10,772.634959,26.227467,"MB/sec",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter:gc.alloc.rate.norm","avgt",1,10,456.003920,0.000133,"B/op",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter:gc.count","avgt",1,10,13.000000,NaN,"counts",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter:gc.time","avgt",1,10,18.000000,NaN,"ms",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter","avgt",1,10,2.159202,0.026978,"us/op",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter:gc.alloc.rate","avgt",1,10,261.449661,3.265066,"MB/sec",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter:gc.alloc.rate.norm","avgt",1,10,592.014987,0.000186,"B/op",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter:gc.count","avgt",1,10,4.000000,NaN,"counts",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriter:gc.time","avgt",1,10,7.000000,NaN,"ms",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic","avgt",1,10,0.612336,0.011642,"us/op",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic:gc.alloc.rate","avgt",1,10,1270.818345,23.618594,"MB/sec",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic:gc.alloc.rate.norm","avgt",1,10,816.004263,0.000079,"B/op",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic:gc.count","avgt",1,10,21.000000,NaN,"counts",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic:gc.time","avgt",1,10,20.000000,NaN,"ms",false
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic","avgt",1,10,2.093049,0.017281,"us/op",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic:gc.alloc.rate","avgt",1,10,411.842251,3.410136,"MB/sec",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic:gc.alloc.rate.norm","avgt",1,10,904.014545,0.000146,"B/op",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic:gc.count","avgt",1,10,7.000000,NaN,"counts",true
+"hr.hrg.dialog.logback.JsonLogWriterBenchmark.writeWithJsonLogWriterClassic:gc.time","avgt",1,10,12.000000,NaN,"ms",true
