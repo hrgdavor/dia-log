@@ -4,10 +4,8 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import hr.hrg.dialog.core.JavaStackTraceWriter;
@@ -73,14 +71,11 @@ public class JsonLogWriterClassic {
             gen.writeName("msg");
             gen.writeString(event.getFormattedMessage());
 
-            Set<String> allKeys = new HashSet<>();
-
             // Structured key-value pairs
             List<KeyValuePair> pairs = event.getKeyValuePairs();
             if (pairs != null && !pairs.isEmpty()) {
                 for (KeyValuePair kvPair : pairs) {
                     if (kvPair.key != null) {
-                        allKeys.add(kvPair.key);
                         addKey(gen, kvPair.key, kvPair.value);
                     }
                 }
@@ -94,9 +89,7 @@ public class JsonLogWriterClassic {
 
             if (mdcMap != null && !mdcMap.isEmpty()) {
                 for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
-                    if (entry.getKey() != null
-                            && !isReserved(entry.getKey())
-                            && !allKeys.contains(entry.getKey())) {
+                    if (entry.getKey() != null && !isReserved(entry.getKey())) {
                         gen.writeName(entry.getKey());
                         gen.writeString(entry.getValue());
                     }

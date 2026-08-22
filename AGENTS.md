@@ -75,8 +75,6 @@ Previously flagged and **already resolved — do not reintroduce**:
 
 - `Wyhash64.Streaming.finalHash()` - no longer allocates a scratch `byte[16]`; the final
   16-byte window is read directly from `buf`
-- `JsonLogWriter.writeJsonEventDirect()` - `allKeys` is lazily allocated, only when KV pairs exist
-  **and** MDC is present (dedup against MDC is the only use)
 - `Float.toString()` / `Double.toString()` in `JsonNumberWriter` - replaced by Ryu
   (`RyuFloat` / `RyuDouble`); also note `String.value` UTF-16 byte order is platform-native,
   never assume it (Wyhash64 probes it once at class init)

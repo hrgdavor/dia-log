@@ -69,7 +69,7 @@ class JsonLogWriterClassicTest {
     }
 
     @Test
-    void kvKeyOverridesMdcKey() throws Exception {
+    void kvKeyAndMdcKey_bothAppear() throws Exception {
         LoggingEvent event = event("dedup");
         applyIfPresent(event, "setKeyValuePairs", new Class<?>[]{List.class}, List.of(
             new KeyValuePair("shared", "from-kv")
@@ -81,9 +81,11 @@ class JsonLogWriterClassicTest {
 
         String json = write(event);
 
-        assertTrue(json.contains("\"shared\":\"from-kv\""), "KV value must win: " + json);
+        assertTrue(json.contains("\"shared\":\"from-kv\""), "KV value must be present: " + json);
         assertTrue(json.contains("\"onlyMdc\":\"mdc-value\""), "MDC-only key must be present: " + json);
-        assertFalse(json.contains("\"shared\":\"from-mdc\""), "MDC must not override KV: " + json);
+        // Duplicate keys are no longer deduped — both KV and MDC values appear.
+        // Downstream log ingestion handles rare duplicate-key cases.
+        assertTrue(json.contains("\"shared\":\"from-mdc\""), "MDC value also present: " + json);
     }
 
     @Test

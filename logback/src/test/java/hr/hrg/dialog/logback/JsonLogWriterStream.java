@@ -13,10 +13,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /// Test-only, byte-identical reimplementation of the naive stream-fallback event
 /// writer that previously lived on {@link JsonLogWriter}. Production uses the
@@ -70,18 +68,10 @@ public final class JsonLogWriterStream {
         } catch (Exception ignored) {
         }
 
-        Set<String> allKeys = null;
         List<KeyValuePair> pairs = event.getKeyValuePairs();
         if (pairs != null && !pairs.isEmpty()) {
-            boolean trackForMdcDedup = mdcMap != null && !mdcMap.isEmpty();
             for (KeyValuePair kvPair : pairs) {
                 if (kvPair.key != null) {
-                    if (trackForMdcDedup) {
-                        if (allKeys == null) {
-                            allKeys = new HashSet<>();
-                        }
-                        allKeys.add(kvPair.key);
-                    }
                     writer.addKey(out, kvPair.key, kvPair.value, mapper);
                 }
             }
@@ -89,9 +79,7 @@ public final class JsonLogWriterStream {
 
         if (mdcMap != null && !mdcMap.isEmpty()) {
             for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
-                if (entry.getKey() != null
-                        && !isReserved(entry.getKey())
-                        && (allKeys == null || !allKeys.contains(entry.getKey()))) {
+                if (entry.getKey() != null && !isReserved(entry.getKey())) {
                     writeFieldPrefixRawKey(out, entry.getKey());
                     EscapedJsonStringWriter.writeJsonStringOrNull(out, entry.getValue());
                 }

@@ -103,11 +103,10 @@ In short, allocation is avoided across the hot path by:
 - **Pre-encoding** field names and JSON literals as `byte[]` constants — writing a field never builds a byte array.
 - **Direct string access** — `StringByteExtractor` / `EscapedJsonStringWriter` stream a `String`'s backing bytes straight to the output via `VarHandle` (with `--add-opens`), skipping `getBytes()`.
 - **Writing numbers without strings** — `JsonNumberWriter` (Ryu for float/double, digit-pair table for int/long) emits digits directly into reusable scratch buffers, never via `String.valueOf(...)`.
-- **Reusing stateful helpers** — `Wyhash64.Streaming` and the single-pass stack write+fingerprint compute `errHash` in one traversal with a caller-owned reusable hasher (passed as a parameter, never hidden in a `ThreadLocal`); `StringHashSet` (a resettable key-dedup set) is cleared per event instead of reallocated.
-- **Lazy allocation** — the KV/MDC dedup set is created only when MDC is actually present, and disabled log levels route through a singleton no-op builder.
+- **Reusing stateful helpers** — `Wyhash64.Streaming` and the single-pass stack write+fingerprint compute `errHash` in one traversal with a caller-owned reusable hasher (passed as a parameter, never hidden in a `ThreadLocal`).
+- **No key dedup** — duplicate keys between statement KV pairs and MDC are emitted as-is; downstream log ingestion handles rare duplicate-key cases. This avoids a per-event key-tracking set on the hot path.
 
-Full results, the allocations found and removed (lazy `allKeys`, caller-owned reusable
-hasher), and the documented remaining allocations: [Allocation Benchmark Results](doc/allocation-benchmark-results.md).
+Full results, the allocations found and removed, and the documented remaining allocations: [Allocation Benchmark Results](doc/allocation-benchmark-results.md).
 
 A head-to-head of logback writing paths — stock pattern encoder vs the optimized JSON
 writer vs a Jackson-generator encoder, with and without traces — is in

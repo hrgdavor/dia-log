@@ -1,6 +1,6 @@
 # 004: Key-value pairs vs MDC design
 
-* **Status:** Accepted
+* **Status:** Accepted (updated 2026-08-22)
 * **Date:** 2026-07-26
 * **Implementation Status:** Implemented
 
@@ -36,16 +36,16 @@ Adopt a dual-context model with clear separation of concerns:
 - Supports `String → Object` with typed values (integers, booleans, etc.)
 - Does not leak to subsequent log statements
 
-### Priority rule
-When both MDC and key-value pairs contain the same key, key-value pairs take precedence in JSON output. This is implemented in [`JsonLogWriter.writeJsonEvent()`](../logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java#L186) where kv keys are written first, and MDC keys are only written if not already present in the kv set.
+### Duplicate key handling
+When both MDC and key-value pairs contain the same key, **both values are emitted** in the JSON output (KV first, then MDC). Duplicate keys are not deduped on the hot path. Downstream log ingestion handles rare duplicate-key cases — most JSON parsers apply last-wins or array semantics, and log aggregation systems (Loki, Elasticsearch, Splunk) accept duplicate object keys without issue. Dedup was removed for performance reasons; see [ADR-012](./012-remove-key-dedup.md).
 
 ## Consequences
 
-* **Positive:** Clear mental model: MDC for "who/where", KVP for "what happened"; KVP is naturally scoped to the log statement; typed values in KVP enable proper JSON serialization (numbers stay numbers); priority rule prevents ambiguity when the same key exists in both contexts.
-* **Negative:** Developers must understand when to use MDC vs KVP; MDC requires manual cleanup (though frameworks like Spring can automate this); the priority rule may surprise developers who expect MDC to override KVP.
+* **Positive:** Clear mental model: MDC for "who/where", KVP for "what happened"; KVP is naturally scoped to the log statement; typed values in KVP enable proper JSON serialization (numbers stay numbers); no per-event key-tracking set on the hot path.
+* **Negative:** Developers must understand when to use MDC vs KVP; MDC requires manual cleanup (though frameworks like Spring can automate this); rare duplicate keys may appear in output when the same key is set in both contexts.
 
 ## References
 
 - [`doc/mdc.vs.key-value.md`](../doc/mdc.vs.key-value.md)
-- [`JsonLogWriter.writeJsonEvent()`](../logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java#L162)
+- [`JsonLogWriter.writeJsonEvent()`](../logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java#L186)
 - [`LoggingEventBuilderWrapperBase.addKeyValue()`](../core/src/main/java/hr/hrg/dialog/core/LoggingEventBuilderWrapperBase.java#L110)

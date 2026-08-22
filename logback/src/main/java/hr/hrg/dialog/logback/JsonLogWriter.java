@@ -5,20 +5,12 @@ import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Predicate;
 
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
-import hr.hrg.dialog.core.EscapedJsonStringWriter;
-import hr.hrg.dialog.core.JsonNumberWriter;
-import hr.hrg.dialog.core.RawJsonSelfWriter;
-import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
-import hr.hrg.dialog.core.StringByteExtractor;
-import hr.hrg.dialog.core.Wyhash64;
-import hr.hrg.dialog.core.WriteOps;
+import hr.hrg.dialog.core.*;
 import org.slf4j.event.KeyValuePair;
 
 import tools.jackson.databind.ObjectMapper;
@@ -262,9 +254,6 @@ public class JsonLogWriter {
         buf = rbo.buf;
         limit = rbo.limit;
 
-        // MDC is fetched first: the KV key-tracking set below is only needed
-        // when MDC keys could collide with statement keys, so it is skipped
-        // entirely (no allocation) when there is no MDC.
         Map<String, String> mdcMap = null;
         try {
             mdcMap = event.getMDCPropertyMap();
@@ -273,16 +262,10 @@ public class JsonLogWriter {
         // Structured key-value pairs. The caller keeps buf/pos/limit live across
         // the loop: ','/':' are inline stores; the variable-length key/value run
         // through the grow-capable helpers (publish + re-read after each).
-        Set<String> allKeys = null;
         List<KeyValuePair> pairs = event.getKeyValuePairs();
         if (pairs != null && !pairs.isEmpty()) {
-            boolean trackForMdcDedup = mdcMap != null && !mdcMap.isEmpty();
             for (KeyValuePair kvPair : pairs) {
                 if (kvPair.key != null && kvPair.value != null) {
-                    if (trackForMdcDedup) {
-                        if (allKeys == null) allKeys = new HashSet<>();
-                        allKeys.add(kvPair.key);
-                    }
                     if (pos >= limit) {
                         rbo.grow(pos + 1);
                         buf = rbo.buf;
@@ -309,16 +292,15 @@ public class JsonLogWriter {
 
         if (mdcMap != null && !mdcMap.isEmpty()) {
             for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
-                if (entry.getKey() != null
-                        && !isReserved(entry.getKey())
-                        && (allKeys == null || !allKeys.contains(entry.getKey()))) {
+                String key = entry.getKey();
+                if (key != null && !isReserved(key)) {
                     if (pos >= limit) {
                         rbo.grow(pos + 1);
                         buf = rbo.buf;
                         limit = rbo.limit;
                     }
                     buf[pos++] = ',';
-                    pos = writeStringDirect(rbo, pos, entry.getKey());
+                    pos = writeStringDirect(rbo, pos, key);
                     buf = rbo.buf;
                     limit = rbo.limit;
                     if (pos >= limit) {

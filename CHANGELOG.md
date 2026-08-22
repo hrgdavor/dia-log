@@ -18,12 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`XZCompressionStrategy`) is available. Using a `fileNamePattern` ending in
   `.xz` on a `TimeBasedRollingPolicy` or `SizeAndTimeBasedRollingPolicy` to
   compress rotated files with XZ.
-- `StringHashSet` — resettable, allocation-minimizing open-addressing set for
-  `String` key deduplication (`add` returns whether the key was new; `clear()`
-  reuses the table; capacity only grows, never shrinks). Implements no
-  `java.util` interfaces and allocates nothing per `add`/`contains`/`clear`
-  in steady state — a drop-in replacement for the per-event
-  `HashSet<String>` used for KV/MDC key dedup.
+
+### Removed
+
+- **Key dedup between KV pairs and MDC removed** from `JsonLogWriter` (and the
+  test-side `JsonLogWriterStream` / `JsonLogWriterClassic` baselines). Duplicate
+  keys are now emitted as-is: when a statement KV key collides with an MDC key,
+  both appear in the JSON output. Downstream log ingestion handles rare
+  duplicate-key cases (last-wins or array semantics depending on the parser).
+  This eliminates the per-event `StringHashSet` key-tracking set from the hot
+  path. `StringHashSet` (`core`) and its test deleted.
 
 ### Changed
 
