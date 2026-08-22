@@ -14,7 +14,7 @@ import java.util.List;
  * escaping:
  * <pre>{@code
  *   // @CB.StrPacker private static final KEY_TS = `{"ts":`
- *   private static final byte[] KEY_TS = "{\"ts\":".getBytes(StandardCharsets.UTF_8);
+ *   private static final String KEY_TS = "{\"ts\":";
  *   private static final long KEY_TS_W0 = 0x00003a227374227bL;
  *   private static final int KEY_TS_LEN = 6;
  *   private static final int KEY_TS_LEN_BUF = 8;
@@ -23,14 +23,15 @@ import java.util.List;
  * Running the tool rewrites the lines below every marker (the marker line itself
  * is the source of truth and is left untouched):
  * <ul>
- *   <li>{@code byte[] NAME} — the literal's UTF-8 bytes, re-emitted from the marker
- *       so the block can never drift from the literal</li>
+ *   <li>{@code String NAME} — the literal itself as a {@code String} reference,
+ *       the naive form used by tests and comparison code that writes strings;
+ *       the optimized path uses the packed words below</li>
  *   <li>{@code long NAME_W0..NAME_W3} — {@link #packWord} of each 8-byte window
  *       (offsets 0, 8, 16, 24), as 16-digit hex literals computed at generation
  *       time instead of at class init. Word {@code i} is emitted when the UTF-8
  *       length exceeds {@code i*8}; a literal longer than
  *       {@value #MAX_LITERAL_BYTES} bytes cannot be fully represented by
- *       {@value #MAX_WORDS} words, so it falls back to a byte[]-only block (no
+ *       {@value #MAX_WORDS} words, so it falls back to a String-only block (no
  *       packed words) and takes the stream path</li>
  *   <li>{@code int NAME_LEN} — the UTF-8 byte length, as a literal</li>
  *   <li>{@code int NAME_LEN_BUF} — the buffer reserve the packed store occupies
@@ -135,7 +136,7 @@ public final class StrPacker {
     }
 
     /**
-     * Generates the field declaration block for a marker spec: the byte[] field,
+     * Generates the field declaration block for a marker spec: the String field,
      * the packed word(s) as compile-time literals, the byte length, and — for the
      * packed path — the buffer reserve ({@code NAME_LEN_BUF}).
      * <p>
@@ -144,15 +145,15 @@ public final class StrPacker {
      * to {@value #MAX_LITERAL_BYTES} bytes produces at most
      * {@value #MAX_WORDS} words plus a {@code NAME_LEN_BUF} equal to
      * {@link #packedBufferBytes}. A literal longer than that cannot be fully
-     * packed, so the block falls back to the byte[] field and {@code NAME_LEN}
+     * packed, so the block falls back to the String field and {@code NAME_LEN}
      * only — no {@code NAME_W*} or {@code NAME_LEN_BUF} constants are emitted.
      */
     public static List<String> generateBlock(Spec spec, String indent) {
         byte[] bytes = spec.literal().getBytes(StandardCharsets.UTF_8);
         boolean packed = bytes.length <= MAX_LITERAL_BYTES;
         List<String> out = new ArrayList<>(packed ? 3 + MAX_WORDS : 2);
-        out.add(indent + spec.modifiers() + " byte[] " + spec.name() + " = "
-                + javaStringLiteral(spec.literal()) + ".getBytes(StandardCharsets.UTF_8);");
+        out.add(indent + spec.modifiers() + " String " + spec.name() + " = "
+                + javaStringLiteral(spec.literal()) + ";");
         if (packed) {
             int words = Math.max(1, (bytes.length + 7) / 8);
             for (int i = 0; i < words; i++) {
@@ -206,11 +207,14 @@ public final class StrPacker {
     }
 
     /**
-     * Returns the existing block lines below the marker at {@code markerIdx} for
-     * {@code name} (the byte[] declaration plus the {@code NAME_W*},
-     * {@code NAME_LEN} and {@code NAME_LEN_BUF} lines), skipping blank lines.
-     * Empty when there is no block to replace — the marker then generates the
-     * block from scratch.
+     * Returns the existing declaration lines below the marker at
+     * {@code markerIdx} for {@code name}: every consecutive
+     * {@code NAME} (String or byte[]), {@code NAME_W*}, {@code NAME_LEN} and
+     * {@code NAME_LEN_BUF} line, skipping blank lines. All of them are replaced
+     * on regeneration, so a stale or duplicated block (e.g. a leftover
+     * byte[]-form block under a marker that now generates String) is fully
+     * overwritten in one pass. Empty when there is no block to replace — the
+     * marker then generates the block from scratch.
      */
     static List<String> consumeBlock(String[] lines, int markerIdx, String name) {
         int j = markerIdx + 1;
@@ -219,20 +223,14 @@ public final class StrPacker {
         }
         List<String> consumed = new ArrayList<>();
         int k = j;
-        if (k < lines.length && isByteArrayDecl(lines[k], name)) {
-            consumed.add(lines[k]);
-            k++;
-            while (k < lines.length && isWordDecl(lines[k], name)) {
-                consumed.add(lines[k]);
+        while (k < lines.length) {
+            String line = lines[k];
+            if (isStringDecl(line, name) || isWordDecl(line, name)
+                    || isLenDecl(line, name) || isBufDecl(line, name)) {
+                consumed.add(line);
                 k++;
-            }
-            if (k < lines.length && isLenDecl(lines[k], name)) {
-                consumed.add(lines[k]);
-                k++;
-            }
-            if (k < lines.length && isBufDecl(lines[k], name)) {
-                consumed.add(lines[k]);
-                k++;
+            } else {
+                break;
             }
         }
         return consumed;
@@ -263,8 +261,11 @@ public final class StrPacker {
         return sb.append('"').toString();
     }
 
-    private static boolean isByteArrayDecl(String line, String name) {
-        return line.trim().matches("private static final byte\\[\\] " + java.util.regex.Pattern.quote(name) + " = .*;");
+    private static boolean isStringDecl(String line, String name) {
+        // Accept both the current String shape and the historical byte[] shape
+        // so old generated blocks are consumed (and migrated) on re-run.
+        return line.trim().matches("private static final (String|byte\\[\\]) "
+                + java.util.regex.Pattern.quote(name) + " = .*;");
     }
 
     private static boolean isWordDecl(String line, String name) {

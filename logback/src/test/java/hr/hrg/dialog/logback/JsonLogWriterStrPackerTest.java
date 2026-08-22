@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -14,8 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * generator (project-automation CodeBuddy) against the runtime implementation:
  * every {@code KEY_*_W0}/{@code KEY_*_W1} literal must equal
  * {@code JsonLogWriter.packWord(KEY_*, off)} and every {@code KEY_*_LEN} must
- * equal {@code KEY_*.length}. Runs against the compiled class, so it also
- * catches drift between the committed source and what was actually built.
+ * equal the UTF-8 byte length of the {@code KEY_*} String. Runs against the
+ * compiled class, so it also catches drift between the committed source and
+ * what was actually built.
  */
 class JsonLogWriterStrPackerTest {
 
@@ -29,7 +31,7 @@ class JsonLogWriterStrPackerTest {
         packWord.setAccessible(true);
 
         for (String key : KEYS) {
-            byte[] bytes = (byte[]) field("KEY_" + key).get(null);
+            byte[] bytes = ((String) field("KEY_" + key).get(null)).getBytes(StandardCharsets.UTF_8);
             String prefix = "KEY_" + key;
 
             assertEquals((long) packWord.invoke(null, bytes, 0),

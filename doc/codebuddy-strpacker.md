@@ -2,8 +2,9 @@
 
 Marker-driven source generation for fixed UTF-8 field prefixes. `@CB.StrPacker`
 replaces a runtime-initialized static field block with **gen-time computed
-compile-time constants**: the packed little-endian long words and the byte
-length become Java literals, so class init no longer runs `packWord(...)` and
+compile-time constants**: the literal itself as a `String` reference (the naive
+form for tests and comparison code), the packed little-endian long words, and
+the byte length — so class init no longer runs `packWord(...)` and
 `KEY_X.length` for every key.
 
 The tool lives in the `project-automation` module (`CodeBuddy` dispatcher +
@@ -30,7 +31,7 @@ Running CodeBuddy replaces the block below the marker with:
 
 ```java
     // @CB.StrPacker private static final KEY_TS = `{"ts":`
-    private static final byte[] KEY_TS = "{\"ts\":".getBytes(StandardCharsets.UTF_8);
+    private static final String KEY_TS = "{\"ts\":";
     private static final long KEY_TS_W0 = 0x00003a227374227bL;
     private static final int KEY_TS_LEN = 6;
     private static final int KEY_TS_LEN_BUF = 8;
@@ -38,7 +39,7 @@ Running CodeBuddy replaces the block below the marker with:
 
 | Generated member | Meaning |
 | --- | --- |
-| `byte[] NAME` | the literal's UTF-8 bytes (re-emitted from the marker, so it can never drift) — stream fallback path |
+| `String NAME` | the literal itself as a `String` reference — the naive form used by tests and comparison code and by the stream fallback |
 | `long NAME_W0..NAME_W3` | one little-endian `packWord` per 8-byte window (offsets 0, 8, 16, 24), as 16-digit hex literals — direct-buffer path (one 8-byte store per word) |
 | `int NAME_LEN` | the UTF-8 byte length, as a literal |
 | `int NAME_LEN_BUF` | the buffer reserve the packed store occupies — `NAME_LEN` rounded up to whole 8-byte word slots (e.g. 9 → 16), used directly by the inline capacity checks |
@@ -47,8 +48,8 @@ Word `i` is emitted when the UTF-8 length exceeds `i*8`, so a 1-byte..8-byte
 literal gets 1 word, 9..16 bytes get 2 words, 17..24 get 3 words, and 25..32
 bytes get 4 words; `NAME_LEN_BUF` is `NAME_LEN` rounded up to a multiple of 8.
 **Literals longer than 32 UTF-8 bytes cannot be fully packed, so they fall back
-to a `byte[]` + `NAME_LEN` block with no packed words and no `NAME_LEN_BUF`** —
-the stream fallback path writes the `byte[]` directly.
+to a `String` + `NAME_LEN` block with no packed words and no `NAME_LEN_BUF`** —
+the stream fallback path writes the String naively.
 
 ## Examples
 
@@ -56,7 +57,7 @@ the stream fallback path writes the `byte[]` directly.
 
 ```java
     // @CB.StrPacker private static final KEY_TS = `{"ts":`
-    private static final byte[] KEY_TS = "{\"ts\":".getBytes(StandardCharsets.UTF_8);
+    private static final String KEY_TS = "{\"ts\":";
     private static final long KEY_TS_W0 = 0x00003a227374227bL;
     private static final int KEY_TS_LEN = 6;
     private static final int KEY_TS_LEN_BUF = 8;
@@ -66,7 +67,7 @@ the stream fallback path writes the `byte[]` directly.
 
 ```java
     // @CB.StrPacker private static final KEY_LOGGER = `"logger":`
-    private static final byte[] KEY_LOGGER = "\"logger\":".getBytes(StandardCharsets.UTF_8);
+    private static final String KEY_LOGGER = "\"logger\":";
     private static final long KEY_LOGGER_W0 = 0x22726567676f6c22L;
     private static final long KEY_LOGGER_W1 = 0x000000000000003aL;
     private static final int KEY_LOGGER_LEN = 9;
@@ -77,7 +78,7 @@ the stream fallback path writes the `byte[]` directly.
 
 ```java
     // @CB.StrPacker private static final KEY_LONG = `"someLongKeyName":"value"`
-    private static final byte[] KEY_LONG = "\"someLongKeyName\":\"value\"".getBytes(StandardCharsets.UTF_8);
+    private static final String KEY_LONG = "\"someLongKeyName\":\"value\"";
     private static final long KEY_LONG_W0 = 0x6e6f4c656d6f7322L;
     private static final long KEY_LONG_W1 = 0x656d614e79654b67L;
     private static final long KEY_LONG_W2 = 0x65756c6176223a22L;
@@ -104,11 +105,11 @@ that overwrite store always has a full slot reserved.
 
 ```java
     // @CB.StrPacker private static final KEY_LONG = `"veryLongKeyWithVeryLongName":"value"`
-    private static final byte[] KEY_LONG = "\"veryLongKeyWithVeryLongName\":\"value\"".getBytes(StandardCharsets.UTF_8);
+    private static final String KEY_LONG = "\"veryLongKeyWithVeryLongName\":\"value\"";
     private static final int KEY_LONG_LEN = 37;
 ```
 
-37 UTF-8 bytes do not fit in 4 words, so only the byte[] and the length are
+37 UTF-8 bytes do not fit in 4 words, so only the String and the length are
 emitted; the key is written through the stream path.
 
 ## Running CodeBuddy
@@ -141,7 +142,7 @@ The tool scans all `*.java` sources for `@CB.*` markers, regenerates every
   runtime reflection test (`JsonLogWriterStrPackerTest`) verify every emitted
   literal against it.
 - **Cap.** `MAX_WORDS = 4` / `MAX_LITERAL_BYTES = 32`; longer literals fall back
-  to a `byte[]` + `NAME_LEN` block instead of emitting partial packed words.
+  to a `String` + `NAME_LEN` block instead of emitting partial packed words.
 
 ## Adding a new packed key
 
@@ -150,9 +151,9 @@ The tool scans all `*.java` sources for `@CB.*` markers, regenerates every
 
    ```java
    // @CB.StrPacker private static final KEY_TRACE_ID = `"traceId":`
-   private static final byte[] KEY_TRACE_ID = "\"traceId\":".getBytes(StandardCharsets.UTF_8);
-   private static final long KEY_TRACE_ID_W0 = packWord(KEY_TRACE_ID, 0);
-   private static final int KEY_TRACE_ID_LEN = KEY_TRACE_ID.length;
+   private static final String KEY_TRACE_ID = "\"traceId\":";
+   private static final long KEY_TRACE_ID_W0 = packWord(KEY_TRACE_ID.getBytes(StandardCharsets.UTF_8), 0);
+   private static final int KEY_TRACE_ID_LEN = KEY_TRACE_ID.length();
    private static final int KEY_TRACE_ID_LEN_BUF = 0; // regenerated by CodeBuddy
    ```
 
@@ -168,8 +169,9 @@ The tool scans all `*.java` sources for `@CB.*` markers, regenerates every
 ## Tests
 
 - `project-automation/.../StrPackerTest.java` — marker parsing, word-window
-  generation (1..4 words), the >32-byte byte[] fallback, source
-  rewriting/idempotency/CRLF, and verification that every committed block in
-  `JsonLogWriter.java` matches `packWord`.
+  generation (1..4 words), the >32-byte String fallback, byte[]→String block
+  migration, source rewriting/idempotency/CRLF, and verification that every
+  committed block in `JsonLogWriter.java` matches `packWord`.
 - `logback/.../JsonLogWriterStrPackerTest.java` — runtime reflection check that
-  the compiled constants equal `JsonLogWriter.packWord(KEY_*, off)` / `KEY_*.length`.
+  the compiled constants equal `JsonLogWriter.packWord(KEY_*, off)` / the UTF-8
+  length of the `KEY_*` String.

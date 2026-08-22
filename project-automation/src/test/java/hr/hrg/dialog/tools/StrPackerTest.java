@@ -93,7 +93,7 @@ class StrPackerTest {
     void generateBlock_escapesLiteralAndComputesConstants() {
         StrPacker.Spec spec = new StrPacker.Spec("private static final", "KEY_TS", "{\"ts\":");
         assertEquals(List.of(
-                "    private static final byte[] KEY_TS = \"{\\\"ts\\\":\".getBytes(StandardCharsets.UTF_8);",
+                "    private static final String KEY_TS = \"{\\\"ts\\\":\";",
                 "    private static final long KEY_TS_W0 = 0x00003a227374227bL;",
                 "    private static final int KEY_TS_LEN = 6;",
                 "    private static final int KEY_TS_LEN_BUF = 8;"
@@ -137,7 +137,7 @@ class StrPackerTest {
         // 25 bytes -> 4 words, concrete values (anchor for doc/codebuddy-strpacker.md)
         StrPacker.Spec fourWords = new StrPacker.Spec("private static final", "KEY_LONG", "\"someLongKeyName\":\"value\"");
         assertEquals(List.of(
-                "    private static final byte[] KEY_LONG = \"\\\"someLongKeyName\\\":\\\"value\\\"\".getBytes(StandardCharsets.UTF_8);",
+                "    private static final String KEY_LONG = \"\\\"someLongKeyName\\\":\\\"value\\\"\";",
                 "    private static final long KEY_LONG_W0 = 0x6e6f4c656d6f7322L;",
                 "    private static final long KEY_LONG_W1 = 0x656d614e79654b67L;",
                 "    private static final long KEY_LONG_W2 = 0x65756c6176223a22L;",
@@ -149,19 +149,19 @@ class StrPackerTest {
 
     @Test
     void generateBlock_fallsBackToBytesOnlyWhenLiteralExceedsMaxWords() {
-        // 33 bytes would need a 5th word -> byte[] + LEN only, no packed words.
+        // 33 bytes would need a 5th word -> String + LEN only, no packed words.
         String literal33 = "\"" + "x".repeat(31) + "\"";
         StrPacker.Spec spec33 = new StrPacker.Spec("private static final", "KEY_33", literal33);
         List<String> block = StrPacker.generateBlock(spec33, "    ");
-        assertEquals(2, block.size(), "fallback block is byte[] + LEN only");
+        assertEquals(2, block.size(), "fallback block is String + LEN only");
         assertEquals("    private static final int KEY_33_LEN = 33;", block.get(1));
-        assertTrue(block.get(0).startsWith("    private static final byte[] KEY_33 = \"\\\""),
-                "byte[] line carries the escaped literal: " + block.get(0));
-        assertTrue(block.get(0).endsWith("\".getBytes(StandardCharsets.UTF_8);"), block.get(0));
+        assertTrue(block.get(0).startsWith("    private static final String KEY_33 = \"\\\""),
+                "String line carries the escaped literal: " + block.get(0));
+        assertTrue(block.get(0).endsWith("\";"), block.get(0));
         assertFalse(String.join("\n", block).contains("_W"), "no packed words in fallback block");
         assertFalse(String.join("\n", block).contains("_LEN_BUF"), "no buffer reserve in fallback block");
 
-        // Exactly 32 bytes is the maximum packed form: byte[] + W0..W3 + LEN + LEN_BUF.
+        // Exactly 32 bytes is the maximum packed form: String + W0..W3 + LEN + LEN_BUF.
         StrPacker.Spec spec32 = new StrPacker.Spec("private static final", "KEY_32", "\"" + "x".repeat(30) + "\"");
         List<String> packed = StrPacker.generateBlock(spec32, "");
         assertEquals(7, packed.size());
@@ -175,15 +175,15 @@ class StrPackerTest {
     @Test
     void processFileText_fallsBackToBytesOnlyAndIsIdempotent() {
         // A 42-byte literal (40 y's + quotes) exceeds 4 words: the placeholder
-        // words must be dropped in favor of a byte[] + LEN fallback block.
+        // words must be dropped in favor of a String + LEN fallback block.
         String literal = "\"" + "y".repeat(40) + "\"";
         String source = "    // @CB.StrPacker private static final KEY_LONG = `" + literal + "`\n"
-                + "    private static final byte[] KEY_LONG = new byte[0];\n"
+                + "    private static final String KEY_LONG = \"\";\n"
                 + "    private static final long KEY_LONG_W0 = 0L;\n"
                 + "    private static final int KEY_LONG_LEN = 0;\n";
         String processed = StrPacker.processFileText(source);
         assertTrue(processed.contains(
-                "private static final byte[] KEY_LONG = \"\\\"" + "y".repeat(40) + "\\\"\".getBytes(StandardCharsets.UTF_8);"),
+                "private static final String KEY_LONG = \"\\\"" + "y".repeat(40) + "\\\"\";"),
                 processed);
         assertFalse(processed.contains("KEY_LONG_W"), "fallback block must not keep packed words: " + processed);
         assertFalse(processed.contains("KEY_LONG_LEN_BUF"), "fallback block must not keep a buffer reserve: " + processed);
@@ -221,14 +221,14 @@ class StrPackerTest {
         String source = ""
                 + "    // explanatory comment\n"
                 + "    // @CB.StrPacker private static final KEY_MSG = `\"msg\":`\n"
-                + "    private static final byte[] KEY_MSG = \"\\\"msg\\\":\".getBytes(StandardCharsets.UTF_8);\n"
+                + "    private static final String KEY_MSG = \"\\\"msg\\\":\";\n"
                 + "    private static final long KEY_MSG_W0 = packWord(KEY_MSG, 0);\n"
                 + "    private static final int KEY_MSG_LEN = KEY_MSG.length;\n"
                 + "    private static final byte[] JSON_NULL = \"null\".getBytes(StandardCharsets.UTF_8);\n";
         String expected = ""
                 + "    // explanatory comment\n"
                 + "    // @CB.StrPacker private static final KEY_MSG = `\"msg\":`\n"
-                + "    private static final byte[] KEY_MSG = \"\\\"msg\\\":\".getBytes(StandardCharsets.UTF_8);\n"
+                + "    private static final String KEY_MSG = \"\\\"msg\\\":\";\n"
                 + "    private static final long KEY_MSG_W0 = 0x00003a2267736d22L;\n"
                 + "    private static final int KEY_MSG_LEN = 6;\n"
                 + "    private static final int KEY_MSG_LEN_BUF = 8;\n"
@@ -240,7 +240,7 @@ class StrPackerTest {
     void processFileText_isIdempotent() {
         String source = ""
                 + "    // @CB.StrPacker private static final KEY_LOGGER = `\"logger\":`\n"
-                + "    private static final byte[] KEY_LOGGER = \"\\\"logger\\\":\".getBytes(StandardCharsets.UTF_8);\n"
+                + "    private static final String KEY_LOGGER = \"\\\"logger\\\":\";\n"
                 + "    private static final long KEY_LOGGER_W0 = packWord(KEY_LOGGER, 0);\n"
                 + "    private static final long KEY_LOGGER_W1 = packWord(KEY_LOGGER, 8);\n"
                 + "    private static final int KEY_LOGGER_LEN = KEY_LOGGER.length;\n";
@@ -254,7 +254,7 @@ class StrPackerTest {
         String source = "    // @CB.StrPacker private static final KEY_TS = `{\"ts\":`\n"
                 + "    private static final int OTHER = 1;\n";
         String processed = StrPacker.processFileText(source);
-        assertTrue(processed.contains("private static final byte[] KEY_TS = \"{\\\"ts\\\":\".getBytes(StandardCharsets.UTF_8);"));
+        assertTrue(processed.contains("private static final String KEY_TS = \"{\\\"ts\\\":\";"));
         assertTrue(processed.contains("private static final long KEY_TS_W0 = 0x00003a227374227bL;"));
         assertTrue(processed.contains("private static final int KEY_TS_LEN = 6;"));
         assertTrue(processed.contains("private static final int KEY_TS_LEN_BUF = 8;"));
@@ -264,12 +264,65 @@ class StrPackerTest {
     @Test
     void processFileText_keepsCrlfLineEndings() {
         String source = "    // @CB.StrPacker private static final KEY_MSG = `\"msg\":`\r\n"
-                + "    private static final byte[] KEY_MSG = new byte[0];\r\n"
+                + "    private static final String KEY_MSG = \"\";\r\n"
                 + "    private static final long KEY_MSG_W0 = 0L;\r\n"
                 + "    private static final int KEY_MSG_LEN = 0;\r\n";
         String processed = StrPacker.processFileText(source);
         assertTrue(processed.contains("\r\n"), "output must keep CRLF");
         assertFalse(processed.replace("\r\n", "\n").contains("\r"), "no stray lone CR");
+    }
+
+    @Test
+    void processFileText_migratesOldByteArrayBlocksToString() {
+        // The previous generated shape was byte[]; CodeBuddy must fully replace
+        // it with the String shape in one pass — no leftover byte[] lines or
+        // runtime initializers, and the result is idempotent.
+        String oldSource = ""
+                + "    // @CB.StrPacker private static final KEY_LOGGER = `\"logger\":`\n"
+                + "    private static final byte[] KEY_LOGGER = \"\\\"logger\\\":\".getBytes(StandardCharsets.UTF_8);\n"
+                + "    private static final long KEY_LOGGER_W0 = packWord(KEY_LOGGER, 0);\n"
+                + "    private static final long KEY_LOGGER_W1 = packWord(KEY_LOGGER, 8);\n"
+                + "    private static final int KEY_LOGGER_LEN = KEY_LOGGER.length;\n"
+                + "    private static final int KEY_LOGGER_LEN_BUF = 16;\n";
+        String once = StrPacker.processFileText(oldSource);
+        assertTrue(once.contains("private static final String KEY_LOGGER = \"\\\"logger\\\":\";"), once);
+        assertFalse(once.contains("byte[] KEY_LOGGER"), "old byte[] declaration must be replaced: " + once);
+        assertFalse(once.contains("packWord("), "runtime initializers must be replaced: " + once);
+        assertEquals(once, StrPacker.processFileText(once), "migrated block must be idempotent");
+    }
+
+    @Test
+    void processFileText_collapsesDuplicateBlocksBelowMarker() {
+        // A stale duplicate block below the marker (the transient state after a
+        // generator shape change) must be fully overwritten, not left behind.
+        String dupSource = ""
+                + "    // @CB.StrPacker private static final KEY_LOGGER = `\"logger\":`\n"
+                + "    private static final String KEY_LOGGER = \"\\\"logger\\\":\";\n"
+                + "    private static final long KEY_LOGGER_W0 = 0x22726567676f6c22L;\n"
+                + "    private static final long KEY_LOGGER_W1 = 0x000000000000003aL;\n"
+                + "    private static final int KEY_LOGGER_LEN = 9;\n"
+                + "    private static final int KEY_LOGGER_LEN_BUF = 16;\n"
+                + "    private static final byte[] KEY_LOGGER = \"\\\"logger\\\":\".getBytes(StandardCharsets.UTF_8);\n"
+                + "    private static final long KEY_LOGGER_W0 = 0x22726567676f6c22L;\n"
+                + "    private static final long KEY_LOGGER_W1 = 0x000000000000003aL;\n"
+                + "    private static final int KEY_LOGGER_LEN = 9;\n"
+                + "    private static final int KEY_LOGGER_LEN_BUF = 16;\n"
+                + "    private static final int OTHER = 1;\n";
+        String processed = StrPacker.processFileText(dupSource);
+        assertEquals(1, countOccurrences(processed, "private static final String KEY_LOGGER ="), processed);
+        assertFalse(processed.contains("byte[] KEY_LOGGER"), "duplicate byte[] block must be removed: " + processed);
+        assertTrue(processed.contains("private static final int OTHER = 1;"), processed);
+        assertEquals(processed, StrPacker.processFileText(processed), "collapsed block must be idempotent");
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = haystack.indexOf(needle, idx)) >= 0) {
+            count++;
+            idx += needle.length();
+        }
+        return count;
     }
 
     // ------------------------------------------------------------------
