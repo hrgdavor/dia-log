@@ -37,12 +37,12 @@ Running CodeBuddy replaces the block below the marker with:
     private static final int KEY_TS_LEN_BUF = 8;
 ```
 
-| Generated member | Meaning |
-| --- | --- |
-| `String NAME` | the literal itself as a `String` reference — the naive form used by tests and comparison code and by the stream fallback |
-| `long NAME_W0..NAME_W3` | one little-endian `packWord` per 8-byte window (offsets 0, 8, 16, 24), as 16-digit hex literals — direct-buffer path (one 8-byte store per word) |
-| `int NAME_LEN` | the UTF-8 byte length, as a literal |
-| `int NAME_LEN_BUF` | the buffer reserve the packed store occupies — `NAME_LEN` rounded up to whole 8-byte word slots (e.g. 9 → 16), used directly by the inline capacity checks |
+| Generated member        | Meaning                                                                                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `String NAME`           | the literal itself as a `String` reference — the naive form used by tests and comparison code and by the stream fallback                                   |
+| `long NAME_W0..NAME_W3` | one little-endian `packWord` per 8-byte window (offsets 0, 8, 16, 24), as 16-digit hex literals — direct-buffer path (one 8-byte store per word)           |
+| `int NAME_LEN`          | the UTF-8 byte length, as a literal                                                                                                                        |
+| `int NAME_LEN_BUF`      | the buffer reserve the packed store occupies — `NAME_LEN` rounded up to whole 8-byte word slots (e.g. 9 → 16), used directly by the inline capacity checks |
 
 Word `i` is emitted when the UTF-8 length exceeds `i*8`, so a 1-byte..8-byte
 literal gets 1 word, 9..16 bytes get 2 words, 17..24 get 3 words, and 25..32

@@ -13,3 +13,4 @@ public class JsonAppenderDev extends JsonAppender {
         return new JsonLogWriterDev();
     }
 }
+ 
