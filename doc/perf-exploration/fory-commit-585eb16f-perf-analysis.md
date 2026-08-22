@@ -11,15 +11,15 @@ the end. All line references below are to the commit diff
 (`Utf8JsonWriter.java` / `StringJsonWriter.java`).
 
 > **Implementation status:** T1–T6 are implemented in this repo. Each
-> technique has a dedicated document under [`doc/perf/`](perf/) with the
+> technique has a dedicated document under `doc/perf-exploration/` with the
 > before/after code, the Fory attribution, and verification:
 >
-> - [T1 — SWAR word-at-a-time JSON escape scan](perf/t1-swar-word-scan.md)
-> - [T2 — length-specialized string writers](perf/t2-length-specialized-writers.md)
-> - [T3 — inlined capacity checks](perf/t3-inlined-capacity-checks.md)
-> - [T4 — writer-owns-buffer direct API](perf/t4-writer-owns-buffer.md)
-> - [T5 — packed digit tables](perf/t5-packed-digit-tables.md)
-> - [T6 — packed field-name prefixes](perf/t6-packed-field-prefixes.md)
+> - [T1 — SWAR word-at-a-time JSON escape scan](t1-swar-word-scan.md)
+> - [T2 — length-specialized string writers](t2-length-specialized-writers.md)
+> - [T3 — inlined capacity checks](t3-inlined-capacity-checks.md)
+> - [T4 — writer-owns-buffer direct API](t4-writer-owns-buffer.md)
+> - [T5 — packed digit tables](t5-packed-digit-tables.md)
+> - [T6 — packed field-name prefixes](t6-packed-field-prefixes.md)
 >
 > The pre-optimization implementations are preserved as benchmark baselines in
 > `core/src/test/java/hr/hrg/dialog/core/perf/` and compared for byte
@@ -280,7 +280,7 @@ through the `OutputStream` interface. Two options:
    `EscapedJsonStringWriter` / `StringByteExtractor` / `JsonNumberWriter` get
    overloads that take the buffer object. Keeps the public `OutputStream`
    API (jackson still needs it) while the known hot fields bypass dispatch.
-2. **Full (implemented — see [perf/t4-writer-owns-buffer.md](perf/t4-writer-owns-buffer.md)):**
+2. **Full (implemented — see [t4-writer-owns-buffer.md](t4-writer-owns-buffer.md)):**
    give `JsonLogWriter` a direct `byte[] + position` assembly mode
    (like Fory's `getBuffer/getPosition/setPosition`), falling back to the
    stream only for `mapper.writeValue`, `RawValue`, the generated stack-trace

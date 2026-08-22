@@ -49,8 +49,6 @@ public class AllocationBenchmark {
     private String throwableClassName;
     private Wyhash64.Streaming reusableStream;
     private ByteArrayOutputStream output;
-    private final byte[] floatBuffer = JsonNumberWriter.makeFloatBuffer();
-    private final byte[] doubleBuffer = JsonNumberWriter.makeDoubleBuffer();
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
@@ -120,14 +118,14 @@ public class AllocationBenchmark {
     @Benchmark
     public int floatWrite() throws IOException {
         output.reset();
-        JsonNumberWriter.writeFloat(output, floatBuffer, 1.2345678f);
+        JsonNumberWriter.writeFloat(output, 1.2345678f);
         return output.size();
     }
 
     @Benchmark
     public int doubleWrite() throws IOException {
         output.reset();
-        JsonNumberWriter.writeDouble(output, doubleBuffer, 1.2345678901234567d);
+        JsonNumberWriter.writeDouble(output, 1.2345678901234567d);
         return output.size();
     }
 

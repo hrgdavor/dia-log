@@ -8,7 +8,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
 /**
- * JSON-escaped string writing into a {@link DirectJsonBuffer} cursor — the
+ * JSON-escaped string writing into a {@link ReusableByteArrayOutputStream} cursor — the
  * T4 option 2 string path used by {@code JsonLogWriter}'s whole-event direct
  * assembly.
  *
@@ -18,11 +18,11 @@ import java.nio.charset.StandardCharsets;
  * its own class so {@code EscapedJsonStringWriter} stays a small, stable C2
  * compilation unit: adding these cursor-form methods to that class changed
  * JIT inlining on the per-string hot path and measurably regressed it (see
- * {@code doc/perf/fory-perf-benchmark-results.md}). The duplication follows
+ * {@code doc/perf-exploration/fory-perf-benchmark-results.md}). The duplication follows
  * the project's documented hot-path duplication policy.
  *
  * <p>Thread-safe: all state is static and immutable; the cursor itself is
- * owned by the writer (see {@link DirectJsonBuffer}).
+ * owned by the writer (see {@link ReusableByteArrayOutputStream}).
  */
 @ThreadSafe
 public final class DirectJsonStringWriter {
@@ -92,7 +92,7 @@ public final class DirectJsonStringWriter {
     private DirectJsonStringWriter() {}
 
     /** Writes a fully quoted JSON string (or {@code null} literal) into the cursor. */
-    public static void writeJsonStringOrNull(DirectJsonBuffer buf, String value) {
+    public static void writeJsonStringOrNull(ReusableByteArrayOutputStream buf, String value) {
         if (value == null) {
             buf.writeRaw(JSON_NULL, 0, JSON_NULL.length);
             return;
@@ -100,36 +100,61 @@ public final class DirectJsonStringWriter {
         writeJsonString(buf, value);
     }
 
-    /** Writes a fully quoted, JSON-escaped string into the cursor. */
-    public static void writeJsonString(DirectJsonBuffer buf, String value) {
-        buf.writeByte('"');
+    /**
+     * Writes a fully quoted, JSON-escaped string into the cursor. Holds the
+     * cursor (pos + backing array) locally for the whole string and publishes it
+     * once at the end; grow only delegates to {@code buf.grow} on the cold path.
+     */
+    public static void writeJsonString(ReusableByteArrayOutputStream buf, String value) {
+        int pos = writeByteDirect(buf, buf.position(), '"');
         if (STRING_CODER_HANDLE != null) {
             byte[] internal = (byte[]) STRING_VALUE_HANDLE.get(value);
             if (internal != null && ((byte) STRING_CODER_HANDLE.get(value)) == 0) {
-                writeEscapedLatin1Cursor(buf, internal);
-                buf.writeByte('"');
+                pos = writeEscapedLatin1Cursor(buf, pos, internal);
+                pos = writeByteDirect(buf, pos, '"');
+                buf.setPosition(pos);
                 return;
             }
         }
-        writeEscapedCharsCursor(buf, value);
-        buf.writeByte('"');
+        pos = writeEscapedCharsCursor(buf, pos, value);
+        pos = writeByteDirect(buf, pos, '"');
+        buf.setPosition(pos);
+    }
+
+    /** Inline single-byte store with an inlined capacity check; returns the advanced position. */
+    private static int writeByteDirect(ReusableByteArrayOutputStream c, int pos, int b) {
+        byte[] buf = c.buffer();
+        if (pos >= buf.length) {
+            c.grow(pos + 1);
+            buf = c.buffer();
+        }
+        buf[pos] = (byte) b;
+        return pos + 1;
+    }
+
+    /** Inline bulk copy with an inlined capacity check; returns the advanced position. */
+    private static int writeRawDirect(ReusableByteArrayOutputStream c, int pos, byte[] src, int off, int len) {
+        byte[] buf = c.buffer();
+        if (pos + len > buf.length) {
+            c.grow(pos + len);
+            buf = c.buffer();
+        }
+        System.arraycopy(src, off, buf, pos, len);
+        return pos + len;
     }
 
     /** SWAR band scan writing straight into the cursor (Latin-1 content). */
-    private static void writeEscapedLatin1Cursor(DirectJsonBuffer c, byte[] bytes) {
+    private static int writeEscapedLatin1Cursor(ReusableByteArrayOutputStream c, int pos, byte[] bytes) {
         int to = bytes.length;
         if (to < 8) {
-            writeEscapedLatin1PerByteCursor(c, bytes, 0, to);
-            return;
+            return writeEscapedLatin1PerByteCursor(c, pos, bytes, 0, to);
         }
         if (to <= 15) {
             long word = (long) LE_WORD.get(bytes, 0);
             if (isJsonAsciiWord(word) && isJsonAsciiTail(bytes, 8, to)) {
-                c.writeRaw(bytes, 0, to);
-                return;
+                return writeRawDirect(c, pos, bytes, 0, to);
             }
-            writeEscapedLatin1PerByteCursor(c, bytes, 0, to);
-            return;
+            return writeEscapedLatin1PerByteCursor(c, pos, bytes, 0, to);
         }
         if (to <= 24) {
             long w0 = (long) LE_WORD.get(bytes, 0);
@@ -138,16 +163,17 @@ public final class DirectJsonStringWriter {
             if (isJsonAsciiWords3(w0, w1, w2)) {
                 // T2 three-word trick: 3 loads + 3 stores; the last store at
                 // start + (to - 8) overlaps the first two but is byte-identical.
-                c.ensure(to);
-                int start = c.position();
-                c.putPackedLE(start, w0, 8);
-                c.putPackedLE(start + 8, w1, 8);
-                c.putPackedLE(start + (to - 8), w2, 8);
-                c.advance(to);
-                return;
+                byte[] buf = c.buffer();
+                if (pos + to > buf.length) {
+                    c.grow(pos + to);
+                    buf = c.buffer();
+                }
+                LE_WORD.set(buf, pos, w0);
+                LE_WORD.set(buf, pos + 8, w1);
+                LE_WORD.set(buf, pos + (to - 8), w2);
+                return pos + to;
             }
-            writeEscapedLatin1PerByteCursor(c, bytes, 0, to);
-            return;
+            return writeEscapedLatin1PerByteCursor(c, pos, bytes, 0, to);
         }
         if (to <= 31) {
             long w0 = (long) LE_WORD.get(bytes, 0);
@@ -155,120 +181,125 @@ public final class DirectJsonStringWriter {
             long w2 = (long) LE_WORD.get(bytes, 16);
             long w3 = (long) LE_WORD.get(bytes, to - 8);
             if (isJsonAsciiWords4(w0, w1, w2, w3)) {
-                c.ensure(to);
-                int start = c.position();
-                c.putPackedLE(start, w0, 8);
-                c.putPackedLE(start + 8, w1, 8);
-                c.putPackedLE(start + 16, w2, 8);
-                c.putPackedLE(start + (to - 8), w3, 8);
-                c.advance(to);
-                return;
+                byte[] buf = c.buffer();
+                if (pos + to > buf.length) {
+                    c.grow(pos + to);
+                    buf = c.buffer();
+                }
+                LE_WORD.set(buf, pos, w0);
+                LE_WORD.set(buf, pos + 8, w1);
+                LE_WORD.set(buf, pos + 16, w2);
+                LE_WORD.set(buf, pos + (to - 8), w3);
+                return pos + to;
             }
-            writeEscapedLatin1PerByteCursor(c, bytes, 0, to);
-            return;
+            return writeEscapedLatin1PerByteCursor(c, pos, bytes, 0, to);
         }
         int i = 0;
         for (; i + 16 <= to; i += 16) {
             long w0 = (long) LE_WORD.get(bytes, i);
             long w1 = (long) LE_WORD.get(bytes, i + 8);
             if (isJsonAsciiWords2(w0, w1)) {
-                c.ensure(16);
-                c.writePackedLE(w0, 8);
-                c.writePackedLE(w1, 8);
+                byte[] buf = c.buffer();
+                if (pos + 16 > buf.length) {
+                    c.grow(pos + 16);
+                    buf = c.buffer();
+                }
+                LE_WORD.set(buf, pos, w0);
+                LE_WORD.set(buf, pos + 8, w1);
+                pos += 16;
             } else {
-                writeEscapedLatin1PerByteCursor(c, bytes, i, i + 16);
+                pos = writeEscapedLatin1PerByteCursor(c, pos, bytes, i, i + 16);
             }
         }
         if (i < to) {
-            writeEscapedLatin1PerByteCursor(c, bytes, i, to);
+            pos = writeEscapedLatin1PerByteCursor(c, pos, bytes, i, to);
         }
+        return pos;
     }
 
-    private static void writeEscapedLatin1PerByteCursor(DirectJsonBuffer c, byte[] bytes, int from, int to) {
+    private static int writeEscapedLatin1PerByteCursor(ReusableByteArrayOutputStream c, int pos, byte[] bytes, int from, int to) {
         int segmentStart = from;
         for (int i = from; i < to; i++) {
             int b = bytes[i] & 0xFF;
             byte[] escape = escapeBytesForAsciiControl(b);
             if (escape != null || b < 0x20 || b >= 0x80) {
                 if (i > segmentStart) {
-                    c.writeRaw(bytes, segmentStart, i - segmentStart);
+                    pos = writeRawDirect(c, pos, bytes, segmentStart, i - segmentStart);
                 }
-                writeEscapedByteCursor(c, b);
+                pos = writeEscapedByteCursor(c, pos, b);
                 segmentStart = i + 1;
             }
         }
         if (segmentStart < to) {
-            c.writeRaw(bytes, segmentStart, to - segmentStart);
+            pos = writeRawDirect(c, pos, bytes, segmentStart, to - segmentStart);
         }
+        return pos;
     }
 
-    private static void writeEscapedByteCursor(DirectJsonBuffer c, int b) {
+    private static int writeEscapedByteCursor(ReusableByteArrayOutputStream c, int pos, int b) {
         switch (b) {
-            case '"': c.writeByte('\\'); c.writeByte('"'); return;
-            case '\\': c.writeByte('\\'); c.writeByte('\\'); return;
-            case '\b': c.writeByte('\\'); c.writeByte('b'); return;
-            case '\f': c.writeByte('\\'); c.writeByte('f'); return;
-            case '\n': c.writeByte('\\'); c.writeByte('n'); return;
-            case '\r': c.writeByte('\\'); c.writeByte('r'); return;
-            case '\t': c.writeByte('\\'); c.writeByte('t'); return;
+            case '"': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, '"');
+            case '\\': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, '\\');
+            case '\b': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 'b');
+            case '\f': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 'f');
+            case '\n': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 'n');
+            case '\r': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 'r');
+            case '\t': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 't');
             default:
                 if (b < 0x20) {
-                    c.writeByte('\\');
-                    c.writeByte('u');
-                    c.writeByte('0');
-                    c.writeByte('0');
-                    c.writeByte(HEX_DIGITS[b >>> 4]);
-                    c.writeByte(HEX_DIGITS[b & 0xF]);
+                    pos = writeByteDirect(c, pos, '\\');
+                    pos = writeByteDirect(c, pos, 'u');
+                    pos = writeByteDirect(c, pos, '0');
+                    pos = writeByteDirect(c, pos, '0');
+                    pos = writeByteDirect(c, pos, HEX_DIGITS[b >>> 4]);
+                    return writeByteDirect(c, pos, HEX_DIGITS[b & 0xF]);
                 } else {
                     // Latin-1 code point to 2-byte UTF-8.
-                    c.writeByte(0xC0 | (b >> 6));
-                    c.writeByte(0x80 | (b & 0x3F));
+                    pos = writeByteDirect(c, pos, 0xC0 | (b >> 6));
+                    return writeByteDirect(c, pos, 0x80 | (b & 0x3F));
                 }
         }
     }
 
     /** Char-scanning UTF-8 writer for UTF-16 content or when add-opens is unavailable. */
-    private static void writeEscapedCharsCursor(DirectJsonBuffer c, String value) {
+    private static int writeEscapedCharsCursor(ReusableByteArrayOutputStream c, int pos, String value) {
         int len = value.length();
         for (int i = 0; i < len; i++) {
             char ch = value.charAt(i);
             byte[] escape = escapeBytesForAsciiControl(ch);
             if (escape != null) {
-                c.writeRaw(escape, 0, escape.length);
+                pos = writeRawDirect(c, pos, escape, 0, escape.length);
             } else if (ch < 0x20) {
-                c.writeByte('\\');
-                c.writeByte('u');
-                c.writeByte('0');
-                c.writeByte('0');
-                c.writeByte(HEX_DIGITS[(ch >>> 4) & 0xF]);
-                c.writeByte(HEX_DIGITS[ch & 0xF]);
+                pos = writeByteDirect(c, pos, '\\');
+                pos = writeByteDirect(c, pos, 'u');
+                pos = writeByteDirect(c, pos, '0');
+                pos = writeByteDirect(c, pos, '0');
+                pos = writeByteDirect(c, pos, HEX_DIGITS[(ch >>> 4) & 0xF]);
+                pos = writeByteDirect(c, pos, HEX_DIGITS[ch & 0xF]);
             } else if (ch <= 0x7F) {
-                c.writeByte(ch);
+                pos = writeByteDirect(c, pos, ch);
             } else if (ch <= 0x7FF) {
-                c.ensure(2);
-                c.writeByte(0xC0 | (ch >> 6));
-                c.writeByte(0x80 | (ch & 0x3F));
+                pos = writeByteDirect(c, pos, 0xC0 | (ch >> 6));
+                pos = writeByteDirect(c, pos, 0x80 | (ch & 0x3F));
             } else if (Character.isHighSurrogate(ch) && i + 1 < len && Character.isLowSurrogate(value.charAt(i + 1))) {
                 int codePoint = Character.toCodePoint(ch, value.charAt(i + 1));
-                c.ensure(4);
-                c.writeByte(0xF0 | (codePoint >> 18));
-                c.writeByte(0x80 | ((codePoint >> 12) & 0x3F));
-                c.writeByte(0x80 | ((codePoint >> 6) & 0x3F));
-                c.writeByte(0x80 | (codePoint & 0x3F));
+                pos = writeByteDirect(c, pos, 0xF0 | (codePoint >> 18));
+                pos = writeByteDirect(c, pos, 0x80 | ((codePoint >> 12) & 0x3F));
+                pos = writeByteDirect(c, pos, 0x80 | ((codePoint >> 6) & 0x3F));
+                pos = writeByteDirect(c, pos, 0x80 | (codePoint & 0x3F));
                 i++;
             } else if (Character.isHighSurrogate(ch) || Character.isLowSurrogate(ch)) {
                 // Lone surrogate → U+FFFD, matching the classic path.
-                c.ensure(3);
-                c.writeByte(0xEF);
-                c.writeByte(0xBF);
-                c.writeByte(0xBD);
+                pos = writeByteDirect(c, pos, 0xEF);
+                pos = writeByteDirect(c, pos, 0xBF);
+                pos = writeByteDirect(c, pos, 0xBD);
             } else {
-                c.ensure(3);
-                c.writeByte(0xE0 | (ch >> 12));
-                c.writeByte(0x80 | ((ch >> 6) & 0x3F));
-                c.writeByte(0x80 | (ch & 0x3F));
+                pos = writeByteDirect(c, pos, 0xE0 | (ch >> 12));
+                pos = writeByteDirect(c, pos, 0x80 | ((ch >> 6) & 0x3F));
+                pos = writeByteDirect(c, pos, 0x80 | (ch & 0x3F));
             }
         }
+        return pos;
     }
 
     // ---- escape byte table (shared with the char-scan path) ----------------

@@ -46,11 +46,11 @@ allocations* with the reason it is not (and should not be) allocation-free.
 7. **Ryu float/double** — `Float.toString()` / `Double.toString()` are replaced by the
    Ryu algorithms, which emit digits straight to the output (no `String`, no boxed
    `Float`/`Double`).
-8. **Digit-pair lookup for int/long** — digits are computed via a precomputed ASCII
-   lookup table for pairs 00–99 and written directly.
-9. **Reusable scratch buffers** — each writer owns reusable `int`/`long`/`float`/`double`
-   buffers (`makeIntBuffer()` & co.), filled and written per event; no per-number buffer
-   is ever allocated.
+8. **Digit-pair/quad lookup for int/long** — digits are computed via the precomputed
+   ASCII `DIGIT_QUADS`/`DIGIT_TRIPLES` tables and written directly.
+9. **Bufferless number writes** — `JsonNumberWriter` writes digits straight into the
+   event `byte[]` at a caller offset (Ryu at that offset for float/double); no scratch
+   buffer and no per-number allocation.
 
 ### The `JsonLogWriter` hot path
 

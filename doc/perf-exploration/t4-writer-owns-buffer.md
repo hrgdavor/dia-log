@@ -82,8 +82,9 @@ dispatches on the target:
   `{`, packed prefixes (T6), the four fixed strings escaped straight into the
   buffer (SWAR bands + escape emitters writing via the cursor,
   `EscapedJsonStringWriter.writeJsonString(DirectJsonBuffer, String)`),
-  numbers built once and bulk-copied (`JsonNumberWriter.buildLong/buildInt` +
-  `writeLong/writeInt(DirectJsonBuffer, ...)`), KV/MDC keys and values, the
+  numbers written straight into the cursor at the current offset
+  (`JsonNumberWriter.writeLong/writeInt(buf, pos, ...)`, no scratch buffer),
+  KV/MDC keys and values, the
   closing `}` — is assembled with `buf`/`pos` live in registers and inlined
   capacity checks; the cursor is published once with `publish()`.
 - Stream-only delegations — jackson (`mapper.writeValue`), `RawValue`,

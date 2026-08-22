@@ -241,13 +241,12 @@ class ForyPerfComparisonTest {
     @Test
     void ints_classicVsNew() throws IOException {
         byte[] classicBuf = ClassicJsonNumberWriter.makeIntBuffer();
-        byte[] newBuf = JsonNumberWriter.makeIntBuffer();
         for (int value : intBattery()) {
             ByteArrayOutputStream classic = new ByteArrayOutputStream();
             ClassicJsonNumberWriter.writeInt(classic, classicBuf, value);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            JsonNumberWriter.writeInt(out, newBuf, value);
+            JsonNumberWriter.writeInt(out, value);
 
             assertEquals(classic.toString(StandardCharsets.UTF_8), out.toString(StandardCharsets.UTF_8),
                     "int=" + value);
@@ -258,13 +257,12 @@ class ForyPerfComparisonTest {
     @Test
     void longs_classicVsNew() throws IOException {
         byte[] classicBuf = ClassicJsonNumberWriter.makeLongBuffer();
-        byte[] newBuf = JsonNumberWriter.makeLongBuffer();
         for (long value : longBattery()) {
             ByteArrayOutputStream classic = new ByteArrayOutputStream();
             ClassicJsonNumberWriter.writeLong(classic, classicBuf, value);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            JsonNumberWriter.writeLong(out, newBuf, value);
+            JsonNumberWriter.writeLong(out, value);
 
             assertEquals(classic.toString(StandardCharsets.UTF_8), out.toString(StandardCharsets.UTF_8),
                     "long=" + value);

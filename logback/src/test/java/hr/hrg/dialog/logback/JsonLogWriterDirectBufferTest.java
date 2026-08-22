@@ -57,16 +57,49 @@ class JsonLogWriterDirectBufferTest {
 
     /** Writes {@code event} once through each path and asserts identical bytes. */
     private void assertDirectMatchesStream(LoggingEvent event) throws Exception {
-        ReusableByteArrayOutputStream direct = new ReusableByteArrayOutputStream(1024);
+        assertDirectMatchesStream(event, 1024);
+    }
+
+    /** Writes {@code event} through each path with the given direct-buffer capacity and asserts identical bytes. */
+    private void assertDirectMatchesStream(LoggingEvent event, int initialCapacity) throws Exception {
+        ReusableByteArrayOutputStream direct = new ReusableByteArrayOutputStream(initialCapacity);
         writer.writeJsonEvent(mapper, event, direct);
 
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         writer.writeJsonEvent(mapper, event, stream);
 
         assertArrayEquals(stream.toByteArray(), java.util.Arrays.copyOf(direct.buffer(), direct.size()),
-                "direct-buffer output must equal stream output");
+                "direct-buffer output must equal stream output (capacity " + initialCapacity + ")");
         String json = new String(stream.toByteArray(), StandardCharsets.UTF_8);
         assertTrue(json.startsWith("{") && json.endsWith("}"), "valid object: " + json);
+    }
+
+    @Test
+    void tinyBufferForcesEveryGrowPath_matchesAcrossPaths() throws Exception {
+        // An 8-byte initial buffer is smaller than the very first inline reserve
+        // (ts prefix word slot + bounded long), so every packed-key capacity
+        // check must round the key up to whole 8-byte word slots and grow
+        // before storing (no ArrayIndexOutOfBounds, byte-identical output).
+        assertDirectMatchesStream(event("grow me"), 8);
+    }
+
+    @Test
+    void tinyBufferThrowableEvent_matchesAcrossPaths() throws Exception {
+        // Exercises the stack and errHash inline checks on the grow path too.
+        LoggerContext context = new LoggerContext();
+        Logger logger = context.getLogger("test.direct");
+        logger.setLevel(Level.ERROR);
+
+        LoggingEvent event = new LoggingEvent("test.direct", logger, Level.ERROR, "boom",
+                new RuntimeException("boom"), null);
+        event.setTimeStamp(123456789L);
+        event.setThreadName("t-1");
+        applyIfPresent(event, "setKeyValuePairs", new Class<?>[]{List.class}, List.of(
+            new KeyValuePair("k", "v"),
+            new KeyValuePair("n", 42)
+        ));
+        applyIfPresent(event, "setMDCPropertyMap", new Class<?>[]{Map.class}, Map.of("m", "1"));
+        assertDirectMatchesStream(event, 8);
     }
 
     @Test

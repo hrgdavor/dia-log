@@ -62,7 +62,7 @@ Numeric fields are written with `JsonNumberWriter`, which converts `int`/`long`/
 
 ### Buffer and streaming-hash object reuse
 
-- **Reusable number buffers** — Each `JsonLogWriter` instance owns reusable `int`/`long` scratch buffers (`intNumberBuffer`, `longNumberBuffer`) that are filled and written per event, so no per-number buffer is allocated.
+- **Bufferless number writes** — `JsonNumberWriter` writes `int`/`long`/`float`/`double` digits directly into the event `byte[]` at the current cursor offset — no `String`, no scratch `byte[]`, no per-number buffer.
 - **Streaming hash reuse** — `Wyhash64.Streaming` is designed to be reset and reused (`reset(...)`) on the hot path instead of creating a fresh hasher per event, keeping hashing allocation-free. The fingerprint entry points (`fingerprint(...)`, `addFromTraceToOutputStream*AndFingerprint(...)`) take a caller-supplied hasher as a parameter and reset it internally — there are no no-stream convenience overloads and no hidden `ThreadLocal` state. `JsonLogWriter` owns its hasher as a plain field, exactly like its number buffers.
 - **Reusable event buffer** — `JsonAppender` / `JsonAppenderRolling` assemble each event in a shared `ReusableByteArrayOutputStream` (1 MiB, grows only to the longest event ever written) and flush the whole event to the real stream with one bulk write, avoiding hundreds of tiny writes to file/network streams per event.
 - **Batched string emission** — `StringByteExtractor.writeLatin1` writes contiguous ASCII runs with bulk `write(byte[], off, len)` calls (per-byte `write(int)` is measured ≈51× slower); this removed the dominant stack-trace-write cost (traced JSON events ≈3.1× faster).
@@ -374,7 +374,7 @@ is a treasure trove.
 
 Allocation: ≈ 0 B/op on every leg, before and after — the gains are pure CPU, the zero-allocation property is intact.
 
-**Document:** `doc/perf/fory-perf-benchmark-results.md` — methodology, full tables, per-technique interpretation (T1–T6), and analysis. Key findings:
+**Document:** `doc/perf-exploration/fory-perf-benchmark-results.md` — methodology, full tables, per-technique interpretation (T1–T6), and analysis. Key findings:
 - The biggest end-to-end win is *structural* (T3/T4/T6, Fory's writer-owns-buffer design: 215→125 ns from new internals alone, then →108 ns with the direct path), not just the SWAR scan.
 - Stream mode is ~neutral on typical short strings and regresses on all-dirty input (double-scan of dirty blocks + per-escape writes) — acceptable since production always targets the direct buffer.
 - **A real benchmark pitfall was found and fixed:** a fresh `new LoggerContext()` has no MDC adapter, so `event.getMDCPropertyMap()` throws NPE on every call (logback 1.5.38, `LoggingEvent` line 460). `JsonLogWriter` swallows it, but an uninitialized benchmark measures the NPE path (~736 B/op, GC-inflated times — my first run showed exactly that). The event benchmark now initializes a `LogbackMDCAdapter` in `@Setup`, matching production; the discarded run is documented.

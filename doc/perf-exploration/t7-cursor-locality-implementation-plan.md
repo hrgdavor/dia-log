@@ -140,8 +140,8 @@ pattern works beyond JSON.
 1. Add a `CursorBufferWriterBenchmark` in `core/src/test/.../perf/` that
    measures `writeInt`, `writeLong`, `writeUTF8` through `CursorBuffer` +
    `WriteOps` vs `ByteArrayOutputStream` + `DataOutputStream`.
-2. Add the results to `doc/perf/fory-perf-benchmark-results.md`.
-3. Update `doc/perf/t7-cursor-locality-buffer-writer.md` to reflect the actual
+2. Add the results to `doc/perf-exploration/fory-perf-benchmark-results.md`.
+3. Update `doc/perf-exploration/t7-cursor-locality-buffer-writer.md` to reflect the actual
    project implementations (JsonNumberWriter, DirectJsonBuffer, ReusableByteArrayOutputStream).
 
 **Success metric:** The cursor-locality path should be at least 2× faster than

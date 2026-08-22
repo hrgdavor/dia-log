@@ -67,9 +67,7 @@ public class ForyPerfComparisonBenchmark {
     private long[] longValues;
     private int[] intValues;
     private byte[] classicIntBuf;
-    private byte[] newIntBuf;
     private byte[] classicLongBuf;
-    private byte[] newLongBuf;
     private byte[] prefixLevelBytes;
     private byte[] prefixErrMessageBytes;
     private long prefixLevelWord0;
@@ -135,9 +133,7 @@ public class ForyPerfComparisonBenchmark {
             smallIntValues[i] = rnd.nextInt(100_000);
         }
         classicIntBuf = ClassicJsonNumberWriter.makeIntBuffer();
-        newIntBuf = JsonNumberWriter.makeIntBuffer();
         classicLongBuf = ClassicJsonNumberWriter.makeLongBuffer();
-        newLongBuf = JsonNumberWriter.makeLongBuffer();
         prefixLevelBytes = "\"level\":".getBytes(StandardCharsets.UTF_8);
         prefixErrMessageBytes = "\"errMessage\":".getBytes(StandardCharsets.UTF_8);
         prefixLevelWord0 = packLE(prefixLevelBytes, 0);
@@ -294,7 +290,7 @@ public class ForyPerfComparisonBenchmark {
     @Benchmark
     public void longNew(Blackhole bh) throws IOException {
         streamOut.reset();
-        JsonNumberWriter.writeLong(streamOut, newLongBuf, longValues[sampleIndex++ % longValues.length]);
+        JsonNumberWriter.writeLong(streamOut, longValues[sampleIndex++ % longValues.length]);
         bh.consume(streamOut);
     }
 
@@ -308,7 +304,7 @@ public class ForyPerfComparisonBenchmark {
     @Benchmark
     public void longSmallNew(Blackhole bh) throws IOException {
         streamOut.reset();
-        JsonNumberWriter.writeLong(streamOut, newLongBuf, smallLongValues[sampleIndex++ % smallLongValues.length]);
+        JsonNumberWriter.writeLong(streamOut, smallLongValues[sampleIndex++ % smallLongValues.length]);
         bh.consume(streamOut);
     }
 
@@ -322,7 +318,7 @@ public class ForyPerfComparisonBenchmark {
     @Benchmark
     public void intNew(Blackhole bh) throws IOException {
         streamOut.reset();
-        JsonNumberWriter.writeInt(streamOut, newIntBuf, intValues[sampleIndex++ % intValues.length]);
+        JsonNumberWriter.writeInt(streamOut, intValues[sampleIndex++ % intValues.length]);
         bh.consume(streamOut);
     }
 
@@ -336,7 +332,7 @@ public class ForyPerfComparisonBenchmark {
     @Benchmark
     public void intSmallNew(Blackhole bh) throws IOException {
         streamOut.reset();
-        JsonNumberWriter.writeInt(streamOut, newIntBuf, smallIntValues[sampleIndex++ % smallIntValues.length]);
+        JsonNumberWriter.writeInt(streamOut, smallIntValues[sampleIndex++ % smallIntValues.length]);
         bh.consume(streamOut);
     }
 

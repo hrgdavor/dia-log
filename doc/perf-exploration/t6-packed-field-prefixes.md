@@ -47,19 +47,21 @@ Baseline fixture: `hr.hrg.dialog.core.perf.ClassicFieldPrefixes` (the old
 
 `logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java`:
 
-- A `PackedKey` record holds each fixed prefix as its UTF-8 bytes plus up to
-  two little-endian packed `long` words (built once at class init by the same
-  `pack` helper shape Fory's codegen emits).
-- `writeObjectStartAndField(out, KEY_TS)` fuses the leading `{` with the first
-  prefix (Fory's object-start fusion), and `writeFieldPrefix(out, key)` writes
-  `,` + the packed prefix.
-- Direct-buffer path (target is a `ReusableByteArrayOutputStream`, which is
-  the production event buffer in `JsonAppender`): `rbo.write(',')` +
-  `writeLongPrefixLE(word0, n)` (+ second word for prefixes longer than 8
-  bytes, e.g. `"errMessage":` = 12 bytes) — 1–2 packed stores with inlined
-  capacity checks, no `arraycopy`, no per-call virtual dispatch.
+- Each fixed prefix is declared by a `// @CB.StrPacker ...` marker (see
+  `doc/codebuddy-strpacker.md`); the project-automation `CodeBuddy` generator
+  emits the UTF-8 `byte[]` plus the packed little-endian `long` constants
+  (`KEY_X_W0..W3`, `KEY_X_LEN`) as compile-time literals.
+- The direct-buffer path (target is a `ReusableByteArrayOutputStream`, the
+  production event buffer in `JsonAppender`) stores each prefix as one
+  little-endian VarHandle long store per 8-byte window (`WriteOps.LE_LONG.set`)
+  with inlined capacity checks — no `arraycopy`, no
+  per-call virtual dispatch. The leading `{` is fused into the first prefix
+  (`KEY_TS` includes the object-start `{`).
 - Stream fallback keeps the original `out.write(',')` + `out.write(bytes)`
   behavior, so output is byte-identical for every sink.
+
+The sub-8-byte tail stores are refined in
+[t8-packed-word-varhandle-stores.md](t8-packed-word-varhandle-stores.md).
 
 User-supplied KV/MDC keys are unaffected: they still go through
 `EscapedJsonStringWriter` (full JSON escaping per AGENTS.md's escape
@@ -71,8 +73,8 @@ discipline). Only the fixed schema prefixes are packed.
   direct-buffer path (packed prefixes active) and the plain-stream fallback
   (old `write(byte[])` behavior) for plain events, all-field-type events,
   throwable events, long-value events and null-field events.
-- `ReusableByteArrayOutputStreamDirectApiTest` pins the `writeLongPrefixLE`
-  store helpers.
+- `core/.../WriteOpsPackedTest` pins the `WriteOps.LE_LONG` packed store at
+  every byte offset (alignment coverage).
 - Existing `JsonLogWriterTest` (field layout, escaping, KV/MDC dedup) passes
   unchanged.
 - Benchmark: `ForyPerfComparisonBenchmark` (`prefixesStreamMediated`,

@@ -12,6 +12,9 @@ Design and attribution for each technique:
 - [t4-writer-owns-buffer.md](t4-writer-owns-buffer.md) — direct-buffer API
 - [t5-packed-digit-tables.md](t5-packed-digit-tables.md) — `DIGIT_QUADS`/`DIGIT_TRIPLES`
 - [t6-packed-field-prefixes.md](t6-packed-field-prefixes.md) — packed `long` field prefixes
+- [t7-cursor-locality-buffer-writer.md](t7-cursor-locality-buffer-writer.md) — whole-event `buf`/`pos`/`limit` cursor
+- [t8-packed-word-varhandle-stores.md](t8-packed-word-varhandle-stores.md) — direct VarHandle stores + full-store/partial-advance tails
+- [t9-bufferless-varhandle-number-writing.md](t9-bufferless-varhandle-number-writing.md) — bufferless offset number writing, `LE_INT` digit stores, no `arraycopy`
 
 ## How the before/after comparison is measured
 
@@ -53,6 +56,7 @@ Artifacts:
 - [bench-fory-event-option2.txt](bench-fory-event-option2.txt) — event benchmark (final, option 2)
 - [bench-fory-perf-output-option2.txt](bench-fory-perf-output-option2.txt) — combined run (option 2, mid-debug)
 - [bench-escaping-option2.txt](bench-escaping-option2.txt) — escaping isolation run (option 2)
+- [bench-packed-word-tails.txt](bench-packed-word-tails.txt) — T8 packed-word tail-store micro benchmark
 
 ## Results — micro benchmarks (average time, ns/op; final option-2 run)
 
@@ -100,8 +104,9 @@ Progression of the production path (`eventNewDirect`):
 - **Option 2 vs option 1: 108 → 95 ns/op ≈ 1.14× (12%) faster.** The remaining
   win of the whole-event cursor over the per-string direct paths: one
   `byte[]`/`int` cursor live across the event, packed prefixes and separators
-  stored with local checks, numbers bulk-copied with no `OutputStream` call,
-  and a single cursor publish.
+  stored with local checks, numbers written straight into the cursor (LE_INT
+  VarHandle digit stores) with no `OutputStream` call, and a single cursor
+  publish.
 - T1/T2/T5 (new internals) account for ~1.2× of the total (215 → 179, stream
   mechanism); T4/T6 (direct buffer + packed prefixes) account for the rest
   (179 → 95).
@@ -170,8 +175,8 @@ The single largest end-to-end contributor is the direct-buffer path. The
 event benchmark isolates it: same new internals, 179 ns stream vs 95 ns
 option-2 direct; and the prefix micro-benchmark shows the mechanism cost of two
 fixed fields collapsing from ~26 ns (`write(',')` + `write(byte[])` virtual
-calls + `arraycopy`) to **4.4 ns** (one `write(',')` + two packed
-`writeLongPrefixLE` stores with one local check) — **6×**. Removing the
+calls + `arraycopy`) to **4.4 ns** (one `write(',')` + two packed little-endian
+VarHandle stores with one local check) — **6×**. Removing the
 per-call virtual dispatch and letting C2 keep `buffer`/`position` live across
 the field sequence is what Fory's design buys; option 2 extends that to the
 whole event with a single cursor.
@@ -253,3 +258,137 @@ Benchmark classes:
 - `core/.../ForyPerfComparisonBenchmark` — micro old-vs-new (T1/T2/T3/T4/T5/T6)
 - `logback/.../ForyPerfEventBenchmark` — whole-event old-vs-new plus
   event-accessor isolation legs
+- `core/.../CursorBufferWriterBenchmark` — T7 cursor-locality writer
+  (WriteOps over a plain `byte[]` vs `JsonCursorBuffer` vs stream-mediated
+  `ByteArrayOutputStream`)
+- `core/.../PackedWordWriteBenchmark` — T8 packed-word tail-store strategies
+  (`arraycopy` vs specialized `writePackedLE1..7` vs full-8-store/partial-advance,
+  aligned vs misaligned)
+
+## T7 — cursor-locality writer (CursorBufferWriterBenchmark)
+
+Mixed primitive + JSON-escaped-string workload (N = 64 events: `writeInt` +
+`writeLong` + `writeEscapedJsonString`), average time, ns/op. The three legs do
+**the same escaping work**; only the cursor discipline differs. `streamDataOutput`
+is the stream-mediated baseline (`JsonNumberWriter`/`EscapedJsonStringWriter`
+over a `ByteArrayOutputStream`); `cursorWriteOps` is the production path
+(`WriteOps` over `JsonCursorBuffer`, which `JsonLogWriter` now uses);
+`pureWriteOps` is the composable `byte[] buf, int pos` facade form.
+
+| Benchmark              | Score (ns/op) | vs stream |
+| ---------------------- | ------------ | --------- |
+| streamDataOutput       | 5147.105     | 1.00×     |
+| cursorWriteOps         | 3011.940     | 1.71×     |
+| pureWriteOps           | 3310.564     | 1.55×     |
+
+`cursorWriteOps` is ~1.7× faster than the stream-mediated baseline. The string
+escaping dominates the workload and is identical in both paths; the win comes
+from the local `buf`/`pos` cursor (no per-value virtual dispatch, no cursor
+reload) on the primitive stores and capacity checks. The `pureWriteOps` leg uses
+the simple `byte[]` facade escape writer (not the SWAR `DirectJsonStringWriter`),
+so it is slightly slower than `cursorWriteOps` but still faster than the
+stream-mediated path — proving the composable API is viable without a
+JSON-specific cursor.
+
+Artifact: [bench-cursor-writer.txt](bench-cursor-writer.txt) (JDK 25.0.3, JMH
+1.37, `-wi 3 -i 5 -f 1`, `--add-opens java.base/java.lang=ALL-UNNAMED`).
+
+> Note: the T7 plan's 2× target assumes a primitive-heavy workload; with a
+> string-dominated mix the measured ratio is ~1.7× because the (identical)
+> escape scan dominates. Allocation on the hot path is 0 B/op (caller-owned
+> digit buffers reused; `CursorBuffer`/`WriteOps` allocate nothing).
+
+## T8 — packed-word VarHandle stores (PackedWordWriteBenchmark)
+
+Decides the store shape for a packed key whose last word delivers fewer than 8
+bytes. Each leg writes a full 8-byte word plus a partial tail of `tailLen`
+bytes into a `byte[]`, at aligned (`offset=0`) and misaligned (`offset=7`)
+positions. Average time, ns/op (5 iterations; `tailLen` = partial tail bytes):
+
+| approach                      | tail=1 | tail=2 | tail=3 | tail=5 | tail=7 |
+|-------------------------------|--------|--------|--------|--------|--------|
+| fullWord (baseline, 8B store) | 0.91   | 0.94   | 0.91   | 0.87   | 0.89   |
+| tailFull8AdvancePartial       | 1.12   | 1.12   | 1.14   | 1.11   | 1.24   |
+| tailSpecialized (1..7 stores) | 1.08   | 1.07   | 1.50   | 1.81   | 2.86   |
+| tailGeneric (runtime n)       | 1.19   | 1.84   | 2.22   | 2.42   | 2.81   |
+| tailArraycopy (byte[])        | 5.31   | 5.33   | 5.27   | 5.32   | 5.36   |
+
+Conclusions:
+
+- **The full-store/partial-advance trick is flat at ~1.1 ns across tail
+  lengths** (one VarHandle store per word, cursor advanced by the real length),
+  while byte-store shapes grow linearly (specialized: 1.08 → 2.86 ns) and
+  `byte[]` arraycopy is 4-5× slower everywhere.
+- **Alignment is immaterial**: offset 0 vs offset 7 are within noise for every
+  leg — the `byte[]` VarHandle view needs no 8-byte alignment on this machine.
+- The production key tails (1, 2, 3, 5, 6 bytes) all land within ~0.04 ns of
+  the full-word baseline using the overwrite trick, so `JsonLogWriter` now
+  writes every window as one `LE_LONG` VarHandle store and advances the cursor
+  by the key's byte length (see `t8-packed-word-varhandle-stores.md`).
+
+Artifact: [bench-packed-word-tails.txt](bench-packed-word-tails.txt) (JDK
+25.0.3, JMH 1.37, `-f 1 -wi 3 -i 5 -r 1s -w 1s`).
+
+## Current state (2026-08-22) — after the VarHandle number rewrite
+
+Re-ran the benchmark suites (same machine, JDK 25.0.3, JMH 1.37; the number
+legs use the same `-wi 4 -i 7 -f 1 -t 1 -prof gc` parameters as the option-2
+baselines above). The deltas are **cumulative** since those recorded option-2
+baselines (T7 cursor-locality, `@CB.StrPacker` constants, packed-key `LE_LONG`
+stores, WriteOps number-alias removal, number-buffer removal, and the
+left-to-right VarHandle digit writer); the unchanged string legs
+(`escaping*`/`latin1*`) are within noise of the old runs, confirming the
+environment is consistent.
+
+Artifacts: `bench-fory-event-current.txt`, `bench-fory-perf-current.txt`,
+`bench-cursor-writer-current.txt`, `bench-writers-current.txt`,
+`bench-misc-current.txt`.
+
+### Gained — production / byte[] direct path
+
+| Benchmark | old | current | delta |
+| --- | --- | --- | --- |
+| `ForyPerfEventBenchmark.eventNewDirect` (avgt, us/op) | 0.095 | **0.064** | **−32.6%** |
+| `eventNewDirect` (thrpt, ops/us) | 10.73 | **16.38** | **+52.7%** |
+| `CursorBufferWriterBenchmark.cursorWriteOps` (ns/op) | 3012 | **2628** | **−12.7%** |
+| `CursorBufferWriterBenchmark.pureWriteOps` (ns/op) | 3311 | 3145 | −5.0% (noisy) |
+| `ForyPerfComparisonBenchmark.prefixesPackedDirect` (ns/op) | 4.39 | **3.77** | **−14.2%** |
+
+`eventNewDirect` remains **≈ 0 B/op** (gc.alloc.rate.norm ≈ 10⁻³) — the direct
+path is faster and still zero-allocation. The end-to-end event write improved
+≈1.5× throughput; the packed-prefix and cursor legs confirm the gain is in the
+direct-buffer assembly, not the string scan.
+
+### Regressed — `OutputStream` stream fallback only (not the production path)
+
+The bufferless `JsonNumberWriter.writeX(OutputStream, ...)` fallback overloads
+allocate a per-call scratch `byte[]` (32 B/op for int, 40 B/op for long). The
+old implementation reused a caller-owned buffer (≈ 0 B/op).
+
+| Benchmark | old | current | alloc | delta |
+| --- | --- | --- | --- | --- |
+| `longNew` (ns/op) | 22.31 | 24.08 | 0 → **40 B/op** | +7.9% |
+| `longSmallNew` (ns/op) | 14.88 | 16.55 | 0 → **40 B/op** | +11.2% |
+| `intNew` (ns/op) | 18.71 | 20.59 | 0 → **32 B/op** | +10.1% |
+| `intSmallNew` (ns/op) | 15.96 | 17.80 | 0 → **32 B/op** | +11.5% |
+| `eventNewStream` (avgt, us/op) | 0.179 | 0.177 | 0 → **40 B/op** | ~flat time |
+| `eventNewStream` (thrpt, ops/us) | 7.10 | 5.81 | 0 → 40 B/op | −18% (GC) |
+| `streamDataOutput` (ns/op) | 5147 | 5321 | — | +3.4% |
+
+These legs exercise the plain-`OutputStream` compatibility path only;
+production (`JsonAppender` → `ReusableByteArrayOutputStream`) goes through
+`writeJsonEventDirect` and never allocates. The regression is the expected
+consequence of removing the reusable number buffers: the stream fallback now
+allocates its scratch. If the fallback must stay allocation-free, it can write
+digit-by-digit via `out.write(int)` (no scratch, no allocation, slower per
+digit) — a decision left open here.
+
+### Stable (unchanged code — sanity)
+
+`escapingNewDirect` 28.5 vs 29.6 ns/op, `latin1NewDirect` 11.6 vs 12.0,
+`latin1LongNewDirect` 14.2 vs 14.8, `prefixesClassicFixture` 24.7 vs 24.6,
+`eventClassicRbo` 0.216 vs 0.205 us/op — all within noise. The stacktrace and
+writer suites (`StackTrace*`, `Stacktrace*`, `JsonLogWriterBenchmark`,
+`JsonLogWriterDevBenchmark`, `LogbackWriterComparisonBenchmark`,
+`AllocationBenchmark`) ran clean with no errors (reduced-iteration runs in
+`bench-misc-current.txt` / `bench-writers-current.txt`).

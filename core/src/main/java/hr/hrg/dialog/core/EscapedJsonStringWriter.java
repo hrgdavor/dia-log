@@ -464,14 +464,7 @@ public final class EscapedJsonStringWriter {
     }
 
     private static void putWordLE(byte[] buf, int pos, long v) {
-        buf[pos] = (byte) v;
-        buf[pos + 1] = (byte) (v >>> 8);
-        buf[pos + 2] = (byte) (v >>> 16);
-        buf[pos + 3] = (byte) (v >>> 24);
-        buf[pos + 4] = (byte) (v >>> 32);
-        buf[pos + 5] = (byte) (v >>> 40);
-        buf[pos + 6] = (byte) (v >>> 48);
-        buf[pos + 7] = (byte) (v >>> 56);
+        LE_WORD.set(buf, pos, v);
     }
 
     // ---- SWAR predicates (ported from Fory Utf8JsonWriter) -----------------

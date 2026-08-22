@@ -1,16 +1,28 @@
 # Performance Documentation Agent Instructions
 
+## Two doc folders
+
+- **`doc/perf/`** — the *consolidated performance advice*: teaching-oriented,
+  basics-first documents that explain the performance model and the techniques
+  (numbered `NN-topic.md`, starting from fundamentals and expanding). Geared
+  towards explaining *why*, not recording what was done.
+- **`doc/perf-exploration/`** — the *as-we-go records*: the `t{N}-{slug}.md`
+  technique records, implementation plans, the Fory analysis, benchmark results
+  and benchmark artifacts.
+
 ## Mandatory Learning Materials for Performance Work
 
 Any change that touches a hot path — serialization, hashing, string access,
 buffer management, stack-trace sanitization — must be accompanied by a learning
-material document in `doc/perf/`.
+material document in `doc/perf-exploration/`.
 
 ### File format
 
 Create a single markdown file named `t{N}-{slug}.md` where `{N}` is the next
 available technique number and `{slug}` is a concise lowercase-hyphenated
-description (e.g. `t7-cursor-locality-buffer-writer.md`).
+description (e.g. `t9-bufferless-varhandle-number-writing.md`). The consolidated
+explanation of the technique must also be folded into the relevant
+`doc/perf/NN-topic.md` (add a section or extend the existing one).
 
 ### Required sections
 
@@ -30,9 +42,9 @@ description (e.g. `t7-cursor-locality-buffer-writer.md`).
 
 ### Benchmark results
 
-Update `doc/perf/fory-perf-benchmark-results.md` when a new technique produces
-measurable numbers. Add the new leg to the relevant tables, quote the artifact
-file names, and note any JIT or environment caveats.
+Update `doc/perf-exploration/fory-perf-benchmark-results.md` when a new
+technique produces measurable numbers. Add the new leg to the relevant tables,
+quote the artifact file names, and note any JIT or environment caveats.
 
 ### Anti-patterns to never introduce
 
@@ -49,13 +61,15 @@ file names, and note any JIT or environment caveats.
 ### Implementation plans
 
 When a technique requires multi-file implementation, add
-`doc/perf/t{N}-{slug}-implementation-plan.md` with concrete phases, file paths,
-acceptance criteria, and a success metric.
+`doc/perf-exploration/t{N}-{slug}-implementation-plan.md` (exploration material
+lives in `doc/perf-exploration/`) with concrete phases, file paths, acceptance
+criteria, and a success metric.
 
 ### Reviewing changes
 
 Before submitting a performance change, verify:
-- [ ] Learning material exists in `doc/perf/`
+- [ ] Learning material exists in `doc/perf-exploration/`
+- [ ] The consolidated advice in `doc/perf/` is updated (explain the technique there)
 - [ ] Benchmarks are updated or added
 - [ ] Zero-allocation property holds on the hot path (gc alloc rate ≈ 0 B/op)
 - [ ] No dev variant was retrofitted with hot-path machinery

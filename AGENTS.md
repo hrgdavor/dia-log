@@ -4,6 +4,21 @@
 
 **This project is still in early phase. There are no external users, and no published contracts require change notifications.** When writing up inconsistencies, regressions, or proposed changes: do not generate documentation noise about "previous user impact" or "breaking for existing consumers." If a change *could* affect a hypothetical consumer, state the actual code behavior factually (e.g., "`errHash` is emitted as a flat top-level JSON key") and move on. Reserve impact language for genuine multi-user scenarios — not an internal logging library with no published API consumers.
 
+## Change Discipline — In-Place Edits, No Backward-Compat Shims
+
+**There is no code that uses this project yet.** Code and documentation changes
+are therefore made **in place**: replace or delete the old shape directly —
+rename, remove, or rewrite the call sites — rather than leaving a deprecated
+alias, a wrapping delegator, or a dual old/new path. Do not keep anything
+"unclean" solely for backward compatibility (no other callers exist to break).
+
+Historical record is still welcome and expected: comments, Javadoc, code
+examples, and the `## What dia-log did before` sections under
+`doc/perf-exploration/` may describe the prior shape as a record of what was
+used before. That is documentation of history, not a compatibility shim — keep
+those accounts accurate, and update or remove them when they go stale (a
+"before" description must never be presented as the current behavior).
+
 ## Performance-Critical Code Patterns
 
 ### Code Duplication is Intentional Micro-Optimization
@@ -119,24 +134,74 @@ project's accepted short-form documentation; use standard Javadoc only where
 
 ## Build Commands (Maven)
 
+### Environment (Windows) — real Maven + JDK 25 required
+
+**Do NOT use `mvn` / `mvnd` from PATH.** `mvn` resolves to `D:\programs\cmd\mvn.bat`,
+a shim that runs `mvnd --raw-streams`; the mvnd daemon fails in the agent sandbox with
+`AccessDeniedException` on `C:\Users\hrg\.m2\mvnd\registry\...\registry.bin`. Use the
+real Maven install instead:
+
+```powershell
+& "D:\programs\mvn\bin\mvn.cmd" <args>
+```
+
+**The enforcer requires JDK >= 25** (`RequireJavaVersion` allowed range `[25,)`). The
+default `JAVA_HOME` is JDK 21, which fails the build. Set it explicitly before every
+Maven invocation:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
+```
+
+Installed JDKs (all under `C:\Program Files\Java\`): `jdk-8.0.442.06-hotspot`, `jdk-17`,
+`jdk-21`, `jdk-24`, `jdk-25`, `graalvm-jdk-25+37.1`.
+
+### Commands
+
 The `gpg` sign-artifacts plugin (`sign-artifacts` execution in the release profile)
 can stall on interactive GPG passphrase entry when running `install`/`deploy` (no TTY),
 hanging the build indefinitely. **Always pass `-Dgpg.skip=true`** to any `mvn install`
 or `mvn deploy` invocation to avoid the stall:
 
-```bash
-mvn -o -pl core install -DskipTests -Dgpg.skip=true
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
+& "D:\programs\mvn\bin\mvn.cmd" -o -pl core install -DskipTests "-Dgpg.skip=true"
 ```
 
 For ordinary compile/test validation, prefer the reactor (no install needed) so the
 gpg plugin never runs:
 
-```bash
-mvn -o -pl core,logback test -Dsurefire.failIfNoSpecifiedTests=false
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
+& "D:\programs\mvn\bin\mvn.cmd" -o -pl core,logback test "-Dsurefire.failIfNoSpecifiedTests=false"
+```
+
+The derivative generator (after editing `JavaStackSanitizer.java`) uses the same
+environment:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
+& "D:\programs\mvn\bin\mvn.cmd" -pl project-automation compile exec:java "-Dexec.mainClass=hr.hrg.dialog.tools.StackSanitizerDerivativeGenerator"
+```
+
+The CodeBuddy marker generator (`@CB.*` comments, e.g. `@CB.StrPacker` packed-key
+blocks in `JsonLogWriter.java`) uses the same environment; see
+`doc/codebuddy-strpacker.md` for the marker conventions and examples:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
+& "D:\programs\mvn\bin\mvn.cmd" -pl project-automation compile exec:java "-Dexec.mainClass=hr.hrg.dialog.tools.CodeBuddy"
 ```
 
 PowerShell note: unquoted `-Dkey=value` flags are sometimes mangled by the shell
 (dropping the `-D` prefix); quote each one, e.g. `"-Dtest=MyTest"`.
+
+To check test results when `-q` hides the summary:
+
+```powershell
+Get-ChildItem core\target\surefire-reports,logback\target\surefire-reports -Filter "*.txt" |
+  ForEach-Object { Select-String -Path $_.FullName -Pattern 'Tests run:' | ForEach-Object { $_.Line } }
+```
 
 ## File Locations Reference
 

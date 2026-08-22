@@ -4,38 +4,45 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 
 /**
- * Reusable, grow-only in-memory {@link OutputStream} for buffering one log event
- * before a single bulk flush to the real stream.
+ * Reusable, grow-only in-memory output stream with cursor-locality write helpers.
  * <p>
- * The backing {@code byte[]} is allocated once (default 1&nbsp;MiB, matching the
- * largest reasonable event) and <b>never shrinks</b>: {@link #reset()} reuses it
- * for the next event, and it only grows when an event exceeds the current capacity
- * (doubling, converging to the longest event ever written). Steady-state events
- * allocate nothing — no per-event buffer, no growth.
+ * Merged from {@code CursorBuffer} (generic cursor-locality abstraction) and
+ * {@code ReusableByteArrayOutputStream} (sink/IO). A single class that owns a
+ * backing {@code byte[]} for one event/batch and exposes direct-cursor primitives
+ * so writers can pull {@code buf}/{@code pos} into stack locals for the whole
+ * hot loop — C2 keeps them in registers.
  * <p>
- * Intended use (see {@code JsonAppender.writeOut}): reset, let the writer fill the
- * buffer, then {@link #writeTo(OutputStream)} the whole event to the real stream in
- * one bulk write, and reset again. This avoids hundreds of tiny writes per event to
- * file/network streams.
+ * The backing array is allocated once and never shrinks: {@link #reset()} reuses
+ * it, and it grows only when an event exceeds capacity (doubling). Hot-path
+ * writers perform inlined capacity checks; the common no-grow case is a single
+ * compare + branch with no virtual dispatch.
  * <p>
- * <b>Thread safety:</b> not thread-safe. In the appenders the buffer is protected by
- * logback's per-appender guard (logback 1.5.x {@code AppenderBase.doAppend} is
- * {@code synchronized}), so one instance per appender is safe.
- *
- * @see StringByteExtractor
- * @see JsonNumberWriter
+ * Thread safety: not thread-safe. Safe to share per stream/worker thread via
+ * logback's {@code doAppend} guard, or wrap in your own synchronization.
  */
 @NotThreadSafe
-public final class ReusableByteArrayOutputStream extends OutputStream {
+public class ReusableByteArrayOutputStream extends OutputStream {
 
     /** Default capacity: 1 MiB — large enough for any realistic event, small enough to be cheap. */
     public static final int DEFAULT_CAPACITY = 1 << 20;
 
-    private byte[] buf;
-    private int count;
+    private static final VarHandle LE_LONG =
+            MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
+    private static final VarHandle LE_INT =
+            MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
+
+    /** Backing array (may be larger than the bytes in use). */
+    public byte[] buf;
+    /** Current write cursor (bytes written so far). */
+    public int pos;
+    /** Capacity bound for the inlined capacity check. */
+    public int limit;
 
     /** Creates a buffer with {@link #DEFAULT_CAPACITY}. */
     public ReusableByteArrayOutputStream() {
@@ -51,14 +58,24 @@ public final class ReusableByteArrayOutputStream extends OutputStream {
             throw new IllegalArgumentException("initialCapacity must be positive: " + initialCapacity);
         }
         buf = new byte[initialCapacity];
+        limit = buf.length;
     }
+
+    // =========================================================================
+    // OutputStream API (stream-mediated fallback for non-direct callers).
+    // =========================================================================
 
     @Override
     public void write(int b) {
-        if (count == buf.length) {
-            grow(count + 1);
+        byte[] buf = this.buf;
+        int pos = this.pos;
+        int limit = this.limit;
+        if (pos >= limit) {
+            grow(pos + 1);
+            buf = this.buf;
         }
-        buf[count++] = (byte) b;
+        buf[pos] = (byte) b;
+        this.pos = pos + 1;
     }
 
     @Override
@@ -66,22 +83,30 @@ public final class ReusableByteArrayOutputStream extends OutputStream {
         if (len == 0) {
             return;
         }
-        int need = count + len;
-        if (need > buf.length) {
+        byte[] buf = this.buf;
+        int pos = this.pos;
+        int limit = this.limit;
+        int need = pos + len;
+        if (need > limit) {
             grow(need);
+            buf = this.buf;
         }
-        System.arraycopy(b, off, buf, count, len);
-        count = need;
+        System.arraycopy(b, off, buf, pos, len);
+        this.pos = need;
     }
+
+    // =========================================================================
+    // Stream state (size / buffer / reset / writeTo).
+    // =========================================================================
 
     /** Reuses the current buffer for the next event (no reallocation, no shrink). */
     public void reset() {
-        count = 0;
+        pos = 0;
     }
 
     /** Number of bytes currently buffered. */
     public int size() {
-        return count;
+        return pos;
     }
 
     /**
@@ -94,24 +119,16 @@ public final class ReusableByteArrayOutputStream extends OutputStream {
 
     /** Bulk-flushes the buffered bytes to {@code out} with a single write. */
     public void writeTo(OutputStream out) throws IOException {
-        out.write(buf, 0, count);
+        out.write(buf, 0, pos);
     }
 
     // =========================================================================
-    // Direct-buffer API ("writer owns the buffer" fast path).
-    //
-    // Ported from Apache Fory's Utf8JsonWriter design (commit 585eb16f,
-    // "feat(java): optimize json perf", PR #3871): the writer reads the backing
-    // array + cursor, performs local capacity checks (T3), and publishes the
-    // cursor once with setPosition. Every helper below uses an inlined
-    // `position + n > buffer.length` check so the common no-grow case is a
-    // single compare + branch with no virtual call, and only the cold path
-    // computes the absolute capacity.
+    // Direct-cursor API (T4 "writer owns the buffer" fast path).
     // =========================================================================
 
-    /** Current byte count (direct-cursor read). */
+    /** Current write cursor (direct-cursor read). */
     public int position() {
-        return count;
+        return pos;
     }
 
     /**
@@ -122,24 +139,86 @@ public final class ReusableByteArrayOutputStream extends OutputStream {
         if (pos < 0 || pos > buf.length) {
             throw new IndexOutOfBoundsException("position " + pos + " of " + buf.length);
         }
-        count = pos;
+        this.pos = pos;
     }
 
+    // =========================================================================
+    // Cursor-locality helpers (merged from CursorBuffer).
+    // =========================================================================
+
+    /** Advances the cursor by {@code n} bytes (after absolute-offset stores). */
+    public void advance(int n) {
+        pos += n;
+    }
+
+    /** Publishes the cursor to the underlying sink (no-op — this class is its own sink). */
+    public void publish() {}
+
+    /** Re-reads buffer/position after the underlying stream was written directly (no-op). */
+    public void resync() {}
+
     /**
-     * Appends the low {@code n} bytes of {@code value} little-endian
-     * ({@code n} in 0..8) with a single inlined capacity check. Packs up to
-     * eight bytes (e.g. a precomputed field-name prefix) into one store group.
+     * Inlined capacity check: guarantees {@code pos + additional} bytes are
+     * available. The common no-grow case is one compare; only the cold path
+     * grows the backing array.
      */
+    public void ensure(int additional) {
+        int pos = this.pos;
+        int limit = this.limit;
+        if (pos + additional > limit) {
+            grow(pos + additional);
+        }
+    }
+
+    /** Appends one byte with an inlined capacity check. */
+    public void writeByte(int b) {
+        byte[] buf = this.buf;
+        int pos = this.pos;
+        int limit = this.limit;
+        if (pos >= limit) {
+            grow(pos + 1);
+            buf = this.buf;
+        }
+        buf[pos] = (byte) b;
+        this.pos = pos + 1;
+    }
+
+    /** Bulk copy with an inlined capacity check. */
+    public void writeRaw(byte[] src, int off, int len) {
+        byte[] buf = this.buf;
+        int pos = this.pos;
+        int limit = this.limit;
+        int need = pos + len;
+        if (need > limit) {
+            grow(need);
+            buf = this.buf;
+        }
+        System.arraycopy(src, off, buf, pos, len);
+        this.pos = need;
+    }
+
+    /** Stores the low {@code n} bytes of {@code value} little-endian (n in 0..8). */
     public void writeLongPrefixLE(long value, int n) {
         if (n < 0 || n > 8) {
             throw new IllegalArgumentException("n must be in 0..8: " + n);
         }
-        int pos = count;
-        if (pos + n > buf.length) {
+        byte[] buf = this.buf;
+        int pos = this.pos;
+        int limit = this.limit;
+        if (n == 8) {
+            if (pos + 8 > limit) {
+                grow(pos + 8);
+                buf = this.buf;
+            }
+            LE_LONG.set(buf, pos, value);
+            this.pos = pos + 8;
+            return;
+        }
+        if (pos + n > limit) {
             grow(pos + n);
+            buf = this.buf;
         }
         switch (n) {
-            case 8: buf[pos + 7] = (byte) (value >>> 56);
             case 7: buf[pos + 6] = (byte) (value >>> 48);
             case 6: buf[pos + 5] = (byte) (value >>> 40);
             case 5: buf[pos + 4] = (byte) (value >>> 32);
@@ -150,20 +229,20 @@ public final class ReusableByteArrayOutputStream extends OutputStream {
             case 0: break;
             default: throw new AssertionError("unreachable");
         }
-        count = pos + n;
+        this.pos = pos + n;
     }
 
-    /**
-     * Appends the low {@code n} bytes of {@code value} little-endian
-     * ({@code n} in 0..4) with a single inlined capacity check.
-     */
+    /** Stores the low {@code n} bytes of {@code value} little-endian (n in 0..4). */
     public void writeIntPrefixLE(int value, int n) {
         if (n < 0 || n > 4) {
             throw new IllegalArgumentException("n must be in 0..4: " + n);
         }
-        int pos = count;
-        if (pos + n > buf.length) {
+        byte[] buf = this.buf;
+        int pos = this.pos;
+        int limit = this.limit;
+        if (pos + n > limit) {
             grow(pos + n);
+            buf = this.buf;
         }
         switch (n) {
             case 4: buf[pos + 3] = (byte) (value >>> 24);
@@ -173,33 +252,115 @@ public final class ReusableByteArrayOutputStream extends OutputStream {
             case 0: break;
             default: throw new AssertionError("unreachable");
         }
-        count = pos + n;
+        this.pos = pos + n;
+    }
+
+    // =========================================================================
+    // Cursor-locality helpers: writePackedLE / putPackedLE (merged from CursorBuffer).
+    // =========================================================================
+
+    /** Stores the low {@code n} bytes of {@code value} little-endian (n in 0..8). */
+    public void writePackedLE(long value, int n) {
+        byte[] buf = this.buf;
+        int pos = this.pos;
+        int limit = this.limit;
+        if (n == 8) {
+            if (pos + 8 > limit) {
+                grow(pos + 8);
+                buf = this.buf;
+            }
+            LE_LONG.set(buf, pos, value);
+            this.pos = pos + 8;
+            return;
+        }
+        if (pos + n > limit) {
+            grow(pos + n);
+            buf = this.buf;
+        }
+        switch (n) {
+            case 7: buf[pos + 6] = (byte) (value >>> 48);
+            case 6: buf[pos + 5] = (byte) (value >>> 40);
+            case 5: buf[pos + 4] = (byte) (value >>> 32);
+            case 4: buf[pos + 3] = (byte) (value >>> 24);
+            case 3: buf[pos + 2] = (byte) (value >>> 16);
+            case 2: buf[pos + 1] = (byte) (value >>> 8);
+            case 1: buf[pos] = (byte) value;
+            case 0: break;
+            default: throw new IllegalArgumentException("n must be in 0..8: " + n);
+        }
+        this.pos = pos + n;
+    }
+
+    /** Stores the low {@code n} bytes of {@code value} little-endian (n in 0..4). */
+    public void writePackedLE(int value, int n) {
+        byte[] buf = this.buf;
+        int pos = this.pos;
+        int limit = this.limit;
+        if (n == 4) {
+            if (pos + 4 > limit) {
+                grow(pos + 4);
+                buf = this.buf;
+            }
+            LE_INT.set(buf, pos, value);
+            this.pos = pos + 4;
+            return;
+        }
+        if (pos + n > limit) {
+            grow(pos + n);
+            buf = this.buf;
+        }
+        switch (n) {
+            case 3: buf[pos + 2] = (byte) (value >>> 16);
+            case 2: buf[pos + 1] = (byte) (value >>> 8);
+            case 1: buf[pos] = (byte) value;
+            case 0: break;
+            default: throw new IllegalArgumentException("n must be in 0..4: " + n);
+        }
+        this.pos = pos + n;
     }
 
     /**
-     * Bulk append with an inlined capacity check. Semantically identical to
-     * {@link #write(byte[], int, int)} minus the virtual-call indirection and
-     * the {@code len == 0} branch; used by direct-buffer writers.
+     * Stores the low {@code n} bytes of {@code value} little-endian at the
+     * absolute {@code offset} (which must already be within the ensured
+     * capacity) without moving the cursor — used for overlapping-store patterns,
+     * where the last word is stored at {@code start + (len - 8)} over bytes an
+     * earlier word already wrote.
      */
-    public void writeRaw(byte[] src, int off, int len) {
-        int pos = count;
-        if (pos + len > buf.length) {
-            grow(pos + len);
+    public void putPackedLE(int offset, long value, int n) {
+        byte[] buf = this.buf;
+        if (n == 8) {
+            LE_LONG.set(buf, offset, value);
+            return;
         }
-        System.arraycopy(src, off, buf, pos, len);
-        count = pos + len;
+        switch (n) {
+            case 7: buf[offset + 6] = (byte) (value >>> 48);
+            case 6: buf[offset + 5] = (byte) (value >>> 40);
+            case 5: buf[offset + 4] = (byte) (value >>> 32);
+            case 4: buf[offset + 3] = (byte) (value >>> 24);
+            case 3: buf[offset + 2] = (byte) (value >>> 16);
+            case 2: buf[offset + 1] = (byte) (value >>> 8);
+            case 1: buf[offset] = (byte) value;
+            case 0: break;
+            default: throw new IllegalArgumentException("n must be in 0..8: " + n);
+        }
     }
+
+    // =========================================================================
+    // Growth (package-private so direct-buffer writers can inline the check).
+    // =========================================================================
 
     /**
      * Grows the backing array so it holds at least {@code need} bytes
-     * (absolute). Package-private so the same-package direct-buffer writers
-     * (T4) can perform the inlined local capacity check + grow themselves.
+     * (absolute). Public so direct-buffer writers (T4/T7, e.g.
+     * {@code JsonLogWriter} in the logback module) can perform the inlined
+     * local capacity check + grow themselves and keep the cursor in registers.
      */
-    void grow(int need) {
+    public void grow(int need) {
         int newCap = buf.length * 2;
         while (newCap < need) {
             newCap *= 2;
         }
         buf = Arrays.copyOf(buf, newCap);
+        limit = buf.length;
     }
 }
