@@ -46,11 +46,18 @@ the destination buffer exactly one time, at the place it belongs.
 
 These are the project-wide rules that every technique below implements:
 
-- **Caller-owned reuse, not `ThreadLocal`.** Scratch state (digit buffers,
-  hashers, the event buffer) is passed as a parameter and owned by the caller.
-  `ThreadLocal` is hidden state: per-thread memory, invisible at the call site,
-  and corruptible by re-entrancy. A plain field on a `@NotThreadSafe` writer is
-  the zero-cost default.
+- **No `ThreadLocal`, ever (unless truly unavoidable — very unlikely).** This
+  project does not use `ThreadLocal` and treats it as a forbidden pattern on
+  the hot path. Scratch state (digit buffers, hashers, the event buffer) is
+  passed as a parameter and owned by the caller, or kept as a plain field on a
+  `@NotThreadSafe` writer. `ThreadLocal` is hidden state: per-thread memory
+  overhead, invisible at the call site, and easily corrupted by re-entrancy (a
+  nested call resets the same value and invalidates the outer computation). The
+  whole codebase is currently `ThreadLocal`-free (verified by a project-wide
+  grep); keep it that way — do not introduce a `ThreadLocal` without a
+  documented, compelling reason. (`ThreadLocalRandom` is the standard JDK RNG
+  and is *not* a `ThreadLocal`; it is fine to use for non-deterministic
+  identifiers and benchmark data.)
 - **Capacity is checked inline, once, before the stores.** The classic pattern
   is `if (pos + need > limit) grow();` — the cold grow is inside the `if`, and
   the hot path is straight-line stores. Never return an array or an object from
