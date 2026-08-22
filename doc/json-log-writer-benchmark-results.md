@@ -4,7 +4,7 @@ This document reports only the latest benchmark state for:
 
 - [logback/src/test/java/hr/hrg/dialog/logback/JsonLogWriterBenchmark.java](logback/src/test/java/hr/hrg/dialog/logback/JsonLogWriterBenchmark.java)
 - [logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java)
-- [logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriterClassic.java](logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriterClassic.java)
+- [logback/src/test/java/hr/hrg/dialog/logback/JsonLogWriterClassic.java](logback/src/test/java/hr/hrg/dialog/logback/JsonLogWriterClassic.java) (benchmark comparison baseline, lives in `src/test`)
 
 Historical optimization timeline, previous runs, and step-by-step gains are tracked in:
 
@@ -54,8 +54,9 @@ Notable changes since 2026-08-18 (full write-up in
 - **No-throwable latency lead narrowed**: `JsonLogWriter` 0.507 → 0.563 us/op
   (~11% slower); classic flat. JSON is now ~8% faster than classic without a
   throwable (was ~17%).
-- **Allocation in the `writeJsonEventStream` (stream fallback) path rose**: this
-  benchmark calls `writeJsonEventStream` (not the production `writeJsonEventDirect`
+- **Allocation in the stream-fallback path rose**: this benchmark calls the
+  test-side `JsonLogWriterStream` helper (the method was moved out of production
+  `JsonLogWriter` into `src/test`) — not the production `writeJsonEventDirect`
   used by `JsonAppender`). The fallback allocates 272 → 456 B/op (no throwable)
   and 272 → 592 B/op (with throwable) because its field prefixes are re-encoded
   per event via `String.getBytes(UTF_8)` and numbers use the bufferless
@@ -65,14 +66,15 @@ Notable changes since 2026-08-18 (full write-up in
   production allocation regression; the higher numbers are a measurement artifact
   of benchmarking the fallback method.
 
-## What the `writeJsonEventStream` numbers actually measure
+## What the stream-fallback numbers actually measure
 
-The `writeWithJsonLogWriter` benchmark calls `JsonLogWriter.writeJsonEventStream`
-— the **stream fallback** — not the production `writeJsonEventDirect` that
-`JsonAppender`/`JsonAppenderRolling` use. So the 456 / 592 B/op figures are the
-fallback's cost, not production's. Two per-event allocations in the fallback explain
-the gap versus the 2026-08-18 272 B/op (which measured the then-optimized
-`writeJsonEvent`):
+The `writeWithJsonLogWriter` benchmark calls the test-side helper
+`JsonLogWriterStream.writeJsonEvent(...)` — the **stream fallback** (the method
+was moved out of production `JsonLogWriter` into `src/test`) — not the production
+`writeJsonEventDirect` that `JsonAppender`/`JsonAppenderRolling` use. So the
+456 / 592 B/op figures are the fallback's cost, not production's. Two per-event
+allocations in the fallback explain the gap versus the 2026-08-18 272 B/op (which
+measured the then-optimized `writeJsonEvent`):
 
 - **Field prefixes re-encoded every event.** `writeFieldPrefix(OutputStream, String)`
   does `out.write(key.getBytes(StandardCharsets.UTF_8))` (and `KEY_TS` is written the
@@ -80,7 +82,7 @@ the gap versus the 2026-08-18 272 B/op (which measured the then-optimized
   ≈ 128 B; the throwable adds `errClass/errMessage/stack/errHash` ≈ 120 B. The
   production `writeJsonEventDirect` instead stores these as packed `LE_LONG` VarHandle
   words into the reusable buffer (0 B/op).
-- **Bufferless number writes.** `writeJsonEventStream` calls
+- **Bufferless number writes.** The helper calls
   `JsonNumberWriter.writeLong(out, long)` (ts; and `errHash` when throwable) — the
   bufferless T9 variant that allocates a ~40 B scratch `byte[]` per number. Production
   `writeJsonEventDirect` writes numbers at a buffer offset (`writeLong(buf, pos, …)`,
@@ -100,10 +102,10 @@ Contrast (this part is real and unchanged): `writeWithJsonLogWriterClassic` show
 
 ## Current interpretation
 
-1. JsonLogWriter matches or beats JsonLogWriterClassic on latency (≈8% faster without a throwable, within ~3% with one) and allocates substantially less in both cases (~44% less without, ~34% less with a throwable) — on the `writeJsonEventStream` path the benchmark exercises.
+1. JsonLogWriter matches or beats JsonLogWriterClassic on latency (≈8% faster without a throwable, within ~3% with one) and allocates substantially less in both cases (~44% less without, ~34% less with a throwable) — on the `JsonLogWriterStream` fallback path the benchmark exercises.
 2. The throwable path is dramatically faster than at 2026-08-18 for both writers, thanks to shared stack-trace writer improvements.
-3. **There is no production allocation regression.** The production path `writeJsonEventDirect` measures ≈330 B/op for the same MDC+KV event — essentially unchanged from the 2026-08-18 272 B/op (the only alloc is the MDC+KV `allKeys` `HashSet`; the throwable branch adds ≈0 B/op, 334 = 334 with/without). The 456 / 592 B/op figures are the `writeJsonEventStream` fallback's `getBytes` field prefixes + bufferless number scratch, not the hot path.
+3. **There is no production allocation regression.** The production path `writeJsonEventDirect` measures ≈330 B/op for the same MDC+KV event — essentially unchanged from the 2026-08-18 272 B/op (the only alloc is the MDC+KV `allKeys` `HashSet`; the throwable branch adds ≈0 B/op, 334 = 334 with/without). The 456 / 592 B/op figures are the `JsonLogWriterStream` fallback's `getBytes` field prefixes + bufferless number scratch, not the hot path.
 
 ## Current recommendation
 
-Use JsonLogWriter as the default high-throughput path (the production `writeJsonEventDirect`). The `JsonLogWriterBenchmark` currently measures the `writeJsonEventStream` fallback; to compare production-vs-classic honestly it should call `writeJsonEventDirect` (with a `ReusableByteArrayOutputStream`), which will show ≈330 B/op and confirm parity with the 2026-08-18 baseline.
+Use JsonLogWriter as the default high-throughput path (the production `writeJsonEventDirect`). The `JsonLogWriterBenchmark` currently measures the `JsonLogWriterStream` fallback; to compare production-vs-classic honestly it should call `writeJsonEventDirect` (with a `ReusableByteArrayOutputStream`), which will show ≈330 B/op and confirm parity with the 2026-08-18 baseline.

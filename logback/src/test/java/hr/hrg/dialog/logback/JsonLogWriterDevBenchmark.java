@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.LoggingEvent;
+import hr.hrg.dialog.core.Wyhash64;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -46,6 +47,7 @@ public class JsonLogWriterDevBenchmark {
     private final JsonLogWriterDev devWriter = new JsonLogWriterDev();
     private final ObjectMapper mapper = new ObjectMapper();
     private final ByteArrayOutputStream output = new ByteArrayOutputStream();
+    private final Wyhash64.Streaming hasher = new Wyhash64.Streaming(0);
 
     private LoggingEvent noKv;
     private LoggingEvent allPresent;
@@ -105,7 +107,7 @@ public class JsonLogWriterDevBenchmark {
 
     private void write(JsonLogWriter writer, LoggingEvent event, Blackhole blackhole) throws IOException {
         output.reset();
-        writer.writeJsonEventStream(mapper, event, output);
+        JsonLogWriterStream.writeJsonEvent(writer, mapper, event, output, hasher);
         blackhole.consume(output.size());
     }
 

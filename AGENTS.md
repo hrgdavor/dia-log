@@ -63,6 +63,14 @@ are tools, not hot paths — do **not** add micro-optimizations (guard scans, st
 buffer reuse) to them; keep them straightforward and correct. Allocating in a dev variant
 to avoid a scan that costs more than the allocation is the wrong trade.
 
+**Published diagnostic appenders stay in `src/main`.** `JsonAppenderDev` and
+`JsonAppenderRollingDev` — and `JsonLogWriterDev`, which they instantiate — are
+deliberate, *published* diagnostic tools: overloads shipped with the library so users can
+enable missing-key reporting during development. They are the explicit exception to the
+"move non-production code to `src/test`" cleanup rule and must remain under
+`src/main/java`. `JsonLogWriterClassic`, by contrast, is a pure benchmark comparison
+baseline and lives under `src/test/java` (it was moved there during that cleanup).
+
 Previously flagged and **already resolved — do not reintroduce**:
 
 - `Wyhash64.Streaming.finalHash()` - no longer allocates a scratch `byte[16]`; the final

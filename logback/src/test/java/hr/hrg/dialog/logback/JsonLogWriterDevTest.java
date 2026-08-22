@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.LoggingEvent;
+import hr.hrg.dialog.core.Wyhash64;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.KeyValuePair;
 import tools.jackson.databind.ObjectMapper;
@@ -27,6 +28,7 @@ class JsonLogWriterDevTest {
     private final JsonLogWriterDev devWriter = new JsonLogWriterDev();
     private final JsonLogWriter plainWriter = new JsonLogWriter();
     private final ObjectMapper mapper = new ObjectMapper();
+    private final Wyhash64.Streaming hasher = new Wyhash64.Streaming(0);
 
     private LoggingEvent event(String message) {
         LoggerContext context = new LoggerContext();
@@ -40,7 +42,7 @@ class JsonLogWriterDevTest {
 
     private String write(JsonLogWriter writer, LoggingEvent event) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        writer.writeJsonEventStream(mapper, event, out);
+        JsonLogWriterStream.writeJsonEvent(writer, mapper, event, out, hasher);
         return out.toString(StandardCharsets.UTF_8);
     }
 

@@ -166,6 +166,10 @@ public class JsonLogWriter {
         this.stackTraceFilter = filter;
     }
 
+    public Predicate<String> getStackTraceFilter() {
+        return stackTraceFilter;
+    }
+
     /**
      * Direct-buffer assembly (the production path). Callers that already hold a
      * {@link ReusableByteArrayOutputStream} must call this variant directly —
@@ -437,116 +441,6 @@ public class JsonLogWriter {
         }
         buf[pos] = '}';
         rbo.pos = pos + 1;
-    }
-
-    /** Naive stream assembly (API-compat / non-reusable-buffer sinks). Callers choose this variant explicitly. */
-    public void writeJsonEventStream(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
-        try {
-            // KEY_TS includes the starting '{' for the object (fused object-start
-            // prefix), so no separate brace is written here.
-            out.write(KEY_TS.getBytes(StandardCharsets.UTF_8));
-            JsonNumberWriter.writeLong(out, event.getTimeStamp());
-
-            writeFieldPrefix(out, KEY_LEVEL);
-            writeJsonStringOrNull(out, event.getLevel() != null ? event.getLevel().toString() : null);
-
-            writeFieldPrefix(out, KEY_LOGGER);
-            writeJsonStringOrNull(out, event.getLoggerName());
-
-            writeFieldPrefix(out, KEY_THREAD);
-            writeJsonStringOrNull(out, event.getThreadName());
-
-            writeFieldPrefix(out, KEY_MSG);
-            writeJsonStringOrNull(out, event.getFormattedMessage());
-
-            // MDC is fetched first: the KV key-tracking set below is only needed
-            // when MDC keys could collide with statement keys, so it is skipped
-            // entirely (no allocation) when there is no MDC.
-            Map<String, String> mdcMap = null;
-            try {
-                mdcMap = event.getMDCPropertyMap();
-            } catch (Exception ignored) {}
-
-            // Structured key-value pairs
-            Set<String> allKeys = null;
-            List<KeyValuePair> pairs = event.getKeyValuePairs();
-            if (pairs != null && !pairs.isEmpty()) {
-                boolean trackForMdcDedup = mdcMap != null && !mdcMap.isEmpty();
-                for (KeyValuePair kvPair : pairs) {
-                    if (kvPair.key != null) {
-                        if (trackForMdcDedup) {
-                            if (allKeys == null) allKeys = new HashSet<>();
-                            allKeys.add(kvPair.key);
-                        }
-                        addKey(out, kvPair.key, kvPair.value, mapper);
-                    }
-                }
-            }
-
-            if (mdcMap != null && !mdcMap.isEmpty()) {
-                for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
-                    if (entry.getKey() != null
-                            && !isReserved(entry.getKey())
-                            && (allKeys == null || !allKeys.contains(entry.getKey()))) {
-                        writeFieldPrefixRawKey(out, entry.getKey());
-                        writeJsonStringOrNull(out, entry.getValue());
-                    }
-                }
-            }
-
-            // Exception info
-            IThrowableProxy tp = event.getThrowableProxy();
-            if (tp != null) {
-                String throwableClassName = tp.getClassName();
-                String throwableMessage = tp.getMessage();
-
-                writeFieldPrefix(out, KEY_ERR_CLASS);
-                writeJsonStringOrNull(out, throwableClassName);
-
-                writeFieldPrefix(out, KEY_ERR_MESSAGE);
-                writeJsonStringOrNull(out, throwableMessage);
-
-                writeFieldPrefix(out, KEY_STACK);
-                out.write('"');
-                if (throwableClassName != null) {
-                    STRING_STRATEGY.write(out, throwableClassName);
-                }
-                StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
-                // Reuse this writer's hasher (owned like the number buffers) so
-                // exception events allocate nothing â€” the single-pass methods
-                // reset the stream internally.
-                Wyhash64.Streaming stream = fingerprintStream;
-                // micro optimization to call variant without filter
-                long fingerPrint = stackTraceFilter == null ?
-                JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
-                    arrProxy,
-                    out,
-                    throwableClassName,
-                    stream
-                ) : 
-                JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
-                    arrProxy,
-                    stackTraceFilter,
-                    out,
-                    throwableClassName,
-                    stream
-                );
-                out.write('"');
-
-                writeFieldPrefix(out, KEY_ERR_HASH);
-                JsonNumberWriter.writeLong(out, fingerPrint);
-
-            }
-
-            // Dev/diagnostic extension point â€” no-op in this production writer.
-            writeExtraFields(event, out, pairs, mdcMap);
-
-            out.write('}');
-        } catch (IOException e) {
-            // Error reporting is the caller's job: logback appenders report write
-            // failures through their StatusManager (AppenderBase.doAppend -> addError).
-            throw e;
-        }
     }
 
     /**

@@ -17,7 +17,7 @@ The resulting JSON shape is similar to:
 {"ts":1748765696789,"level":"INFO","logger":"com.example.MyClass","thread":"main","msg":"User {userId} performed {action}","userId":42,"action":"login"}
 ```
 
-`JsonLogWriterClassic` remains available as an alternative implementation, but `JsonLogWriter` is the default high-throughput path.
+`JsonLogWriter` is the default high-throughput path. `JsonLogWriterClassic` (a Jackson-`JsonGenerator` writer) is retained only as a benchmark comparison baseline under `src/test/java` — it is not part of the published artifact.
 
 ## Filtering stack-trace frames during fingerprinting
 

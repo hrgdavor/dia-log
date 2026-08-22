@@ -7,6 +7,7 @@ import ch.qos.logback.classic.spi.LoggingEvent;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.KeyValuePair;
 import hr.hrg.dialog.core.RawJsonSelfWriter;
+import hr.hrg.dialog.core.Wyhash64;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.util.RawValue;
 
@@ -28,6 +29,7 @@ class JsonLogWriterTest {
 
     private final JsonLogWriter writer = new JsonLogWriter();
     private final ObjectMapper mapper = new ObjectMapper();
+    private final Wyhash64.Streaming hasher = new Wyhash64.Streaming(0);
 
     private LoggingEvent event(String message) {
         LoggerContext context = new LoggerContext();
@@ -41,7 +43,7 @@ class JsonLogWriterTest {
 
     private String write(LoggingEvent event) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        writer.writeJsonEventStream(mapper, event, out);
+        JsonLogWriterStream.writeJsonEvent(writer, mapper, event, out, hasher);
         return out.toString(StandardCharsets.UTF_8);
     }
 
@@ -146,7 +148,7 @@ class JsonLogWriterTest {
         JsonLogWriter filtered = new JsonLogWriter();
         filtered.setStackTraceFilter(cls -> true);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        filtered.writeJsonEventStream(mapper, event, out);
+        JsonLogWriterStream.writeJsonEvent(filtered, mapper, event, out, hasher);
         String json = out.toString(StandardCharsets.UTF_8);
 
         assertTrue(json.endsWith("}"), "filtered event must be complete: " + json);

@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
+import hr.hrg.dialog.core.Wyhash64;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.KeyValuePair;
 import tools.jackson.databind.ObjectMapper;
@@ -35,6 +36,7 @@ class JsonLogWriterDirectBufferTest {
 
     private final JsonLogWriter writer = new JsonLogWriter();
     private final ObjectMapper mapper = new ObjectMapper();
+    private final Wyhash64.Streaming hasher = new Wyhash64.Streaming(0);
 
     private LoggingEvent event(String message) {
         LoggerContext context = new LoggerContext();
@@ -66,7 +68,7 @@ class JsonLogWriterDirectBufferTest {
         writer.writeJsonEventDirect(mapper, event, direct);
 
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        writer.writeJsonEventStream(mapper, event, stream);
+        JsonLogWriterStream.writeJsonEvent(writer, mapper, event, stream, hasher);
 
         assertArrayEquals(stream.toByteArray(), java.util.Arrays.copyOf(direct.buffer(), direct.size()),
                 "direct-buffer output must equal stream output (capacity " + initialCapacity + ")");

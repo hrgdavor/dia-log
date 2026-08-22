@@ -58,6 +58,13 @@ quote the artifact file names, and note any JIT or environment caveats.
   `JsonLogWriterClassic`, benchmark fixtures). Keep those straightforward and
   correct.
 
+**Published diagnostic appenders stay in `src/main`.** `JsonAppenderDev` and
+`JsonAppenderRollingDev` — and `JsonLogWriterDev`, which they instantiate — are
+deliberate, *published* diagnostic tools (missing-key reporting during development)
+and are the explicit exception to the "move non-production code to `src/test`"
+cleanup rule: they must remain under `src/main/java`. `JsonLogWriterClassic` is a
+pure benchmark comparison baseline and lives under `src/test/java`.
+
 ### Implementation plans
 
 When a technique requires multi-file implementation, add

@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
+import hr.hrg.dialog.core.Wyhash64;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -63,6 +64,7 @@ public class ForyPerfEventBenchmark {
     private ReusableByteArrayOutputStream rbo;
     private ByteArrayOutputStream baos;
     private LoggingEvent event;
+    private Wyhash64.Streaming hasher;
 
     @Setup(Level.Trial)
     public void setup() {
@@ -71,6 +73,7 @@ public class ForyPerfEventBenchmark {
         mapper = new ObjectMapper();
         rbo = new ReusableByteArrayOutputStream(16 * 1024);
         baos = new ByteArrayOutputStream(16 * 1024);
+        hasher = new Wyhash64.Streaming(0);
 
         LoggerContext context = new LoggerContext();
         // A fresh LoggerContext has no MDC adapter; initialize one so
@@ -118,7 +121,7 @@ public class ForyPerfEventBenchmark {
     @Benchmark
     public void eventNewStream(Blackhole bh) throws IOException {
         baos.reset();
-        writer.writeJsonEventStream(mapper, event, baos);
+        JsonLogWriterStream.writeJsonEvent(writer, mapper, event, baos, hasher);
         bh.consume(baos);
     }
 

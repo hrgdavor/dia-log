@@ -16,6 +16,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
+import hr.hrg.dialog.core.Wyhash64;
 import org.openjdk.jmh.infra.Blackhole;
 import org.slf4j.event.KeyValuePair;
 import tools.jackson.core.JsonGenerator;
@@ -52,6 +53,7 @@ public class JsonLogWriterBenchmark {
     private JsonFactory jsonFactory;
     private ReusableByteArrayOutputStream output;
     private LoggingEvent event;
+    private Wyhash64.Streaming hasher;
 
     @Setup(org.openjdk.jmh.annotations.Level.Trial)
     public void setup() {
@@ -60,6 +62,7 @@ public class JsonLogWriterBenchmark {
         mapper = new ObjectMapper();
         jsonFactory = JsonFactory.builder().build();
         output = new ReusableByteArrayOutputStream(16 * 1024);
+        hasher = new Wyhash64.Streaming(0);
 
         LoggerContext context = new LoggerContext();
         Logger logger = context.getLogger("bench.logger");
@@ -97,7 +100,7 @@ public class JsonLogWriterBenchmark {
     @Benchmark
     public void writeWithJsonLogWriter(Blackhole blackhole) throws IOException {
         output.reset();
-        writer.writeJsonEventStream(mapper, event, output);
+        JsonLogWriterStream.writeJsonEvent(writer, mapper, event, output, hasher);
         output.write('\n');
         blackhole.consume(output.size());
         blackhole.consume(output.tailChecksum());

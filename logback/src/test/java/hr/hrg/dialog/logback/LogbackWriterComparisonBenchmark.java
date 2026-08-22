@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.LoggingEvent;
+import hr.hrg.dialog.core.Wyhash64;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -79,6 +80,7 @@ public class LogbackWriterComparisonBenchmark {
     private JsonFactory jsonFactory;
     private ReusableByteArrayOutputStream output;
     private LoggingEvent event;
+    private Wyhash64.Streaming hasher;
 
     @Setup(org.openjdk.jmh.annotations.Level.Trial)
     public void setup() {
@@ -94,6 +96,7 @@ public class LogbackWriterComparisonBenchmark {
         mapper = new ObjectMapper();
         jsonFactory = JsonFactory.builder().build();
         output = new ReusableByteArrayOutputStream(16 * 1024);
+        hasher = new Wyhash64.Streaming(0);
 
         Throwable throwable = includeThrowable ? createThrowable() : null;
         event = new LoggingEvent(
@@ -128,7 +131,7 @@ public class LogbackWriterComparisonBenchmark {
     @Benchmark
     public void optimizedJsonLog(Blackhole blackhole) throws IOException {
         output.reset();
-        jsonWriter.writeJsonEventStream(mapper, event, output);
+        JsonLogWriterStream.writeJsonEvent(jsonWriter, mapper, event, output, hasher);
         output.write('\n');
         blackhole.consume(output.size());
         blackhole.consume(output.tailChecksum());
