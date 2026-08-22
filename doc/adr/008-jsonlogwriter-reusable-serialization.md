@@ -25,7 +25,11 @@ Initially, JSON serialization logic would be duplicated across each appender cla
 Extract JSON serialization into a reusable [`JsonLogWriter`](../logback/src/main/java/hr/hrg/dialog/logback/JsonLogWriter.java) component that:
 - Is independent of any specific appender type
 - Holds all JSON-related configuration (`includeMDC`, `includeKeys`, `prettyPrint`, `customFields`, `maxStackFrames`)
-- Provides a single `writeJsonEvent(ILoggingEvent, OutputStream)` method
+- Provides two explicit write variants — `writeJsonEventDirect(mapper, event,
+  ReusableByteArrayOutputStream)` (the production direct-buffer path) and
+  `writeJsonEventStream(mapper, event, OutputStream)` (naive stream fallback).
+  Callers choose the exact variant; there is no OutputStream dispatcher, so a
+  `ReusableByteArrayOutputStream` is never routed through the stream path
 - Can be shared by any appender that needs JSON output
 
 ### Encoder integration

@@ -90,7 +90,7 @@ public class StacktraceFingerprintBenchmark {
     @Benchmark
     public void writeWithJsonLogWriter(Blackhole blackhole) throws IOException {
         output.reset();
-        writer.writeJsonEvent(mapper, event, output);
+        writer.writeJsonEventStream(mapper, event, output);
         output.write('\n');
         blackhole.consume(output.size());
         blackhole.consume(output.tailChecksum());

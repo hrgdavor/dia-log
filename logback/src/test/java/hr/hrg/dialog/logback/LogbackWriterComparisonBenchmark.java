@@ -128,7 +128,7 @@ public class LogbackWriterComparisonBenchmark {
     @Benchmark
     public void optimizedJsonLog(Blackhole blackhole) throws IOException {
         output.reset();
-        jsonWriter.writeJsonEvent(mapper, event, output);
+        jsonWriter.writeJsonEventStream(mapper, event, output);
         output.write('\n');
         blackhole.consume(output.size());
         blackhole.consume(output.tailChecksum());

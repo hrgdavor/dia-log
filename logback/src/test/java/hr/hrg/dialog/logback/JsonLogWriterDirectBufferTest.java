@@ -63,10 +63,10 @@ class JsonLogWriterDirectBufferTest {
     /** Writes {@code event} through each path with the given direct-buffer capacity and asserts identical bytes. */
     private void assertDirectMatchesStream(LoggingEvent event, int initialCapacity) throws Exception {
         ReusableByteArrayOutputStream direct = new ReusableByteArrayOutputStream(initialCapacity);
-        writer.writeJsonEvent(mapper, event, direct);
+        writer.writeJsonEventDirect(mapper, event, direct);
 
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        writer.writeJsonEvent(mapper, event, stream);
+        writer.writeJsonEventStream(mapper, event, stream);
 
         assertArrayEquals(stream.toByteArray(), java.util.Arrays.copyOf(direct.buffer(), direct.size()),
                 "direct-buffer output must equal stream output (capacity " + initialCapacity + ")");

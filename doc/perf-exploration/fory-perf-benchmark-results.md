@@ -121,9 +121,9 @@ cost; the difference between the legs is the writer internals.
 
 Option 2 is the full "writer owns the buffer" assembly
 (`core/.../DirectJsonBuffer.java` + `core/.../DirectJsonStringWriter.java`):
-`JsonLogWriter.writeJsonEvent` dispatches on the target; for a
-`ReusableByteArrayOutputStream` it assembles the whole event through one
-reusable cursor (`byte[] buf` + `int pos` live in registers), publishing once
+`JsonLogWriter.writeJsonEventDirect` (no OutputStream dispatcher — callers pick
+the exact variant) assembles the whole event through one reusable cursor
+(`byte[] buf` + `int pos` live in registers), publishing once
 via `publish()` and falling back to the stream only for jackson, raw values,
 the generated stack-trace writers and the dev `writeExtraFields`
 (publish → write → resync). See [t4-writer-owns-buffer.md](t4-writer-owns-buffer.md).

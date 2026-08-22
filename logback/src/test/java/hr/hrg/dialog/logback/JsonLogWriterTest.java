@@ -41,7 +41,7 @@ class JsonLogWriterTest {
 
     private String write(LoggingEvent event) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        writer.writeJsonEvent(mapper, event, out);
+        writer.writeJsonEventStream(mapper, event, out);
         return out.toString(StandardCharsets.UTF_8);
     }
 
@@ -146,7 +146,7 @@ class JsonLogWriterTest {
         JsonLogWriter filtered = new JsonLogWriter();
         filtered.setStackTraceFilter(cls -> true);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        filtered.writeJsonEvent(mapper, event, out);
+        filtered.writeJsonEventStream(mapper, event, out);
         String json = out.toString(StandardCharsets.UTF_8);
 
         assertTrue(json.endsWith("}"), "filtered event must be complete: " + json);

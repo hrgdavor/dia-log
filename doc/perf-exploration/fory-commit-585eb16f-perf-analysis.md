@@ -234,9 +234,11 @@ steady state (1 MiB event buffer).
 
 - `core/.../ReusableByteArrayOutputStream.write(int)` and `write(byte[],off,len)`
   already inline their checks — nothing to do there.
-- The real target is the *callers*: `JsonLogWriter.writeJsonEvent` currently
-  funnels every byte through `OutputStream.write(...)` virtual calls (see T4).
-  If T4 lands, every site that previously relied on `out.write` must apply the
+- The real target was the *callers*: `JsonLogWriter.writeJsonEvent` funneled
+  every byte through `OutputStream.write(...)` virtual calls (see T4). With T4
+  the dispatcher is gone — callers invoke `writeJsonEventDirect` (reusable
+  buffer) or `writeJsonEventStream` explicitly. Every site that previously
+  relied on `out.write` must apply the
   local-check pattern against the direct buffer.
 - `JsonNumberWriter.writeInt/writeLong` build into a caller-provided buffer of
   exactly `MAX_*_BYTES` — no growth needed; if T5 lands, drop the length guard

@@ -55,7 +55,7 @@ mvn -pl project-automation compile exec:java \
   writing) is duplicated on purpose for JIT inlining. Do not "deduplicate" it.
 - **Allocation hotspots to avoid** when adding features:
   - `Wyhash64.Streaming.finalHash()` — must not allocate a scratch `byte[16]`
-  - `JsonLogWriter.writeJsonEvent()` — `allKeys` is lazily allocated, keep it so
+  - `JsonLogWriter.writeJsonEventDirect()` — `allKeys` is lazily allocated, keep it so
   - `StringByteExtractor.writeClassic()` — allocates per string (fallback only)
   - `Float.toString()` / `Double.toString()` in `JsonNumberWriter` (Ryu used)
 - **Thread safety model** (documented in `AGENTS.md`):

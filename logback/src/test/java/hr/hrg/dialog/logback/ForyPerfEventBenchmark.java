@@ -98,7 +98,7 @@ public class ForyPerfEventBenchmark {
             ReusableByteArrayOutputStream a = new ReusableByteArrayOutputStream(1024);
             classicWriter.writeEvent(event, a);
             ReusableByteArrayOutputStream b = new ReusableByteArrayOutputStream(1024);
-            writer.writeJsonEvent(mapper, event, b);
+            writer.writeJsonEventDirect(mapper, event, b);
             assertArrayEquals(
                     java.util.Arrays.copyOf(a.buffer(), a.size()),
                     java.util.Arrays.copyOf(b.buffer(), b.size()),
@@ -118,14 +118,14 @@ public class ForyPerfEventBenchmark {
     @Benchmark
     public void eventNewStream(Blackhole bh) throws IOException {
         baos.reset();
-        writer.writeJsonEvent(mapper, event, baos);
+        writer.writeJsonEventStream(mapper, event, baos);
         bh.consume(baos);
     }
 
     @Benchmark
     public void eventNewDirect(Blackhole bh) throws IOException {
         rbo.reset();
-        writer.writeJsonEvent(mapper, event, rbo);
+        writer.writeJsonEventDirect(mapper, event, rbo);
         bh.consume(rbo);
     }
 

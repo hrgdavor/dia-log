@@ -166,15 +166,12 @@ public class JsonLogWriter {
         this.stackTraceFilter = filter;
     }
 
-    public void writeJsonEvent(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
-        if (out instanceof ReusableByteArrayOutputStream rbo) {
-            writeJsonEventDirect(mapper, event, rbo);
-        } else {
-            writeJsonEventStream(mapper, event, out);
-        }
-    }
-
     /**
+     * Direct-buffer assembly (the production path). Callers that already hold a
+     * {@link ReusableByteArrayOutputStream} must call this variant directly —
+     * there is no OutputStream dispatcher that would route through the naive
+     * stream path when the buffer is available.
+     * <p>
      * T4 option 2: full "writer owns the buffer" assembly (ported from Apache
      * Fory commit 585eb16f, Utf8JsonWriter's getBuffer/getPosition/setPosition
      * design). One reusable {@link ReusableByteArrayOutputStream} cursor keeps {@code byte[]
@@ -185,7 +182,7 @@ public class JsonLogWriter {
      * stack-trace writers, dev {@code writeExtraFields}) publish the cursor,
      * write through the stream, then resync.
      */
-    private void writeJsonEventDirect(ObjectMapper mapper, ILoggingEvent event, ReusableByteArrayOutputStream rbo) throws IOException {
+    public void writeJsonEventDirect(ObjectMapper mapper, ILoggingEvent event, ReusableByteArrayOutputStream rbo) throws IOException {
         rbo.reset();
         byte[] buf = rbo.buf;
         int pos = 0;
@@ -442,7 +439,8 @@ public class JsonLogWriter {
         rbo.pos = pos + 1;
     }
 
-    private void writeJsonEventStream(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
+    /** Naive stream assembly (API-compat / non-reusable-buffer sinks). Callers choose this variant explicitly. */
+    public void writeJsonEventStream(ObjectMapper mapper, ILoggingEvent event, OutputStream out) throws IOException {
         try {
             // KEY_TS includes the starting '{' for the object (fused object-start
             // prefix), so no separate brace is written here.

@@ -40,7 +40,7 @@ class JsonLogWriterDevTest {
 
     private String write(JsonLogWriter writer, LoggingEvent event) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        writer.writeJsonEvent(mapper, event, out);
+        writer.writeJsonEventStream(mapper, event, out);
         return out.toString(StandardCharsets.UTF_8);
     }
 

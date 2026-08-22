@@ -116,7 +116,7 @@ public class JsonAppenderRolling extends RollingFileAppender<ILoggingEvent> {
     protected void writeOut(ILoggingEvent event) throws IOException {
         var activeStreamLoc = activeStream;
         eventBuffer.reset();
-        jsonLogWriter.writeJsonEvent(objectMapper, event, eventBuffer);
+        jsonLogWriter.writeJsonEventDirect(objectMapper, event, eventBuffer);
 
         EventSnapshotHandler handler = eventSnapshotHandler;
         if (handler.isEnabled()) {

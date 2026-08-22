@@ -105,7 +105,7 @@ public class JsonLogWriterDevBenchmark {
 
     private void write(JsonLogWriter writer, LoggingEvent event, Blackhole blackhole) throws IOException {
         output.reset();
-        writer.writeJsonEvent(mapper, event, output);
+        writer.writeJsonEventStream(mapper, event, output);
         blackhole.consume(output.size());
     }
 

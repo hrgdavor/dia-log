@@ -75,8 +75,9 @@ the packed path (T6) when the target is the reusable buffer.
 **Option 2 (full writer-owns-buffer assembly — implemented):**
 `core/src/main/java/hr/hrg/dialog/core/DirectJsonBuffer.java` is a reusable
 cursor (one per `JsonLogWriter` instance, no per-event allocation) holding
-`byte[] buf` + `int pos` for the **whole event**. `JsonLogWriter.writeJsonEvent`
-dispatches on the target:
+`byte[] buf` + `int pos` for the **whole event**. Callers invoke the exact
+variant — there is no `OutputStream` dispatcher that would route an rbo through
+the stream path:
 
 - `ReusableByteArrayOutputStream` → `writeJsonEventDirect`: the entire event —
   `{`, packed prefixes (T6), the four fixed strings escaped straight into the
