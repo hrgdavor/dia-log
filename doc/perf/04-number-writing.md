@@ -63,3 +63,38 @@ End-to-end event writing (the direct path) is 0.095 → 0.064 µs/op (−33%) vs
 the recorded baseline, and number formatting is byte-identical to the
 digit-by-digit reference across hundreds of random values. Details in
 [`t9-bufferless-varhandle-number-writing.md`](../perf-exploration/t9-bufferless-varhandle-number-writing.md).
+
+## Going further: division-free reciprocals (T10, `JeaiiiFastWriter`)
+
+The T5/T9 writer still pays one hardware division per 4-digit group (the JIT
+strength-reduces `/ 10000`, but it is still a multiply-shift chain). The jeaiii
+technique (github.com/jeaiii/itoa) removes the division entirely: for a divisor
+`d = 10^k`, `M = ceil(2^64 / d)` fits a positive `long`, and
+`Math.multiplyHigh(v, M)` returns the exact quotient for every `v < 2^64 / d` —
+a single `mulx`/high-word move on x86-64.
+
+Two details make it work in practice:
+
+- **Division-free `long` split.** A 19-digit `long` cannot be divided by `10^9`
+  with a plain 64-bit reciprocal (the dividend exceeds the exactness bound
+  `2^64 / d`). Instead: `hi = multiplyHigh(u, M9)` is `floor(u / 10^9)` or one
+  too high, and a single signed-remainder repair (`if (lo < 0) { hi--; lo +=
+  10^9; }`) makes the split exact. Each half then fits the exactness bound.
+- **Trailing-zero leading group.** `DIGIT_QUADS` is fixed 4 digits and cannot
+  skip leading zeros, so the 1..3 digit leading group uses a *right-aligned*
+  table (`TRAILING_TRIPLES`): one `LE_INT` store writes the significant digits
+  first and a trailing `'0'` that is overwritten by the next group or lies past
+  the returned position. The caller's buffer must leave ≥ 4 bytes of room at
+  the offset (the production callers already ensure `MAX_INT_BYTES` /
+  `MAX_LONG_BYTES`). This is the same "full-store/partial-advance" overwrite
+  trick as T8.
+
+The digit count is decided by a comparison ladder (`< 10 / < 100 / < 1000 /
+< 10000`) — for short values those 1–4 well-predicted branches are cheaper than
+any branchless alternative, and short values (line numbers, levels, durations)
+are exactly the case that must be fast.
+
+Result (isolated writer benchmark, ns/op): int `medium` 6.21 → 2.75, long
+`timestamp` 7.89 → 4.40 vs `JsonNumberWriter`, and `jeaiiiQuad` is fastest on
+every distribution for both int and long. Details:
+[`t10-jeaiii-fast-writer.md`](../perf-exploration/t10-jeaiii-fast-writer.md).

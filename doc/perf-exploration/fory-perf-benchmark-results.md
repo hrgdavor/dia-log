@@ -15,6 +15,7 @@ Design and attribution for each technique:
 - [t7-cursor-locality-buffer-writer.md](t7-cursor-locality-buffer-writer.md) — whole-event `buf`/`pos`/`limit` cursor
 - [t8-packed-word-varhandle-stores.md](t8-packed-word-varhandle-stores.md) — direct VarHandle stores + full-store/partial-advance tails
 - [t9-bufferless-varhandle-number-writing.md](t9-bufferless-varhandle-number-writing.md) — bufferless offset number writing, `LE_INT` digit stores, no `arraycopy`
+- [t10-jeaiii-fast-writer.md](t10-jeaiii-fast-writer.md) — division-free jeaiii int/long writer: `multiplyHigh` reciprocals, trailing-zero quads
 
 ## How the before/after comparison is measured
 
@@ -392,3 +393,47 @@ writer suites (`StackTrace*`, `Stacktrace*`, `JsonLogWriterBenchmark`,
 `JsonLogWriterDevBenchmark`, `LogbackWriterComparisonBenchmark`,
 `AllocationBenchmark`) ran clean with no errors (reduced-iteration runs in
 `bench-misc-current.txt` / `bench-writers-current.txt`).
+
+## T10 — division-free jeaiii int/long writer (IntWriteBenchmark / LongWriteBenchmark)
+
+Full record: [t10-jeaiii-fast-writer.md](t10-jeaiii-fast-writer.md). The
+production int/long writer was replaced by a **division-free** jeaiii-style
+writer (`JeaiiiFastWriter`: `Math.multiplyHigh` reciprocals, 4-digit quads +
+right-aligned trailing-zero leading group). This is a separate comparison from
+the Fory legs above — it measures the *number-writer* in isolation against the
+previous production `JsonNumberWriter` (T5) and the plain JDK `toString`.
+
+Artifact: [bench-jeaiii-writer.txt](bench-jeaiii-writer.txt) (JDK 25.0.3, JMH
+1.37, `-wi 3 -i 6 -f 2 -t 1`; 12 samples; Ryzen 9 7945HX). Average time, ns/op:
+
+| int distribution | jeaiiiPairs | jeaiiiQuad | jsonNumberWriter | standardToString |
+| --- | --- | --- | --- | --- |
+| tiny (0–9) | 0.883 | 0.888 | 2.223 | 10.904 |
+| small (0–99) | 1.380 | 1.378 | 2.854 | 11.671 |
+| medium (0–10⁶) | 4.662 | **2.745** | 6.212 | 17.115 |
+| full | 7.167 | **5.082** | 8.510 | 18.607 |
+| negative | 7.346 | **4.846** | 8.072 | 18.951 |
+
+| long distribution | jeaiiiPairs | jeaiiiQuad | jsonNumberWriter | standardToString |
+| --- | --- | --- | --- | --- |
+| tiny (0–99) | 1.548 | 1.535 | 3.144 | 11.750 |
+| medium (0–10⁹) | 6.723 | **5.210** | 8.150 | 18.626 |
+| timestamp (0–10¹²) | 7.839 | **4.396** | 7.889 | 19.524 |
+| full (19-digit) | 13.085 | **8.226** | 13.433 | 28.592 |
+| negative | 13.045 | **7.771** | 12.719 | 30.408 |
+
+Reading:
+
+- `jeaiiiQuad` (the production writer) is fastest on **every** distribution for
+  both int and long — ~1.2–2.5× vs the previous `JsonNumberWriter`, and strictly
+  dominant over the 2-digit-pair variant it evolved from (matching it on
+  tiny/small, beating it 1.3–1.8× on medium+).
+- The win is biggest on short/medium values (line numbers, levels, durations):
+  int `medium` 6.21 → 2.75 ns (**2.3×** vs JsonNumberWriter), long `timestamp`
+  7.89 → 4.40 ns (**1.8×**).
+- The `jeaiiiPairs` leg is the stage-1 implementation preserved as a fixture
+  (`core/.../perf/JeaiiiPairsWriter`); the trailing-zero stage (stage 4) alone
+  was worth ~25% on int `medium` and ~16% on long `timestamp` (cross-run,
+  approximate — see the t10 record).
+- `standardToString` allocates (`Integer/Long.toString` + `byte[]`); the custom
+  writers are allocation-free into the caller's buffer.

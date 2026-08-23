@@ -1,0 +1,75 @@
+Jeaiii int/long writer benchmark — final run (T10)
+==================================================
+
+Machine: AMD Ryzen 9 7945HX, Windows (x86-64, little-endian)
+JDK: 25.0.3 (Oracle), JMH: 1.37
+Parameters: -wi 3 -i 6 -f 2 -t 1 (12 samples per leg)
+Benchmarks: IntWriteBenchmark, LongWriteBenchmark
+Legs: jeaiiiPairs (stage-1 fixture), jeaiiiQuad (production, trailing-zero),
+      jsonNumberWriter (T5/Fory), standardToString (Integer/Long.toString + UTF-8)
+
+Average time, ns/op (lower is better):
+
+Benchmark                           (distribution)  Mode  Cnt  Score   Error   Units
+IntWriteBenchmark.jeaiiiPairs               tiny  avgt   12   0.883 ± 0.007  ns/op
+IntWriteBenchmark.jeaiiiPairs              small  avgt   12   1.380 ± 0.056  ns/op
+IntWriteBenchmark.jeaiiiPairs             medium  avgt   12   4.662 ± 0.128  ns/op
+IntWriteBenchmark.jeaiiiPairs               full  avgt   12   7.167 ± 0.285  ns/op
+IntWriteBenchmark.jeaiiiPairs           negative  avgt   12   7.346 ± 0.255  ns/op
+IntWriteBenchmark.jeaiiiQuad                tiny  avgt   12   0.888 ± 0.024  ns/op
+IntWriteBenchmark.jeaiiiQuad               small  avgt   12   1.378 ± 0.054  ns/op
+IntWriteBenchmark.jeaiiiQuad              medium  avgt   12   2.745 ± 0.127  ns/op
+IntWriteBenchmark.jeaiiiQuad                full  avgt   12   5.082 ± 0.275  ns/op
+IntWriteBenchmark.jeaiiiQuad            negative  avgt   12   4.846 ± 0.087  ns/op
+IntWriteBenchmark.jsonNumberWriter          tiny  avgt   12   2.223 ± 0.097  ns/op
+IntWriteBenchmark.jsonNumberWriter         small  avgt   12   2.854 ± 0.096  ns/op
+IntWriteBenchmark.jsonNumberWriter        medium  avgt   12   6.212 ± 0.321  ns/op
+IntWriteBenchmark.jsonNumberWriter          full  avgt   12   8.510 ± 0.323  ns/op
+IntWriteBenchmark.jsonNumberWriter      negative  avgt   12   8.072 ± 0.351  ns/op
+IntWriteBenchmark.standardToString          tiny  avgt   12  10.904 ± 0.450  ns/op
+IntWriteBenchmark.standardToString         small  avgt   12  11.671 ± 0.712  ns/op
+IntWriteBenchmark.standardToString        medium  avgt   12  17.115 ± 0.664  ns/op
+IntWriteBenchmark.standardToString          full  avgt   12  18.607 ± 0.115  ns/op
+IntWriteBenchmark.standardToString      negative  avgt   12  18.951 ± 1.349  ns/op
+
+LongWriteBenchmark.jeaiiiPairs               tiny  avgt   12   1.548 ± 0.089  ns/op
+LongWriteBenchmark.jeaiiiPairs             medium  avgt   12   6.723 ± 0.311  ns/op
+LongWriteBenchmark.jeaiiiPairs          timestamp  avgt   12   7.839 ± 0.084  ns/op
+LongWriteBenchmark.jeaiiiPairs               full  avgt   12  13.085 ± 0.583  ns/op
+LongWriteBenchmark.jeaiiiPairs           negative  avgt   12  13.045 ± 0.477  ns/op
+LongWriteBenchmark.jeaiiiQuad                tiny  avgt   12   1.535 ± 0.071  ns/op
+LongWriteBenchmark.jeaiiiQuad              medium  avgt   12   5.210 ± 0.264  ns/op
+LongWriteBenchmark.jeaiiiQuad           timestamp  avgt   12   4.396 ± 0.139  ns/op
+LongWriteBenchmark.jeaiiiQuad                full  avgt   12   8.226 ± 0.521  ns/op
+LongWriteBenchmark.jeaiiiQuad            negative  avgt   12   7.771 ± 0.260  ns/op
+LongWriteBenchmark.jsonNumberWriter          tiny  avgt   12   3.144 ± 0.115  ns/op
+LongWriteBenchmark.jsonNumberWriter         medium  avgt   12   8.150 ± 0.022  ns/op
+LongWriteBenchmark.jsonNumberWriter      timestamp  avgt   12   7.889 ± 0.280  ns/op
+LongWriteBenchmark.jsonNumberWriter          full  avgt   12  13.433 ± 0.544  ns/op
+LongWriteBenchmark.jsonNumberWriter      negative  avgt   12  12.719 ± 0.543  ns/op
+LongWriteBenchmark.standardToString          tiny  avgt   12  11.750 ± 0.081  ns/op
+LongWriteBenchmark.standardToString         medium  avgt   12  18.626 ± 0.737  ns/op
+LongWriteBenchmark.standardToString      timestamp  avgt   12  19.524 ± 1.345  ns/op
+LongWriteBenchmark.standardToString          full  avgt   12  28.592 ± 3.907  ns/op
+LongWriteBenchmark.standardToString      negative  avgt   12  30.408 ± 2.778  ns/op
+
+Throughput, ops/ns (higher is better):
+
+Benchmark                           (distribution)  Mode  Cnt  Score   Error   Units
+IntWriteBenchmark.jeaiiiQuad                tiny  thrpt   12  0.966 ± 0.073  ops/ns
+IntWriteBenchmark.jeaiiiQuad               small  thrpt   12  0.620 ± 0.076  ops/ns
+IntWriteBenchmark.jeaiiiQuad              medium  thrpt   12  0.311 ± 0.028  ops/ns
+IntWriteBenchmark.jeaiiiQuad                full  thrpt   12  0.170 ± 0.024  ops/ns
+IntWriteBenchmark.jeaiiiQuad            negative  thrpt   12  0.175 ± 0.016  ops/ns
+LongWriteBenchmark.jeaiiiQuad                tiny  thrpt   12  0.568 ± 0.076  ops/ns
+LongWriteBenchmark.jeaiiiQuad              medium  thrpt   12  0.165 ± 0.016  ops/ns
+LongWriteBenchmark.jeaiiiQuad           timestamp  thrpt   12  0.192 ± 0.028  ops/ns
+LongWriteBenchmark.jeaiiiQuad                full  thrpt   12  0.106 ± 0.013  ops/ns
+LongWriteBenchmark.jeaiiiQuad            negative  thrpt   12  0.107 ± 0.014  ops/ns
+
+Notes:
+- jeaiiiQuad is fastest on every distribution (int and long).
+- The standardToString leg allocates (Integer/Long.toString + byte[]); the
+  custom writers are allocation-free.
+- Allocation was not profiled (-prof gc) in this run; the writers write only
+  into the caller-provided byte[] and allocate nothing (verified separately).

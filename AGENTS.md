@@ -182,22 +182,25 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
 & "D:\programs\mvn\bin\mvn.cmd" -o -pl core,logback test "-Dsurefire.failIfNoSpecifiedTests=false"
 ```
 
-The derivative generator (after editing `JavaStackSanitizer.java`) uses the same
-environment:
+Both tools are packaged as a single fat jar (build once after editing sources):
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
-& "D:\programs\mvn\bin\mvn.cmd" -pl project-automation compile exec:java "-Dexec.mainClass=hr.hrg.dialog.tools.StackSanitizerDerivativeGenerator"
+& "D:\programs\mvn\bin\mvn.cmd" -o package -DskipTests "-Dgpg.skip=true" "-Djacoco.skip=true" -pl project-automation
 ```
 
-The CodeBuddy marker generator (`@CB.*` comments, e.g. `@CB.StrPacker` packed-key
-blocks in `JsonLogWriter.java`) uses the same environment; see
-`doc/codebuddy-strpacker.md` for the marker conventions and examples:
+Then run with JDK 25's `java` (the default `java` on PATH is JDK 8 and will fail with
+`UnsupportedClassVersionError`):
 
 ```powershell
-$env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
-& "D:\programs\mvn\bin\mvn.cmd" -pl project-automation compile exec:java "-Dexec.mainClass=hr.hrg.dialog.tools.CodeBuddy"
+& "C:\Program Files\Java\jdk-25\bin\java.exe" -jar "D:\wrk\java\dia-log\project-automation\target\dia-log-project-automation-1.0.0-cli.jar" derivative
+& "C:\Program Files\Java\jdk-25\bin\java.exe" -jar "D:\wrk\java\dia-log\project-automation\target\dia-log-project-automation-1.0.0-cli.jar" codebuddy
 ```
+
+The fat jar's `Tools` dispatcher accepts `derivative` or `codebuddy` as the first arg,
+with an optional repo-root path as the second arg. The Maven `exec:java` invocations
+still work during development (no package step needed) but require the full `-Dexec.mainClass`
+flag for each tool.
 
 PowerShell note: unquoted `-Dkey=value` flags are sometimes mangled by the shell
 (dropping the `-D` prefix); quote each one, e.g. `"-Dtest=MyTest"`.
