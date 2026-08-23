@@ -17,8 +17,10 @@
     <name>Diagnostic Logger :: Project Automation</name>
     <description>Boilerplate generation for the dia-log project (JavaParser-based source generators)</description>
 
+    <!-- Code coverage is not measured or enforced for project-automation (internal build tool) -->
     <properties>
         <javaparser.version>3.28.2</javaparser.version>
+        <jacoco.skip>true</jacoco.skip>
     </properties>
 
     <dependencies>
