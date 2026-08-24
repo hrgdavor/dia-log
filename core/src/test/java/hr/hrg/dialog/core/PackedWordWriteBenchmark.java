@@ -96,7 +96,7 @@ public class PackedWordWriteBenchmark {
         int pos = offset;
         WriteOps.LE_LONG.set(buf, pos, w0);
         pos += 8;
-        pos = WriteOps.writePackedLE(buf, pos, w1, tailLen);
+        pos = PackedWriteTestOps.writePackedLE(buf, pos, w1, tailLen);
         bh.consume(buf[pos - 1]);
         return pos;
     }
@@ -108,13 +108,13 @@ public class PackedWordWriteBenchmark {
         WriteOps.LE_LONG.set(buf, pos, w0);
         pos += 8;
         pos = switch (tailLen) {
-            case 1 -> WriteOps.writePackedLE1(buf, pos, w1);
-            case 2 -> WriteOps.writePackedLE2(buf, pos, w1);
-            case 3 -> WriteOps.writePackedLE3(buf, pos, w1);
-            case 4 -> WriteOps.writePackedLE4(buf, pos, w1);
-            case 5 -> WriteOps.writePackedLE5(buf, pos, w1);
-            case 6 -> WriteOps.writePackedLE6(buf, pos, w1);
-            default -> WriteOps.writePackedLE7(buf, pos, w1);
+            case 1 -> PackedWriteTestOps.writePackedLE1(buf, pos, w1);
+            case 2 -> PackedWriteTestOps.writePackedLE2(buf, pos, w1);
+            case 3 -> PackedWriteTestOps.writePackedLE3(buf, pos, w1);
+            case 4 -> PackedWriteTestOps.writePackedLE4(buf, pos, w1);
+            case 5 -> PackedWriteTestOps.writePackedLE5(buf, pos, w1);
+            case 6 -> PackedWriteTestOps.writePackedLE6(buf, pos, w1);
+            default -> PackedWriteTestOps.writePackedLE7(buf, pos, w1);
         };
         bh.consume(buf[pos - 1]);
         return pos;

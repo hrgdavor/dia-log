@@ -51,7 +51,7 @@ class WriteOpsPackedTest {
                 byte[] a = new byte[32];
                 byte[] b = new byte[32];
                 int ra = specializedWrite(a, off, PATTERN2, n);
-                int rb = WriteOps.writePackedLE(b, off, PATTERN2, n);
+                int rb = PackedWriteTestOps.writePackedLE(b, off, PATTERN2, n);
                 assertEquals(rb, ra, "return n=" + n + " off=" + off);
                 assertArrayEquals(a, b, "n=" + n + " off=" + off);
             }
@@ -76,13 +76,13 @@ class WriteOpsPackedTest {
 
     private static int specializedWrite(byte[] buf, int pos, long v, int n) {
         return switch (n) {
-            case 1 -> WriteOps.writePackedLE1(buf, pos, v);
-            case 2 -> WriteOps.writePackedLE2(buf, pos, v);
-            case 3 -> WriteOps.writePackedLE3(buf, pos, v);
-            case 4 -> WriteOps.writePackedLE4(buf, pos, v);
-            case 5 -> WriteOps.writePackedLE5(buf, pos, v);
-            case 6 -> WriteOps.writePackedLE6(buf, pos, v);
-            default -> WriteOps.writePackedLE7(buf, pos, v);
+            case 1 -> PackedWriteTestOps.writePackedLE1(buf, pos, v);
+            case 2 -> PackedWriteTestOps.writePackedLE2(buf, pos, v);
+            case 3 -> PackedWriteTestOps.writePackedLE3(buf, pos, v);
+            case 4 -> PackedWriteTestOps.writePackedLE4(buf, pos, v);
+            case 5 -> PackedWriteTestOps.writePackedLE5(buf, pos, v);
+            case 6 -> PackedWriteTestOps.writePackedLE6(buf, pos, v);
+            default -> PackedWriteTestOps.writePackedLE7(buf, pos, v);
         };
     }
 

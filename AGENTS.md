@@ -131,8 +131,9 @@ tail store:
 1. **Full 8-byte store per word — never a partial tail store.** Store *every*
    window, including the final tail, with one `WriteOps.LE_LONG.set(buf, pos,
    word)` (or an equivalent little-endian 8-byte store). Do **not** fall back
-   to `WriteOps.writePackedLE1..7`, a length `switch`, or a `byte[]`
-   `arraycopy` for the tail — that is exactly the linear-cost shape the trick
+   to `PackedWriteTestOps.writePackedLE1..7` (the test/benchmark-only length
+   switch), a `byte[]` `arraycopy` for the tail — that is exactly the
+   linear-cost shape the trick
    exists to avoid.
 2. **Reserve a full 8-byte slot per packed-long write.** The inline capacity
    check must reserve the generated `KEY_X_LEN_BUF` constant — the byte length

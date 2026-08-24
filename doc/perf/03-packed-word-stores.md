@@ -65,8 +65,9 @@ or silently re-introduces a per-byte / `arraycopy` hot path.
 1. **Each packed long is stored with one full 8-byte VarHandle store — never a
    partial tail store.** Use `WriteOps.LE_LONG.set(buf, pos, word)` (or an
    equivalent little-endian 8-byte store) for *every* window, including the
-   final tail word. Do **not** fall back to `WriteOps.writePackedLE1..7`, a
-   length `switch`, or a `byte[]` `arraycopy` for the tail. The win is that the
+    final tail word. Do **not** fall back to `PackedWriteTestOps.writePackedLE1..7`
+    (the test/benchmark-only length switch), a `byte[]` `arraycopy` for the tail.
+    The win is that the
    tail costs exactly one wide store regardless of length; a length-dependent
    tail store grows linearly (see the benchmark below) and defeats the design.
 
