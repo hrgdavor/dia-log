@@ -209,8 +209,7 @@ public final class StringByteExtractor {
                     int pos = rbo.position();
                     byte[] buf = rbo.buffer();
                     if (pos + 2 > buf.length) {
-                        rbo.grow(pos + 2);
-                        buf = rbo.buffer();
+                        buf = rbo.grow(pos + 2);
                     }
                     buf[pos] = (byte) (0xC0 | (v >> 6));   // 110xxxxx
                     buf[pos + 1] = (byte) (0x80 | (v & 0x3F)); // 10xxxxxx
@@ -229,8 +228,7 @@ public final class StringByteExtractor {
                 int pos = rbo.position();
                 byte[] buf = rbo.buffer();
                 if (pos + 2 > buf.length) {
-                    rbo.grow(pos + 2);
-                    buf = rbo.buffer();
+                    buf = rbo.grow(pos + 2);
                 }
                 buf[pos] = (byte) (0xC0 | (v >> 6));   // 110xxxxx
                 buf[pos + 1] = (byte) (0x80 | (v & 0x3F)); // 10xxxxxx
@@ -251,8 +249,7 @@ public final class StringByteExtractor {
         int pos = rbo.position();
         byte[] buf = rbo.buffer();
         if (pos + len > buf.length) {
-            rbo.grow(pos + len);
-            buf = rbo.buffer();
+            buf = rbo.grow(pos + len);
         }
         System.arraycopy(src, from, buf, pos, len);
         rbo.setPosition(pos + len);

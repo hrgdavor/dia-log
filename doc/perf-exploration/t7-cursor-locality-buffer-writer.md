@@ -9,9 +9,11 @@ generalized via design discussion for a reusable, composable buffer writer.
 
 Fory's headline win is not SWAR or digit tables in isolation — it is moving the
 write cursor from a heap-allocated object field to a **stack-local variable** for
-the duration of a hot serialization loop. C2 can then keep `buffer`, `position`,
-and `limit` in CPU registers, eliminating virtual dispatch on every value write,
-cache-line reloads of cursor state, and redundant bounds checks.
+the duration of a hot serialization loop. C2 can then keep `buffer` and
+`position` in CPU registers, eliminating virtual dispatch on every value write,
+cache-line reloads of cursor state, and redundant bounds checks. The capacity is
+always the buffer's own length — the buffer object keeps no separate `limit`
+field, so a grow never forces an extra field reload.
 
 This technique generalizes beyond JSON to any workload that serializes primitives,
 UTF-8 strings, or raw bytes into a `byte[]` for periodic or batch IO.
@@ -21,25 +23,21 @@ UTF-8 strings, or raw bytes into a `byte[]` for periodic or batch IO.
 Every serialization method follows this exact structure:
 
 ```java
-public void writeMessage(Message m, CursorBuffer cb) throws IOException {
+public void writeMessage(Message m, ReusableByteArrayOutputStream rbo) throws IOException {
     // --- Pull locals once (cursor lives in registers for the whole method) ---
-    byte[] buf = cb.buf;
-    int pos = cb.pos;
-    int limit = cb.limit;
+    byte[] buf = rbo.buf;
+    int pos = 0;
     int maxSize = MAX_MESSAGE_SIZE;
 
     // --- Single cold-path check (rare: once per several KB) ---
-    if (pos + maxSize > limit) {
+    if (pos + maxSize > buf.length) {
         if (pos > 0) {
-            cb.sink.write(buf, 0, pos);
+            rbo.publish();
             pos = 0;
         }
         if (buf.length < maxSize) {
-            buf = new byte[Math.max(buf.length << 1, maxSize)];
-            limit = buf.length;
+            buf = rbo.grow(maxSize);   // grow returns the (reallocated) buffer
         }
-        cb.buf = buf;
-        cb.limit = limit;
     }
 
     // --- Hot path: pure straight-line stores, zero method calls ---
@@ -53,26 +51,26 @@ public void writeMessage(Message m, CursorBuffer cb) throws IOException {
     pos = WriteOps.writeEscapedJsonString(buf, pos, m.name);
 
     // --- Publish cursor ONCE at the end ---
-    cb.pos = pos;
+    rbo.pos = pos;
 }
 ```
 
-The critical detail: `cb.pos = pos` is written **once per message** (or per
-batch), not per field. The main loop owns the cursor; the `CursorBuffer` object
-is a carrier, not a controller.
+The critical detail: `rbo.pos = pos` is written **once per message** (or per
+batch), not per field. The main loop owns the cursor; the
+`ReusableByteArrayOutputStream` object is a carrier, not a controller.
 
 ## The anti-pattern: returning arrays or objects from capacity checks
 
 ```java
 // BAD — destroys cursor locality
-int[] result = cb.ensure(pos, 4);
+int[] result = rbo.ensure(pos, 4);
 buf = result[0];  // forces alias analysis, escape analysis failure
 pos = result[1];  // register spill
 ```
 
-Returning an array forces the JIT to treat `buf`, `pos`, and `limit` as
-potentially aliased heap objects. C2 must reload them from memory after the call,
-defeating the register residency that makes the pattern fast.
+Returning an array forces the JIT to treat `buf` and `pos` as potentially
+aliased heap objects. C2 must reload them from memory after the call, defeating
+the register residency that makes the pattern fast.
 
 The correct alternatives:
 
@@ -255,9 +253,9 @@ single VarHandle store instead of per-byte stores.
   single-threaded, so `LE_LONG.set` writes the same `buf` the local `pos`
   points at, with no data-race concerns.
 - **Bounds-check behavior.** The VarHandle checks `pos + viewSize <= array.length`
-  (the array length, not the writer's `limit`). The surrounding `ensure(8)` call
-  guarantees this for the writer's `limit`, so the VarHandle's check never
-  triggers on the hot path — it is an uncommon-trip safety net only.
+  (the array length). The surrounding `ensure(8)` call guarantees there is room,
+  so the VarHandle's check never triggers on the hot path — it is an
+  uncommon-trip safety net only.
 - **C2 inlining.** Static-final VarHandles are constant-folded; the JIT sees
   `LE_LONG.set` as a direct intrinsic, not a virtual call. This matches the
   existing `LE_WORD.get` inlining already proven in `StringByteExtractor` and
@@ -273,7 +271,7 @@ single VarHandle store instead of per-byte stores.
 3. **Zero-copy, zero-allocation** stores for prefilled `long`/`int` values
    (packed field prefixes, SWAR clean words).
 4. **Direct interop** with `ReusableByteArrayOutputStream.buffer()`.
-5. **JIT-friendly** layout that keeps `buf`/`pos`/`limit` in registers.
+5. **JIT-friendly** layout that keeps `buf`/`pos` in registers.
 
 The store direction now uses the VarHandle too: `WriteOps.LE_LONG` (the
 `byte[]` VarHandle view) is the public store handle, and the hot writers call
@@ -286,17 +284,14 @@ words is gone (see `t8-packed-word-varhandle-stores.md`).
 Flushing to IO must not destroy cursor locality. The cold path handles it:
 
 ```java
-if (pos + need > limit) {
+if (pos + need > buf.length) {
     if (pos > 0) {
-        cb.sink.write(buf, 0, pos); // rare: once per several KB
+        rbo.publish();  // rare: once per several KB
         pos = 0;
     }
     if (buf.length < need) {
-        buf = new byte[Math.max(buf.length << 1, need)];
-        limit = buf.length;
+        buf = rbo.grow(need);   // grow returns the (reallocated) buffer
     }
-    cb.buf = buf;
-    cb.limit = limit;
 }
 ```
 
@@ -328,23 +323,20 @@ writers could not reuse the same local-cursor discipline.
 
 **Now:** the pattern is extracted into two reusable classes:
 
-- `core/.../CursorBuffer` — the generalized base cursor (`buf`/`pos`/`limit`
-  fields, write helpers `writeByte`/`writeRaw`/`writePackedLE`/`putPackedLE`,
-  `ensure`/`publish`/`resync`). The base `ensure` is a no-op so non-sink
-  callers (binary TLV, custom protocols) can pre-size `limit` and own the
-  cold-path flush.
-- `core/.../JsonCursorBuffer extends CursorBuffer` — the grow-capable carrier for
-  JSON writers; overrides `ensure` to grow the `ReusableByteArrayOutputStream`
-  and `publish`/`resync` to sync the local cursor to the sink. `DirectJsonBuffer`
-  is retained as a thin backward-compatible subclass.
+- `core/.../ReusableByteArrayOutputStream` — the grow-capable carrier that owns
+  the backing `byte[]` and cursor (`buf`/`pos` fields, write helpers
+  `writeByte`/`writeRaw`/`writePackedLE`/`putPackedLE`, `ensure`/`publish`/`resync`,
+  and `grow`, which returns the reallocated buffer). The capacity is always
+  `buf.length`, so there is no separate `limit` field to maintain or fetch.
 - `core/.../WriteOps` — a `final` facade over the existing optimized backends
   (`DirectJsonStringWriter`, `StringByteExtractor`, and the packed VarHandle
   stores). Number writing lives in `JsonNumberWriter` directly (`writeInt`/
   `writeLong`/`writeFloat`/`writeDouble` take a `byte[]` and offset, no scratch
   buffer). Every method returns the new `int pos` and takes only primitives; no
   heap state, no allocation on the hot path. Two shapes: pure `byte[] buf,
-  int pos` overloads (capacity assumed) and grow-capable `CursorBuffer`
-  overloads (used by `JsonLogWriter`'s direct path).
+  int pos` overloads (capacity assumed) and grow-capable
+  `ReusableByteArrayOutputStream` overloads (used by `JsonLogWriter`'s direct
+  path).
 
 `JsonLogWriter.writeJsonEventDirect` now assembles numbers via
 `JsonNumberWriter` (`byte[]` + offset, no buffers) and strings via `WriteOps`,

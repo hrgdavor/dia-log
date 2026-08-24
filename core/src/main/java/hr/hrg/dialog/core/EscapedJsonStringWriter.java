@@ -338,9 +338,8 @@ public final class EscapedJsonStringWriter {
                 // string; the last store overlaps the first two but is byte-identical.
                 int pos = rbo.position();
                 byte[] buf = rbo.buffer();
-                if (pos + to > buf.length) {
-                    rbo.grow(pos + to);
-                    buf = rbo.buffer();
+                if (pos + 16 > buf.length) {
+                    buf = rbo.grow(pos + 16);
                 }
                 putWordLE(buf, pos, w0);
                 putWordLE(buf, pos + 8, w1);
@@ -360,8 +359,7 @@ public final class EscapedJsonStringWriter {
                 int pos = rbo.position();
                 byte[] buf = rbo.buffer();
                 if (pos + to > buf.length) {
-                    rbo.grow(pos + to);
-                    buf = rbo.buffer();
+                    buf = rbo.grow(pos + to);
                 }
                 putWordLE(buf, pos, w0);
                 putWordLE(buf, pos + 8, w1);
@@ -382,9 +380,8 @@ public final class EscapedJsonStringWriter {
             if (isJsonAsciiWords2(w0, w1)) {
                 int pos = rbo.position();
                 byte[] buf = rbo.buffer();
-                if (pos + 16 > buf.length) {
-                    rbo.grow(pos + 16);
-                    buf = rbo.buffer();
+                if (pos + to > buf.length) {
+                    buf = rbo.grow(pos + to);
                 }
                 putWordLE(buf, pos, w0);
                 putWordLE(buf, pos + 8, w1);
@@ -419,8 +416,7 @@ public final class EscapedJsonStringWriter {
         int pos = rbo.position();
         byte[] buf = rbo.buffer();
         if (pos + 6 > buf.length) {
-            rbo.grow(pos + 6);
-            buf = rbo.buffer();
+            buf = rbo.grow(pos + 6);
         }
         switch (b) {
             case '"': buf[pos++] = '\\'; buf[pos++] = '"'; break;
@@ -456,8 +452,7 @@ public final class EscapedJsonStringWriter {
         int pos = rbo.position();
         byte[] buf = rbo.buffer();
         if (pos + len > buf.length) {
-            rbo.grow(pos + len);
-            buf = rbo.buffer();
+            buf = rbo.grow(pos + len);
         }
         System.arraycopy(src, from, buf, pos, len);
         rbo.setPosition(pos + len);

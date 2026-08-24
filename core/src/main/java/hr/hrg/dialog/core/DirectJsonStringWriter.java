@@ -125,8 +125,7 @@ public final class DirectJsonStringWriter {
     private static int writeByteDirect(ReusableByteArrayOutputStream c, int pos, int b) {
         byte[] buf = c.buffer();
         if (pos >= buf.length) {
-            c.grow(pos + 1);
-            buf = c.buffer();
+            buf = c.grow(pos + 1);
         }
         buf[pos] = (byte) b;
         return pos + 1;
@@ -136,8 +135,7 @@ public final class DirectJsonStringWriter {
     private static int writeRawDirect(ReusableByteArrayOutputStream c, int pos, byte[] src, int off, int len) {
         byte[] buf = c.buffer();
         if (pos + len > buf.length) {
-            c.grow(pos + len);
-            buf = c.buffer();
+            buf = c.grow(pos + len);
         }
         System.arraycopy(src, off, buf, pos, len);
         return pos + len;
@@ -165,8 +163,7 @@ public final class DirectJsonStringWriter {
                 // start + (to - 8) overlaps the first two but is byte-identical.
                 byte[] buf = c.buffer();
                 if (pos + to > buf.length) {
-                    c.grow(pos + to);
-                    buf = c.buffer();
+                    buf = c.grow(pos + to);
                 }
                 LE_WORD.set(buf, pos, w0);
                 LE_WORD.set(buf, pos + 8, w1);
@@ -183,8 +180,7 @@ public final class DirectJsonStringWriter {
             if (isJsonAsciiWords4(w0, w1, w2, w3)) {
                 byte[] buf = c.buffer();
                 if (pos + to > buf.length) {
-                    c.grow(pos + to);
-                    buf = c.buffer();
+                    buf = c.grow(pos + to);
                 }
                 LE_WORD.set(buf, pos, w0);
                 LE_WORD.set(buf, pos + 8, w1);
@@ -201,8 +197,7 @@ public final class DirectJsonStringWriter {
             if (isJsonAsciiWords2(w0, w1)) {
                 byte[] buf = c.buffer();
                 if (pos + 16 > buf.length) {
-                    c.grow(pos + 16);
-                    buf = c.buffer();
+                    buf = c.grow(pos + 16);
                 }
                 LE_WORD.set(buf, pos, w0);
                 LE_WORD.set(buf, pos + 8, w1);

@@ -170,9 +170,9 @@ The tool scans all `*.java` sources for `@CB.*` markers, regenerates every
 3. Run CodeBuddy — the placeholders are replaced with literal constants.
 4. Use the constants in the writer: the inline prefix range check + store,
    then the value written separately, e.g.
-   `if (pos + 1 + KEY_TRACE_ID_LEN_BUF > limit) { rbo.grow(...); ... }`
-   followed by `buf[pos++] = ','; WriteOps.LE_LONG.set(buf, pos,
-   KEY_TRACE_ID_W0); pos += 8; pos = writeStringDirect(rbo, pos, value);`.
+    `if (pos + 1 + KEY_TRACE_ID_LEN_BUF > buf.length) { buf = rbo.grow(...); }`
+    followed by `buf[pos++] = ','; WriteOps.LE_LONG.set(buf, pos,
+    KEY_TRACE_ID_W0); pos += 8; pos = writeStringDirect(rbo, pos, value);`.
 
 ## Tests
 

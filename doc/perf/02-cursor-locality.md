@@ -1,7 +1,7 @@
 # 02 — Cursor locality: the writer-owns-buffer pattern
 
 The single most important structural decision in the writer: **the event is
-assembled into a reusable `byte[]` by code that keeps `buf`/`pos`/`limit` in
+assembled into a reusable `byte[]` by code that keeps `buf`/`pos` in
 registers**, instead of being pushed through an `OutputStream`.
 
 ## Why
@@ -12,12 +12,13 @@ call, cannot see what bytes were written, and each call re-checks capacity.
 Writing a log event field-by-field through `OutputStream` costs a virtual call
 per token plus an `arraycopy` per token.
 
-The alternative: pull the buffer and cursor into **stack locals**:
+The alternative: pull the buffer and cursor into **stack locals**. The
+capacity is always `buf.length` — the buffer object keeps no separate `limit`
+field, so there is nothing extra to fetch after a grow:
 
 ```java
 byte[] buf = rbo.buf;     // the reusable event buffer
 int pos = 0;              // the cursor
-int limit = rbo.limit;    // capacity
 
 // straight-line stores, all through the SAME locals
 buf[pos++] = ',';
@@ -25,22 +26,24 @@ WriteOps.LE_LONG.set(buf, pos, KEY_LEVEL_W0);
 pos += 8;
 ```
 
-Now C2 sees `buf`, `pos`, `limit` as register-resident values for the whole
-event: stores are direct, capacity checks are one compare, and the JIT can
-inline every small static helper. The cursor is published back to the buffer
-object exactly once at the end.
+Now C2 sees `buf` and `pos` as register-resident values for the whole event:
+stores are direct, capacity checks are one compare against `buf.length`, and
+the JIT can inline every small static helper. The cursor is published back to
+the buffer object exactly once at the end.
 
 ## The pattern, concretely
 
-1. **Snap the cursor** at the start: `byte[] buf = rbo.buf; int pos = 0; int
-   limit = rbo.limit;`.
+1. **Snap the cursor** at the start: `byte[] buf = rbo.buf; int pos = 0;`.
 2. **Check capacity inline before a store group**, not per byte:
-   `if (pos + need > limit) { rbo.grow(pos + need); buf = rbo.buf; limit = rbo.limit; }`
-   — the grow is the cold path, inside the `if`.
+   `if (pos + need > buf.length) { buf = rbo.grow(pos + need); }`
+   — the grow is the cold path, inside the `if`, and `grow` returns the
+   (possibly reallocated) buffer so the local `buf` stays current without a
+   separate field read.
 3. **Store directly** into `buf[pos..]` with byte stores and VarHandle word
    stores; advance `pos` by the bytes consumed.
-4. **Re-read the cursor** after any call that can grow or publish
-   (`buf = rbo.buf; limit = rbo.limit;`).
+4. **Re-read the buffer** after any call that can grow or publish
+   (`buf = rbo.buf;`). The capacity is always `buf.length`, so no separate
+   `limit` re-read is needed.
 5. **Publish once** at the end (`rbo.pos = pos`).
 
 ## Why capacity is checked with the *whole word-slot* in mind
@@ -54,16 +57,15 @@ check must reserve **whole 8-byte word slots** — `packedKeyBytes(len) =
 constant *is* that rounded size, so the check reads a constant:
 
 ```java
-if (pos + 1 + KEY_LOGGER_LEN_BUF > limit) {
-    rbo.grow(pos + 1 + KEY_LOGGER_LEN_BUF);
-    buf = rbo.buf;
+if (pos + 1 + KEY_LOGGER_LEN_BUF > buf.length) {
+    buf = rbo.grow(pos + 1 + KEY_LOGGER_LEN_BUF);
 }
 ```
 
 ## Anti-patterns
 
 - **Returning `int[]`/cursor objects from capacity checks** — forces C2 to
-  treat `buf`/`pos`/`limit` as heap-aliased; register residency is lost.
+  treat `buf`/`pos` as heap-aliased; register residency is lost.
 - **Hiding the cursor in a `ThreadLocal`** — hidden state, per-thread cost,
   re-entrancy corruption.
 - **A helper method between the cursor and the byte stores in steady state** —

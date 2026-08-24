@@ -41,8 +41,6 @@ public class ReusableByteArrayOutputStream extends OutputStream {
     public byte[] buf;
     /** Current write cursor (bytes written so far). */
     public int pos;
-    /** Capacity bound for the inlined capacity check. */
-    public int limit;
 
     /** Creates a buffer with {@link #DEFAULT_CAPACITY}. */
     public ReusableByteArrayOutputStream() {
@@ -58,7 +56,6 @@ public class ReusableByteArrayOutputStream extends OutputStream {
             throw new IllegalArgumentException("initialCapacity must be positive: " + initialCapacity);
         }
         buf = new byte[initialCapacity];
-        limit = buf.length;
     }
 
     // =========================================================================
@@ -69,10 +66,8 @@ public class ReusableByteArrayOutputStream extends OutputStream {
     public void write(int b) {
         byte[] buf = this.buf;
         int pos = this.pos;
-        int limit = this.limit;
-        if (pos >= limit) {
-            grow(pos + 1);
-            buf = this.buf;
+        if (pos >= buf.length) {
+            buf = grow(pos + 1);
         }
         buf[pos] = (byte) b;
         this.pos = pos + 1;
@@ -85,11 +80,9 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         }
         byte[] buf = this.buf;
         int pos = this.pos;
-        int limit = this.limit;
         int need = pos + len;
-        if (need > limit) {
-            grow(need);
-            buf = this.buf;
+        if (need > buf.length) {
+            buf = grow(need);
         }
         System.arraycopy(b, off, buf, pos, len);
         this.pos = need;
@@ -164,8 +157,7 @@ public class ReusableByteArrayOutputStream extends OutputStream {
      */
     public void ensure(int additional) {
         int pos = this.pos;
-        int limit = this.limit;
-        if (pos + additional > limit) {
+        if (pos + additional > this.buf.length) {
             grow(pos + additional);
         }
     }
@@ -174,10 +166,8 @@ public class ReusableByteArrayOutputStream extends OutputStream {
     public void writeByte(int b) {
         byte[] buf = this.buf;
         int pos = this.pos;
-        int limit = this.limit;
-        if (pos >= limit) {
-            grow(pos + 1);
-            buf = this.buf;
+        if (pos >= buf.length) {
+            buf = grow(pos + 1);
         }
         buf[pos] = (byte) b;
         this.pos = pos + 1;
@@ -187,11 +177,9 @@ public class ReusableByteArrayOutputStream extends OutputStream {
     public void writeRaw(byte[] src, int off, int len) {
         byte[] buf = this.buf;
         int pos = this.pos;
-        int limit = this.limit;
         int need = pos + len;
-        if (need > limit) {
-            grow(need);
-            buf = this.buf;
+        if (need > buf.length) {
+            buf = grow(need);
         }
         System.arraycopy(src, off, buf, pos, len);
         this.pos = need;
@@ -204,19 +192,16 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         }
         byte[] buf = this.buf;
         int pos = this.pos;
-        int limit = this.limit;
         if (n == 8) {
-            if (pos + 8 > limit) {
-                grow(pos + 8);
-                buf = this.buf;
+            if (pos + 8 > buf.length) {
+                buf = grow(pos + 8);
             }
             LE_LONG.set(buf, pos, value);
             this.pos = pos + 8;
             return;
         }
-        if (pos + n > limit) {
-            grow(pos + n);
-            buf = this.buf;
+        if (pos + n > buf.length) {
+            buf = grow(pos + n);
         }
         switch (n) {
             case 7: buf[pos + 6] = (byte) (value >>> 48);
@@ -239,10 +224,8 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         }
         byte[] buf = this.buf;
         int pos = this.pos;
-        int limit = this.limit;
-        if (pos + n > limit) {
-            grow(pos + n);
-            buf = this.buf;
+        if (pos + n > buf.length) {
+            buf = grow(pos + n);
         }
         switch (n) {
             case 4: buf[pos + 3] = (byte) (value >>> 24);
@@ -263,19 +246,16 @@ public class ReusableByteArrayOutputStream extends OutputStream {
     public void writePackedLE(long value, int n) {
         byte[] buf = this.buf;
         int pos = this.pos;
-        int limit = this.limit;
         if (n == 8) {
-            if (pos + 8 > limit) {
-                grow(pos + 8);
-                buf = this.buf;
+            if (pos + 8 > buf.length) {
+                buf = grow(pos + 8);
             }
             LE_LONG.set(buf, pos, value);
             this.pos = pos + 8;
             return;
         }
-        if (pos + n > limit) {
-            grow(pos + n);
-            buf = this.buf;
+        if (pos + n > buf.length) {
+            buf = grow(pos + n);
         }
         switch (n) {
             case 7: buf[pos + 6] = (byte) (value >>> 48);
@@ -295,19 +275,16 @@ public class ReusableByteArrayOutputStream extends OutputStream {
     public void writePackedLE(int value, int n) {
         byte[] buf = this.buf;
         int pos = this.pos;
-        int limit = this.limit;
         if (n == 4) {
-            if (pos + 4 > limit) {
-                grow(pos + 4);
-                buf = this.buf;
+            if (pos + 4 > buf.length) {
+                buf = grow(pos + 4);
             }
             LE_INT.set(buf, pos, value);
             this.pos = pos + 4;
             return;
         }
-        if (pos + n > limit) {
-            grow(pos + n);
-            buf = this.buf;
+        if (pos + n > buf.length) {
+            buf = grow(pos + n);
         }
         switch (n) {
             case 3: buf[pos + 2] = (byte) (value >>> 16);
@@ -354,13 +331,19 @@ public class ReusableByteArrayOutputStream extends OutputStream {
      * (absolute). Public so direct-buffer writers (T4/T7, e.g.
      * {@code JsonLogWriter} in the logback module) can perform the inlined
      * local capacity check + grow themselves and keep the cursor in registers.
+     * <p>
+     * Returns the (possibly reallocated) backing array so callers can refresh
+     * their {@code buf} local with the return value — the capacity is always
+     * {@code buf.length}, so there is no separate {@code limit} to fetch.
+     *
+     * @return the backing array after growth (the new {@code buf})
      */
-    public void grow(int need) {
+    public byte[] grow(int need) {
         int newCap = buf.length * 2;
         while (newCap < need) {
             newCap *= 2;
         }
         buf = Arrays.copyOf(buf, newCap);
-        limit = buf.length;
+        return buf;
     }
 }

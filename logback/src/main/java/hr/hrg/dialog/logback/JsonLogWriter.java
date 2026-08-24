@@ -196,7 +196,7 @@ public class JsonLogWriter {
         rbo.reset();
         byte[] buf = rbo.buf;
         int pos = 0;
-        int limit = rbo.limit;
+        int limit = buf.length;
         // @CB.StrPackerWrite.config buffer=buf, position=pos, limit=limit
 
         // T7 caller-owns-cursor: '{' + "ts": + timestamp are one combined
@@ -205,9 +205,8 @@ public class JsonLogWriter {
         // packed prefix is reserved as whole 8-byte word slots (KEY_TS_LEN_BUF):
         // a 6-byte key still occupies one full word.
         if (pos + KEY_TS_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES > limit) {
-            rbo.grow(pos + KEY_TS_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES);
-            buf = rbo.buf;
-            limit = rbo.limit;
+            buf = rbo.grow(pos + KEY_TS_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES);
+            limit = buf.length;
         }
         // timestamp field ts includes starting { for object: one full 8-byte
         // word store; the cursor advances by the 6-byte key length.
@@ -221,21 +220,19 @@ public class JsonLogWriter {
         // the grow-capable string writer. Re-read buf/limit after each (grow
         // may reallocate).
         if (pos + 1 + KEY_LEVEL_LEN_BUF > limit) {
-            rbo.grow(pos + 1 + KEY_LEVEL_LEN_BUF);
-            buf = rbo.buf;
-            limit = rbo.limit;
+            buf = rbo.grow(pos + 1 + KEY_LEVEL_LEN_BUF);
+            limit = buf.length;
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_LEVEL_W0);
         pos += 8;
         pos = writeStringDirect(rbo, pos, event.getLevel() != null ? event.getLevel().toString() : null);
         buf = rbo.buf;
-        limit = rbo.limit;
+        limit = buf.length;
 
         if (pos + 1 + KEY_LOGGER_LEN_BUF > limit) {
-            rbo.grow(pos + 1 + KEY_LOGGER_LEN_BUF);
-            buf = rbo.buf;
-            limit = rbo.limit;
+            buf = rbo.grow(pos + 1 + KEY_LOGGER_LEN_BUF);
+            limit = buf.length;
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_LOGGER_W0);
@@ -244,12 +241,11 @@ public class JsonLogWriter {
         pos += 1;                                      // advance by the 1-byte tail
         pos = writeStringDirect(rbo, pos, event.getLoggerName());
         buf = rbo.buf;
-        limit = rbo.limit;
+        limit = buf.length;
 
         if (pos + 1 + KEY_THREAD_LEN_BUF > limit) {
-            rbo.grow(pos + 1 + KEY_THREAD_LEN_BUF);
-            buf = rbo.buf;
-            limit = rbo.limit;
+            buf = rbo.grow(pos + 1 + KEY_THREAD_LEN_BUF);
+            limit = buf.length;
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_THREAD_W0);
@@ -258,19 +254,18 @@ public class JsonLogWriter {
         pos += 1;                                      // advance by the 1-byte tail
         pos = writeStringDirect(rbo, pos, event.getThreadName());
         buf = rbo.buf;
-        limit = rbo.limit;
+        limit = buf.length;
 
         if (pos + 1 + KEY_MSG_LEN_BUF > limit) {
-            rbo.grow(pos + 1 + KEY_MSG_LEN_BUF);
-            buf = rbo.buf;
-            limit = rbo.limit;
+            buf = rbo.grow(pos + 1 + KEY_MSG_LEN_BUF);
+            limit = buf.length;
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_MSG_W0); // 6-byte key: full store, partial advance
         pos += KEY_MSG_LEN;
         pos = writeStringDirect(rbo, pos, event.getFormattedMessage());
         buf = rbo.buf;
-        limit = rbo.limit;
+        limit = buf.length;
 
         Map<String, String> mdcMap = null;
         try {
@@ -285,23 +280,21 @@ public class JsonLogWriter {
             for (KeyValuePair kvPair : pairs) {
                 if (kvPair.key != null && kvPair.value != null) {
                     if (pos >= limit) {
-                        rbo.grow(pos + 1);
-                        buf = rbo.buf;
-                        limit = rbo.limit;
+                        buf = rbo.grow(pos + 1);
+                        limit = buf.length;
                     }
                     buf[pos++] = ',';
                     pos = writeStringDirect(rbo, pos, kvPair.key);
                     buf = rbo.buf;
-                    limit = rbo.limit;
+                    limit = buf.length;
                     if (pos >= limit) {
-                        rbo.grow(pos + 1);
-                        buf = rbo.buf;
-                        limit = rbo.limit;
+                        buf = rbo.grow(pos + 1);
+                        limit = buf.length;
                     }
                     buf[pos++] = ':';
                     pos = writeValueDirect(rbo, pos, kvPair.value, mapper);
                     buf = rbo.buf;
-                    limit = rbo.limit;
+                    limit = buf.length;
                 }
             }
         }
@@ -311,23 +304,21 @@ public class JsonLogWriter {
                 String key = entry.getKey();
                 if (key != null && !isReserved(key)) {
                     if (pos >= limit) {
-                        rbo.grow(pos + 1);
-                        buf = rbo.buf;
-                        limit = rbo.limit;
+                        buf = rbo.grow(pos + 1);
+                        limit = buf.length;
                     }
                     buf[pos++] = ',';
                     pos = writeStringDirect(rbo, pos, key);
                     buf = rbo.buf;
-                    limit = rbo.limit;
+                    limit = buf.length;
                     if (pos >= limit) {
-                        rbo.grow(pos + 1);
-                        buf = rbo.buf;
-                        limit = rbo.limit;
+                        buf = rbo.grow(pos + 1);
+                        limit = buf.length;
                     }
                     buf[pos++] = ':';
                     pos = writeStringDirect(rbo, pos, entry.getValue());
                     buf = rbo.buf;
-                    limit = rbo.limit;
+                    limit = buf.length;
                 }
             }
         }
@@ -340,9 +331,8 @@ public class JsonLogWriter {
 
             // errClass: inline ',' + packed key prefix, value written separately.
             if (pos + 1 + KEY_ERR_CLASS_LEN_BUF > limit) {
-                rbo.grow(pos + 1 + KEY_ERR_CLASS_LEN_BUF);
-                buf = rbo.buf;
-                limit = rbo.limit;
+                buf = rbo.grow(pos + 1 + KEY_ERR_CLASS_LEN_BUF);
+                limit = buf.length;
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_CLASS_W0);
@@ -351,13 +341,12 @@ public class JsonLogWriter {
             pos += 3;                                         // advance by the 3-byte tail
             pos = writeStringDirect(rbo, pos, throwableClassName);
             buf = rbo.buf;
-            limit = rbo.limit;
+            limit = buf.length;
 
             // errMessage: inline ',' + packed key prefix, value written separately.
             if (pos + 1 + KEY_ERR_MESSAGE_LEN_BUF > limit) {
-                rbo.grow(pos + 1 + KEY_ERR_MESSAGE_LEN_BUF);
-                buf = rbo.buf;
-                limit = rbo.limit;
+                buf = rbo.grow(pos + 1 + KEY_ERR_MESSAGE_LEN_BUF);
+                limit = buf.length;
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_MESSAGE_W0);
@@ -366,15 +355,14 @@ public class JsonLogWriter {
             pos += 5;                                           // advance by the 5-byte tail
             pos = writeStringDirect(rbo, pos, throwableMessage);
             buf = rbo.buf;
-            limit = rbo.limit;
+            limit = buf.length;
 
             // The stack-trace writers are OutputStream-based (generated
             // sanitizer derivatives — see AGENTS.md); commit the cursor, write
             // the stack through the stream, then re-read.
             if (pos + 1 + KEY_STACK_LEN_BUF > limit) {
-                rbo.grow(pos + 1 + KEY_STACK_LEN_BUF);
-                buf = rbo.buf;
-                limit = rbo.limit;
+                buf = rbo.grow(pos + 1 + KEY_STACK_LEN_BUF);
+                limit = buf.length;
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_STACK_W0);
@@ -408,14 +396,13 @@ public class JsonLogWriter {
             rbo.resync();
             pos = rbo.pos;
             buf = rbo.buf;
-            limit = rbo.limit;
+            limit = buf.length;
 
             // errHash: inline prefix + bounded long (like ts); the prefix is
             // reserved as whole 8-byte word slots.
             if (pos + 1 + KEY_ERR_HASH_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES > limit) {
-                rbo.grow(pos + 1 + KEY_ERR_HASH_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES);
-                buf = rbo.buf;
-                limit = rbo.limit;
+                buf = rbo.grow(pos + 1 + KEY_ERR_HASH_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES);
+                limit = buf.length;
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_HASH_W0);
@@ -432,12 +419,11 @@ public class JsonLogWriter {
         rbo.resync();
         pos = rbo.pos;
         buf = rbo.buf;
-        limit = rbo.limit;
+        limit = buf.length;
 
         // closing brace (inline)
         if (pos >= limit) {
-            rbo.grow(pos + 1);
-            buf = rbo.buf;
+            buf = rbo.grow(pos + 1);
         }
         buf[pos] = '}';
         rbo.pos = pos + 1;

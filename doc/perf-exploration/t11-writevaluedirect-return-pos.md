@@ -16,8 +16,7 @@ buf[pos++] = ':';
 rbo.pos = pos;                       // field round-trip: register -> heap
 writeValueDirect(rbo, kvPair.value, mapper);
 pos = rbo.pos;                       // field round-trip: heap -> register
-buf = rbo.buf;
-limit = rbo.limit;
+buf = rbo.buf;                       // capacity had to be fetched separately
 ```
 
 ```java
@@ -49,8 +48,7 @@ so the call site is a single clean return-value update with no field round-trip
 ```java
 buf[pos++] = ':';
 pos = writeValueDirect(rbo, pos, kvPair.value, mapper);   // pos stays in a register
-buf = rbo.buf;
-limit = rbo.limit;
+buf = rbo.buf;                                            // capacity is buf.length
 ```
 
 ```java
