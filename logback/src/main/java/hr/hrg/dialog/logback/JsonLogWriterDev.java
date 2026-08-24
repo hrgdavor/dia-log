@@ -36,6 +36,7 @@ public class JsonLogWriterDev extends JsonLogWriter {
 
     /** Named placeholder {@code {name}} — skips {@code {}} and escaped braces. */
     private static final Pattern NAMED_PLACEHOLDER = Pattern.compile("(?<!\\{)\\{([^{}]+)\\}(?!\\})");
+    public static final List<String> EMPTY_LIST_STRING = List.of();
 
     @Override
     protected void writeExtraFields(ILoggingEvent event, OutputStream out, List<KeyValuePair> pairs, Map<String, String> mdcMap) throws IOException {
@@ -66,7 +67,7 @@ public class JsonLogWriterDev extends JsonLogWriter {
      */
     static List<String> findMissingKeys(ILoggingEvent event, List<KeyValuePair> pairs, Map<String, String> mdcMap) {
         if (event == null || event.getFormattedMessage() == null) {
-            return List.of();
+            return EMPTY_LIST_STRING;
         }
         Set<String> missing = new LinkedHashSet<>();
         Matcher m = NAMED_PLACEHOLDER.matcher(event.getFormattedMessage());
