@@ -264,20 +264,22 @@ public final class StrPacker {
     private static boolean isStringDecl(String line, String name) {
         // Accept both the current String shape and the historical byte[] shape
         // so old generated blocks are consumed (and migrated) on re-run.
-        return line.trim().matches("private static final (String|byte\\[\\]) "
+        // Modifiers (private/public/etc.) are not hardcoded so declarations with
+        // non-private modifiers are consumed correctly.
+        return line.trim().matches("\\w+ static final (String|byte\\[\\]) "
                 + java.util.regex.Pattern.quote(name) + " = .*;");
     }
 
     private static boolean isWordDecl(String line, String name) {
-        return line.trim().matches("private static final long " + java.util.regex.Pattern.quote(name) + "_W\\d+ = .*;");
+        return line.trim().matches("\\w+ static final long " + java.util.regex.Pattern.quote(name) + "_W\\d+ = .*;");
     }
 
     private static boolean isLenDecl(String line, String name) {
-        return line.trim().matches("private static final int " + java.util.regex.Pattern.quote(name) + "_LEN = .*;");
+        return line.trim().matches("\\w+ static final int " + java.util.regex.Pattern.quote(name) + "_LEN = .*;");
     }
 
     private static boolean isBufDecl(String line, String name) {
-        return line.trim().matches("private static final int " + java.util.regex.Pattern.quote(name) + "_LEN_BUF = .*;");
+        return line.trim().matches("\\w+ static final int " + java.util.regex.Pattern.quote(name) + "_LEN_BUF = .*;");
     }
 
     static String leadingWhitespace(String line) {

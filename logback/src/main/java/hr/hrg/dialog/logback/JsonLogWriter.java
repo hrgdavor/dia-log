@@ -140,7 +140,7 @@ public class JsonLogWriter {
     public static final int JSON_TRUE_LEN = 4;
     public static final int JSON_TRUE_LEN_BUF = 8;
 
-    // @CB.StrPacker private static final JSON_FALSE = `false`
+    // @CB.StrPacker public static final JSON_FALSE = `false`
     public static final String JSON_FALSE = "false";
     public static final long JSON_FALSE_W0 = 0x00000065736c6166L;
     public static final int JSON_FALSE_LEN = 5;
