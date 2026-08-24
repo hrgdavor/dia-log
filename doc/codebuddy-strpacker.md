@@ -143,6 +143,14 @@ The tool scans all `*.java` sources for `@CB.*` markers, regenerates every
   literal against it.
 - **Cap.** `MAX_WORDS = 4` / `MAX_LITERAL_BYTES = 32`; longer literals fall back
   to a `String` + `NAME_LEN` block instead of emitting partial packed words.
+- **Overwrite-trict write discipline.** Every generated word — including the
+  final tail word — is stored with one **full 8-byte** `WriteOps.LE_LONG`
+  store, the inline capacity check reserves `NAME_LEN_BUF` (length rounded up to
+  whole 8-byte slots, **not** `NAME_LEN`), and `pos` advances by the actual
+  byte length (1..8), never by 8. These three together are what make the
+  full-store tail safe and fast; see
+  `doc/perf/03-packed-word-stores.md` and the
+  **Packed-Long String Writing** section in `AGENTS.md`.
 
 ## Adding a new packed key
 

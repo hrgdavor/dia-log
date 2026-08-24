@@ -113,6 +113,42 @@ Why:
 The dev/diagnostic variants (`JsonLogWriterDev`, `JsonLogWriterClassic`, benchmark
 fixtures) follow the dev-variant policy above and are not held to this rule.
 
+### Packed-Long String Writing (overwrite trick)
+
+Fixed string prefixes are precomputed into little-endian `long` words
+(`KEY_X_W0..W3`) by the `@CB.StrPacker` CodeBuddy marker and stored one word
+per 8-byte window with `WriteOps.LE_LONG` (the `byte[]` VarHandle view). The
+tail word uses an **overwrite trick**: a *full* 8-byte VarHandle store with the
+cursor advanced by only the meaningful byte length. This is flat ~1.1 ns per
+tail regardless of length, versus byte stores that grow linearly (~1.1 → 2.9 ns)
+and `arraycopy` at ~5.3 ns (see
+`doc/perf-exploration/t8-packed-word-varhandle-stores.md`).
+
+The trick is only correct if **all three** invariants hold at every packed-long
+write site — breaking any one corrupts output or silently re-introduces a slow
+tail store:
+
+1. **Full 8-byte store per word — never a partial tail store.** Store *every*
+   window, including the final tail, with one `WriteOps.LE_LONG.set(buf, pos,
+   word)` (or an equivalent little-endian 8-byte store). Do **not** fall back
+   to `WriteOps.writePackedLE1..7`, a length `switch`, or a `byte[]`
+   `arraycopy` for the tail — that is exactly the linear-cost shape the trick
+   exists to avoid.
+2. **Reserve a full 8-byte slot per packed-long write.** The inline capacity
+   check must reserve the generated `KEY_X_LEN_BUF` constant — the byte length
+   rounded *up* to whole 8-byte word slots — **not** `KEY_X_LEN`. A 9-byte key
+   reserves 16 bytes because its two stores each touch a full 8-byte slot,
+   including the tail slot whose high bytes are overwritten.
+3. **`pos` advances by the actual meaningful length, not 8.** After the full
+   8-byte store, advance `pos` by the bytes that word actually contributes
+   (1..8). The trailing slot bytes are garbage; advancing by the real length
+   lets the next contiguous store overwrite them and the flush boundary
+   (`pos`, never `buf.length`) excludes them.
+
+The compile-time `KEY_X_LEN` / `KEY_X_LEN_BUF` constants exist so rules 2 and 3
+constant-fold at each call site. See `doc/perf/03-packed-word-stores.md` for
+the full explanation.
+
 ### Thread Safety Requirements
 
 - `DiaLoggerBase.prefix` must remain `volatile` if `prependPrefix()` exists

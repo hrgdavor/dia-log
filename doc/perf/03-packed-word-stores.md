@@ -10,7 +10,7 @@ with one VarHandle store.
 
 Each fixed prefix becomes:
 
-- a `byte[]` (the UTF-8 bytes) for the stream fallback path, and
+- a `String` reference (the naive form) for the stream fallback path, and
 - one packed `long` per 8-byte window of those bytes (`W0`, `W1`, …), plus
 - the byte length (`LEN`) and the whole-word-slot buffer reserve (`LEN_BUF`).
 
@@ -21,7 +21,7 @@ constants** — no `packWord` call at class init, no `KEY_X.length` at runtime.
 
 ```java
 // @CB.StrPacker private static final KEY_LOGGER = `"logger":`
-private static final byte[] KEY_LOGGER = "\"logger\":".getBytes(StandardCharsets.UTF_8);
+private static final String KEY_LOGGER = "\"logger\":";
 private static final long KEY_LOGGER_W0 = 0x22726567676f6c22L; // bytes 0..7
 private static final long KEY_LOGGER_W1 = 0x000000000000003aL; // byte 8
 private static final int KEY_LOGGER_LEN = 9;
@@ -56,10 +56,43 @@ advancing the cursor by only the real length is:
 This is why `LEN_BUF` exists: it is exactly the number of bytes the stores
 touch, so the inline check matches the stores byte-for-byte.
 
+## Strict rules for packed-long string writing
+
+The overwrite trick is only correct under three invariants. **All three must
+hold at every packed-long write site**; breaking any one either corrupts output
+or silently re-introduces a per-byte / `arraycopy` hot path.
+
+1. **Each packed long is stored with one full 8-byte VarHandle store — never a
+   partial tail store.** Use `WriteOps.LE_LONG.set(buf, pos, word)` (or an
+   equivalent little-endian 8-byte store) for *every* window, including the
+   final tail word. Do **not** fall back to `WriteOps.writePackedLE1..7`, a
+   length `switch`, or a `byte[]` `arraycopy` for the tail. The win is that the
+   tail costs exactly one wide store regardless of length; a length-dependent
+   tail store grows linearly (see the benchmark below) and defeats the design.
+
+2. **The buffer must reserve a full 8-byte slot for every packed-long write.**
+   The inline capacity check reserves the generated `LEN_BUF` constant — the
+   byte length rounded *up* to whole 8-byte word slots — **not** `LEN`. A 9-byte
+   key therefore reserves 16 bytes, because its two stores each touch a full
+   8-byte slot. The check must guarantee those 8 bytes are available at the
+   store offset, including the tail slot whose high bytes are overwritten.
+
+3. **`pos` advances by the actual meaningful byte length, not by 8.** After the
+   full 8-byte store, advance `pos` by the number of bytes that word actually
+   contributes (1..8). The trailing slot bytes are garbage; advancing by the
+   real length means the next contiguous store overwrites them and the flush
+   boundary (`pos`, never `buf.length`) excludes them. Advancing by 8 would emit
+   the garbage bytes into the output.
+
+These three rules are a package: the full store (1) is only safe because the
+whole slot is reserved (2) and the cursor ignores the garbage (3). The
+compile-time `LEN` / `LEN_BUF` constants exist precisely to make rules 2 and 3
+constant-foldable at each call site.
+
 ## What it buys, measured
 
 The packed-prefix store benchmark (`prefixesPackedDirect`) is ~4 ns for two
-fields vs ~26 ns for the byte[]-prefix path — 6×. The T8 records in
+fields vs ~26 ns for the `byte[]`-prefix path — 6×. The T8 records in
 [`doc/perf-exploration/`](../perf-exploration/) have the tail-store
 comparison (`t8-packed-word-varhandle-stores.md`) and the packed-key
 generation (`t6-packed-field-prefixes.md`).
