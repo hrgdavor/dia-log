@@ -128,9 +128,23 @@ public class JsonLogWriter {
     private static final int KEY_STACK_LEN = 8;
     private static final int KEY_STACK_LEN_BUF = 8;
 
-    private static final byte[] JSON_NULL = "null".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] JSON_TRUE = "true".getBytes(StandardCharsets.UTF_8);
-    private static final byte[] JSON_FALSE = "false".getBytes(StandardCharsets.UTF_8);
+    // @CB.StrPacker private static final JSON_NULL = `null`
+    private static final String JSON_NULL = "null";
+    private static final long JSON_NULL_W0 = 0x000000006c6c756eL;
+    private static final int JSON_NULL_LEN = 4;
+    private static final int JSON_NULL_LEN_BUF = 8;
+
+    // @CB.StrPacker public static final JSON_TRUE = `true`
+    public static final String JSON_TRUE = "true";
+    public static final long JSON_TRUE_W0 = 0x0000000065757274L;
+    public static final int JSON_TRUE_LEN = 4;
+    public static final int JSON_TRUE_LEN_BUF = 8;
+
+    // @CB.StrPacker private static final JSON_FALSE = `false`
+    public static final String JSON_FALSE = "false";
+    public static final long JSON_FALSE_W0 = 0x00000065736c6166L;
+    public static final int JSON_FALSE_LEN = 5;
+    public static final int JSON_FALSE_LEN_BUF = 8;
 
     /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
     private Predicate<String> stackTraceFilter = null;
@@ -461,39 +475,10 @@ public class JsonLogWriter {
         out.write(':');
     }
 
-    protected void addKey(OutputStream out, String key, Object value, ObjectMapper mapper) throws IOException {
-        if (value == null) return;
-
-        writeFieldPrefixRawKey(out, key);
-
-        writeValue(out, value, mapper);
-    }
-
-    private void writeValue(OutputStream out, Object value, ObjectMapper mapper) throws IOException {
-        switch (value) {
-            case String s -> EscapedJsonStringWriter.writeJsonStringOrNull(out, s);
-            case CharSequence cs -> EscapedJsonStringWriter.writeJsonStringOrNull(out, cs.toString());
-            case Character c -> EscapedJsonStringWriter.writeJsonStringOrNull(out, c.toString());
-            case Enum<?> e -> EscapedJsonStringWriter.writeJsonStringOrNull(out, e.name());
-            case RawValue raw -> writeRawValue(out, raw, mapper);
-            case Long l -> JsonNumberWriter.writeLong(out, l);
-            case Integer i -> JsonNumberWriter.writeInt(out, i);
-            case Short s -> JsonNumberWriter.writeInt(out, s.intValue());
-            case Byte b -> JsonNumberWriter.writeInt(out, b.intValue());
-            case Float f -> JsonNumberWriter.writeFloat(out, f);
-            case Double d -> JsonNumberWriter.writeDouble(out, d);
-            case Number n -> JsonNumberWriter.writeNumber(out, n);
-            case Boolean b -> out.write(b ? JSON_TRUE : JSON_FALSE);
-            case RawJsonSelfWriter w -> w.writeJson(out);
-            case RawJsonBytes b -> out.write(b.bytes());
-            default -> mapper.writeValue(out, value);
-        }
-    }
-
-    private static void writeRawValue(OutputStream out, RawValue raw, ObjectMapper mapper) throws IOException {
+    public static void writeRawValue(OutputStream out, RawValue raw, ObjectMapper mapper) throws IOException {
         Object backing = raw.rawValue();
         if (backing == null) {
-            out.write(JSON_NULL);
+            out.write(JSON_NULL.getBytes(StandardCharsets.UTF_8));
             return;
         }
         if (backing instanceof String s) {
@@ -531,7 +516,17 @@ public class JsonLogWriter {
             case Float f -> writeFloatDirect(rbo, f);
             case Double d -> writeDoubleDirect(rbo, d);
             case Number n -> writeNumberDirect(rbo, n);
-            case Boolean b -> WriteOps.writeRaw(rbo, b ? JSON_TRUE : JSON_FALSE, 0, b ? 4 : 5);
+            case Boolean b -> {
+                if (b) {
+                    rbo.ensure(JSON_TRUE_LEN_BUF);
+                    WriteOps.LE_LONG.set(rbo.buf, rbo.pos, JSON_TRUE_W0);
+                    rbo.pos += JSON_TRUE_LEN;
+                } else {
+                    rbo.ensure(JSON_FALSE_LEN_BUF);
+                    WriteOps.LE_LONG.set(rbo.buf, rbo.pos, JSON_FALSE_W0);
+                    rbo.pos += JSON_FALSE_LEN;
+                }
+            }
             case RawJsonSelfWriter w -> {
                 rbo.publish();
                 w.writeJson(rbo);
@@ -549,7 +544,9 @@ public class JsonLogWriter {
     private void writeRawValueDirect(ReusableByteArrayOutputStream rbo, RawValue raw, ObjectMapper mapper) throws IOException {
         Object backing = raw.rawValue();
         if (backing == null) {
-            rbo.writeRaw(JSON_NULL, 0, JSON_NULL.length);
+            rbo.ensure(JSON_NULL_LEN_BUF);
+            WriteOps.LE_LONG.set(rbo.buf, rbo.pos, JSON_NULL_W0);
+            rbo.pos += JSON_NULL_LEN;
             return;
         }
         rbo.publish();

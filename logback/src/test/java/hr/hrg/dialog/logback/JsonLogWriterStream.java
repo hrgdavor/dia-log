@@ -3,12 +3,10 @@ package hr.hrg.dialog.logback;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
-import hr.hrg.dialog.core.EscapedJsonStringWriter;
-import hr.hrg.dialog.core.JsonNumberWriter;
-import hr.hrg.dialog.core.StringByteExtractor;
-import hr.hrg.dialog.core.Wyhash64;
+import hr.hrg.dialog.core.*;
 import org.slf4j.event.KeyValuePair;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.util.RawValue;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -137,4 +135,36 @@ public final class JsonLogWriterStream {
             default -> false;
         };
     }
+
+    protected void addKey(OutputStream out, String key, Object value, ObjectMapper mapper) throws IOException {
+        if (value == null) return;
+
+        writeFieldPrefixRawKey(out, key);
+
+        writeValue(out, value, mapper);
+    }
+
+    private void writeValue(OutputStream out, Object value, ObjectMapper mapper) throws IOException {
+        switch (value) {
+            case String s -> EscapedJsonStringWriter.writeJsonStringOrNull(out, s);
+            case CharSequence cs -> EscapedJsonStringWriter.writeJsonStringOrNull(out, cs.toString());
+            case Character c -> EscapedJsonStringWriter.writeJsonStringOrNull(out, c.toString());
+            case Enum<?> e -> EscapedJsonStringWriter.writeJsonStringOrNull(out, e.name());
+            case RawValue raw -> JsonLogWriter.writeRawValue(out, raw, mapper);
+            case Long l -> JsonNumberWriter.writeLong(out, l);
+            case Integer i -> JsonNumberWriter.writeInt(out, i);
+            case Short s -> JsonNumberWriter.writeInt(out, s.intValue());
+            case Byte b -> JsonNumberWriter.writeInt(out, b.intValue());
+            case Float f -> JsonNumberWriter.writeFloat(out, f);
+            case Double d -> JsonNumberWriter.writeDouble(out, d);
+            case Number n -> JsonNumberWriter.writeNumber(out, n);
+            case Boolean b -> out.write((b ? JsonLogWriter.JSON_TRUE : JsonLogWriter.JSON_FALSE).getBytes(StandardCharsets.UTF_8));
+            case RawJsonSelfWriter w -> w.writeJson(out);
+            case JsonLogWriter.RawJsonBytes b -> out.write(b.bytes());
+            default -> mapper.writeValue(out, value);
+        }
+    }
+
+
 }
+

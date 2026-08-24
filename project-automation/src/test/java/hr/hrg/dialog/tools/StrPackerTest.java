@@ -372,7 +372,7 @@ class StrPackerTest {
                     spec.name() + "_LEN_BUF for marker: " + lines[i].trim());
             assertEquals(3 + words, block.size(), "block line count for marker: " + lines[i].trim());
         }
-        assertEquals(9, markers, "expected the 9 key markers (TS, LEVEL, LOGGER, THREAD, MSG, ERR_CLASS, ERR_MESSAGE, ERR_HASH, STACK)");
+        assertEquals(12, markers, "expected the 12 markers (TS, LEVEL, LOGGER, THREAD, MSG, ERR_CLASS, ERR_MESSAGE, ERR_HASH, STACK, JSON_NULL, JSON_TRUE, JSON_FALSE)");
     }
 
     // ------------------------------------------------------------------

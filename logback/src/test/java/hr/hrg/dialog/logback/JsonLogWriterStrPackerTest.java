@@ -25,6 +25,9 @@ class JsonLogWriterStrPackerTest {
             "TS", "LEVEL", "LOGGER", "THREAD", "MSG",
             "ERR_CLASS", "ERR_MESSAGE", "ERR_HASH", "STACK");
 
+    private static final List<String> VALUES = List.of(
+            "JSON_NULL", "JSON_TRUE", "JSON_FALSE");
+
     @Test
     void packedKeyConstants_matchRuntimePackWord() throws Exception {
         Method packWord = JsonLogWriter.class.getDeclaredMethod("packWord", byte[].class, int.class);
@@ -42,6 +45,21 @@ class JsonLogWriterStrPackerTest {
             } else {
                 assertTrue(bytes.length <= 8, prefix + " must have no W1 for <= 8 byte key");
             }
+            assertEquals(bytes.length, field(prefix + "_LEN").getInt(null), prefix + "_LEN");
+        }
+    }
+
+    @Test
+    void packedValueConstants_matchRuntimePackWord() throws Exception {
+        Method packWord = JsonLogWriter.class.getDeclaredMethod("packWord", byte[].class, int.class);
+        packWord.setAccessible(true);
+
+        for (String value : VALUES) {
+            byte[] bytes = ((String) field(value).get(null)).getBytes(StandardCharsets.UTF_8);
+            String prefix = value;
+
+            assertEquals((long) packWord.invoke(null, bytes, 0),
+                    field(prefix + "_W0").getLong(null), prefix + "_W0");
             assertEquals(bytes.length, field(prefix + "_LEN").getInt(null), prefix + "_LEN");
         }
     }
