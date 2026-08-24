@@ -28,12 +28,12 @@ GPG signing is bound to the `verify` phase for Maven Central releases, so local
 The stack-trace sanitization family is **deliberately duplicated** as a
 performance optimization, and the duplicates are **auto-generated**:
 
-| File | Role |
-|---|---|
-| `core/.../JavaStackSanitizer.java` | **Canonical source** — modify this file ONLY |
-| `core/.../JavaStackTraceWriter.java` | Core, no-filter derivative |
-| `logback/.../JavaStackSanitizerLogback.java` | Filter-enabled, logback input |
-| `logback/.../JavaStackWriterLogback.java` | No-filter, logback input |
+| File                                         | Role                                         |
+| -------------------------------------------- | -------------------------------------------- |
+| `core/.../JavaStackSanitizer.java`           | **Canonical source** — modify this file ONLY |
+| `core/.../JavaStackTraceWriter.java`         | Core, no-filter derivative                   |
+| `logback/.../JavaStackSanitizerLogback.java` | Filter-enabled, logback input                |
+| `logback/.../JavaStackWriterLogback.java`    | No-filter, logback input                     |
 
 **Workflow**: edit `JavaStackSanitizer.java`, then sync all derivatives:
 
