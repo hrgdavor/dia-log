@@ -70,7 +70,7 @@ public final class JsonLogWriterStream {
         if (pairs != null && !pairs.isEmpty()) {
             for (KeyValuePair kvPair : pairs) {
                 if (kvPair.key != null) {
-                    writer.addKey(out, kvPair.key, kvPair.value, mapper);
+                    addKey(out, kvPair.key, kvPair.value, mapper);
                 }
             }
         }
@@ -136,7 +136,7 @@ public final class JsonLogWriterStream {
         };
     }
 
-    protected void addKey(OutputStream out, String key, Object value, ObjectMapper mapper) throws IOException {
+    protected static void addKey(OutputStream out, String key, Object value, ObjectMapper mapper) throws IOException {
         if (value == null) return;
 
         writeFieldPrefixRawKey(out, key);
@@ -144,7 +144,7 @@ public final class JsonLogWriterStream {
         writeValue(out, value, mapper);
     }
 
-    private void writeValue(OutputStream out, Object value, ObjectMapper mapper) throws IOException {
+    private static void writeValue(OutputStream out, Object value, ObjectMapper mapper) throws IOException {
         switch (value) {
             case String s -> EscapedJsonStringWriter.writeJsonStringOrNull(out, s);
             case CharSequence cs -> EscapedJsonStringWriter.writeJsonStringOrNull(out, cs.toString());

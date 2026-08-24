@@ -223,6 +223,7 @@ public class JsonLogWriter {
         if (pos + 1 + KEY_LEVEL_LEN_BUF > limit) {
             rbo.grow(pos + 1 + KEY_LEVEL_LEN_BUF);
             buf = rbo.buf;
+            limit = rbo.limit;
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_LEVEL_W0);
@@ -234,6 +235,7 @@ public class JsonLogWriter {
         if (pos + 1 + KEY_LOGGER_LEN_BUF > limit) {
             rbo.grow(pos + 1 + KEY_LOGGER_LEN_BUF);
             buf = rbo.buf;
+            limit = rbo.limit;
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_LOGGER_W0);
@@ -247,6 +249,7 @@ public class JsonLogWriter {
         if (pos + 1 + KEY_THREAD_LEN_BUF > limit) {
             rbo.grow(pos + 1 + KEY_THREAD_LEN_BUF);
             buf = rbo.buf;
+            limit = rbo.limit;
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_THREAD_W0);
@@ -260,6 +263,7 @@ public class JsonLogWriter {
         if (pos + 1 + KEY_MSG_LEN_BUF > limit) {
             rbo.grow(pos + 1 + KEY_MSG_LEN_BUF);
             buf = rbo.buf;
+            limit = rbo.limit;
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_MSG_W0); // 6-byte key: full store, partial advance
@@ -295,9 +299,7 @@ public class JsonLogWriter {
                         limit = rbo.limit;
                     }
                     buf[pos++] = ':';
-                    rbo.pos = pos;
-                    writeValueDirect(rbo, kvPair.value, mapper);
-                    pos = rbo.pos;
+                    pos = writeValueDirect(rbo, pos, kvPair.value, mapper);
                     buf = rbo.buf;
                     limit = rbo.limit;
                 }
@@ -340,6 +342,7 @@ public class JsonLogWriter {
             if (pos + 1 + KEY_ERR_CLASS_LEN_BUF > limit) {
                 rbo.grow(pos + 1 + KEY_ERR_CLASS_LEN_BUF);
                 buf = rbo.buf;
+                limit = rbo.limit;
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_CLASS_W0);
@@ -354,6 +357,7 @@ public class JsonLogWriter {
             if (pos + 1 + KEY_ERR_MESSAGE_LEN_BUF > limit) {
                 rbo.grow(pos + 1 + KEY_ERR_MESSAGE_LEN_BUF);
                 buf = rbo.buf;
+                limit = rbo.limit;
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_MESSAGE_W0);
@@ -502,92 +506,134 @@ public class JsonLogWriter {
         return WriteOps.writeEscapedJsonString(rbo, value);
     }
 
-    private void writeValueDirect(ReusableByteArrayOutputStream rbo, Object value, ObjectMapper mapper) throws IOException {
+    /**
+     * Writes a JSON value straight into {@code rbo}, returning the advanced cursor.
+     * The cursor {@code pos} is a primitive caller-owned local: the caller passes
+     * it in and takes the new value back, so C2 keeps {@code pos} in a register
+     * across the whole serialize sequence — see {@code
+     * doc/perf-exploration/t7-cursor-locality-buffer-writer.md}. The grow-capable
+     * backend helpers ({@code WriteOps}, {@code JsonNumberWriter}) still operate on
+     * the {@code rbo.pos} field, so each branch commits the local cursor to the
+     * field once (via {@code rbo.pos = pos}) before a grow/publish, then reads the
+     * advanced value back — a single sync per value, not a field round-trip per
+     * byte. Only the stream-mediated delegations (jackson, raw values,
+     * self-writers) commit, write through the stream, resync, and return the new
+     * {@code rbo.pos}.
+     */
+    private static int writeValueDirect(ReusableByteArrayOutputStream rbo, int pos, Object value, ObjectMapper mapper) throws IOException {
         switch (value) {
-            case String s -> WriteOps.writeEscapedJsonString(rbo, s);
-            case CharSequence cs -> WriteOps.writeEscapedJsonString(rbo, cs.toString());
-            case Character ch -> WriteOps.writeEscapedJsonString(rbo, ch.toString());
-            case Enum<?> e -> WriteOps.writeEscapedJsonString(rbo, e.name());
-            case RawValue raw -> writeRawValueDirect(rbo, raw, mapper);
-            case Long l -> writeLongDirect(rbo, l);
-            case Integer i -> writeIntDirect(rbo, i);
-            case Short s -> writeIntDirect(rbo, s.intValue());
-            case Byte b -> writeIntDirect(rbo, b.intValue());
-            case Float f -> writeFloatDirect(rbo, f);
-            case Double d -> writeDoubleDirect(rbo, d);
-            case Number n -> writeNumberDirect(rbo, n);
+            case String s -> pos = writeEscapedJsonString(rbo, pos, s);
+            case CharSequence cs -> pos = writeEscapedJsonString(rbo, pos, cs.toString());
+            case Character ch -> pos = writeEscapedJsonString(rbo, pos, ch.toString());
+            case Enum<?> e -> pos = writeEscapedJsonString(rbo, pos, e.name());
+            case RawValue raw -> pos = writeRawValueDirect(rbo, pos, raw, mapper);
+            case Long l -> pos = writeLongDirect(rbo, pos, l);
+            case Integer i -> pos = writeIntDirect(rbo, pos, i);
+            case Short s -> pos = writeIntDirect(rbo, pos, s.intValue());
+            case Byte b -> pos = writeIntDirect(rbo, pos, b.intValue());
+            case Float f -> pos = writeFloatDirect(rbo, pos, f);
+            case Double d -> pos = writeDoubleDirect(rbo, pos, d);
+            case Number n -> pos = writeNumberDirect(rbo, pos, n);
             case Boolean b -> {
+                rbo.pos = pos;
                 if (b) {
                     rbo.ensure(JSON_TRUE_LEN_BUF);
-                    WriteOps.LE_LONG.set(rbo.buf, rbo.pos, JSON_TRUE_W0);
-                    rbo.pos += JSON_TRUE_LEN;
+                    WriteOps.LE_LONG.set(rbo.buf, pos, JSON_TRUE_W0);
+                    pos += JSON_TRUE_LEN;
                 } else {
                     rbo.ensure(JSON_FALSE_LEN_BUF);
-                    WriteOps.LE_LONG.set(rbo.buf, rbo.pos, JSON_FALSE_W0);
-                    rbo.pos += JSON_FALSE_LEN;
+                    WriteOps.LE_LONG.set(rbo.buf, pos, JSON_FALSE_W0);
+                    pos += JSON_FALSE_LEN;
                 }
             }
             case RawJsonSelfWriter w -> {
+                rbo.pos = pos;
                 rbo.publish();
                 w.writeJson(rbo);
                 rbo.resync();
+                pos = rbo.pos;
             }
-            case RawJsonBytes b -> WriteOps.writeRaw(rbo, b.bytes(), 0, b.bytes().length);
+            case RawJsonBytes b -> pos = writeRawJsonBytes(rbo, pos, b);
             default -> {
+                rbo.pos = pos;
                 rbo.publish();
                 mapper.writeValue(rbo, value);
                 rbo.resync();
+                pos = rbo.pos;
             }
         }
+        return pos;
     }
 
-    private void writeRawValueDirect(ReusableByteArrayOutputStream rbo, RawValue raw, ObjectMapper mapper) throws IOException {
+    /** Commits the local cursor, writes an escaped JSON string through rbo, returns the new position. */
+    private static int writeEscapedJsonString(ReusableByteArrayOutputStream rbo, int pos, String value) {
+        rbo.pos = pos;
+        return WriteOps.writeEscapedJsonString(rbo, value);
+    }
+
+    /** Commits the local cursor, bulk-copies pre-encoded raw JSON bytes through rbo, returns the new position. */
+    private static int writeRawJsonBytes(ReusableByteArrayOutputStream rbo, int pos, RawJsonBytes b) {
+        rbo.pos = pos;
+        return WriteOps.writeRaw(rbo, b.bytes(), 0, b.bytes().length);
+    }
+
+    private static int writeRawValueDirect(ReusableByteArrayOutputStream rbo, int pos, RawValue raw, ObjectMapper mapper) throws IOException {
         Object backing = raw.rawValue();
         if (backing == null) {
+            rbo.pos = pos;
             rbo.ensure(JSON_NULL_LEN_BUF);
-            WriteOps.LE_LONG.set(rbo.buf, rbo.pos, JSON_NULL_W0);
-            rbo.pos += JSON_NULL_LEN;
-            return;
+            WriteOps.LE_LONG.set(rbo.buf, pos, JSON_NULL_W0);
+            pos += JSON_NULL_LEN;
+            return pos;
         }
+        rbo.pos = pos;
         rbo.publish();
         writeRawValue(rbo, raw, mapper);
         rbo.resync();
+        return rbo.pos;
     }
 
-    private void writeNumberDirect(ReusableByteArrayOutputStream rbo, Number n) throws IOException {
+    private static int writeNumberDirect(ReusableByteArrayOutputStream rbo, int pos, Number n) throws IOException {
         switch (n) {
-            case Integer i -> writeIntDirect(rbo, i);
-            case Long l -> writeLongDirect(rbo, l);
-            case Short s -> writeIntDirect(rbo, s.intValue());
-            case Byte b -> writeIntDirect(rbo, b.intValue());
-            case Float f -> writeFloatDirect(rbo, f);
-            case Double d -> writeDoubleDirect(rbo, d);
+            case Integer i -> pos = writeIntDirect(rbo, pos, i);
+            case Long l -> pos = writeLongDirect(rbo, pos, l);
+            case Short s -> pos = writeIntDirect(rbo, pos, s.intValue());
+            case Byte b -> pos = writeIntDirect(rbo, pos, b.intValue());
+            case Float f -> pos = writeFloatDirect(rbo, pos, f);
+            case Double d -> pos = writeDoubleDirect(rbo, pos, d);
             default -> {
+                rbo.pos = pos;
                 rbo.publish();
                 JsonNumberWriter.writeNumber(rbo, n);
                 rbo.resync();
+                pos = rbo.pos;
             }
         }
+        return pos;
     }
 
-    private void writeIntDirect(ReusableByteArrayOutputStream rbo, int value) {
+    private static int writeIntDirect(ReusableByteArrayOutputStream rbo, int pos, int value) {
+        rbo.pos = pos;
         rbo.ensure(JsonNumberWriter.MAX_INT_BYTES);
-        rbo.pos = JsonNumberWriter.writeInt(rbo.buf, rbo.pos, value);
+        return JsonNumberWriter.writeInt(rbo.buf, pos, value);
     }
 
-    private void writeLongDirect(ReusableByteArrayOutputStream rbo, long value) {
+    private static int writeLongDirect(ReusableByteArrayOutputStream rbo, int pos, long value) {
+        rbo.pos = pos;
         rbo.ensure(JsonNumberWriter.MAX_LONG_BYTES);
-        rbo.pos = JsonNumberWriter.writeLong(rbo.buf, rbo.pos, value);
+        return JsonNumberWriter.writeLong(rbo.buf, pos, value);
     }
 
-    private void writeFloatDirect(ReusableByteArrayOutputStream rbo, float value) {
+    private static int writeFloatDirect(ReusableByteArrayOutputStream rbo, int pos, float value) {
+        rbo.pos = pos;
         rbo.ensure(JsonNumberWriter.MAX_FLOAT_BYTES);
-        rbo.pos = JsonNumberWriter.writeFloat(rbo.buf, rbo.pos, value);
+        return JsonNumberWriter.writeFloat(rbo.buf, pos, value);
     }
 
-    private void writeDoubleDirect(ReusableByteArrayOutputStream rbo, double value) {
+    private static int writeDoubleDirect(ReusableByteArrayOutputStream rbo, int pos, double value) {
+        rbo.pos = pos;
         rbo.ensure(JsonNumberWriter.MAX_DOUBLE_BYTES);
-        rbo.pos = JsonNumberWriter.writeDouble(rbo.buf, rbo.pos, value);
+        return JsonNumberWriter.writeDouble(rbo.buf, pos, value);
     }
 
     /** Packs up to 8 bytes starting at {@code off} little-endian into one long. */
