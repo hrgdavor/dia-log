@@ -1,0 +1,537 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog
+# Parameters: (includeThrowable = false)
+
+# Run progress: 0.00% complete, ETA 00:03:00
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 7.203 ops/us
+# Warmup Iteration   2: 7.219 ops/us
+# Warmup Iteration   3: 7.172 ops/us
+# Warmup Iteration   4: 7.274 ops/us
+# Warmup Iteration   5: 7.153 ops/us
+Iteration   1: 6.848 ops/us
+Iteration   2: 6.522 ops/us
+Iteration   3: 6.714 ops/us
+Iteration   4: 7.203 ops/us
+Iteration   5: 5.781 ops/us
+Iteration   6: 5.990 ops/us
+Iteration   7: 6.327 ops/us
+Iteration   8: 6.064 ops/us
+Iteration   9: 6.263 ops/us
+Iteration  10: 6.014 ops/us
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog":
+  6.372 ±(99.9%) 0.674 ops/us [Average]
+  (min, avg, max) = (5.781, 6.372, 7.203), stdev = 0.446
+  CI (99.9%): [5.698, 7.046] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog
+# Parameters: (includeThrowable = true)
+
+# Run progress: 8.33% complete, ETA 00:02:51
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.831 ops/us
+# Warmup Iteration   2: 0.894 ops/us
+# Warmup Iteration   3: 0.933 ops/us
+# Warmup Iteration   4: 0.928 ops/us
+# Warmup Iteration   5: 0.927 ops/us
+Iteration   1: 0.935 ops/us
+Iteration   2: 0.933 ops/us
+Iteration   3: 0.944 ops/us
+Iteration   4: 0.932 ops/us
+Iteration   5: 0.948 ops/us
+Iteration   6: 0.945 ops/us
+Iteration   7: 0.935 ops/us
+Iteration   8: 0.944 ops/us
+Iteration   9: 0.850 ops/us
+Iteration  10: 0.937 ops/us
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog":
+  0.930 ±(99.9%) 0.043 ops/us [Average]
+  (min, avg, max) = (0.850, 0.930, 0.948), stdev = 0.029
+  CI (99.9%): [0.887, 0.974] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog
+# Parameters: (includeThrowable = false)
+
+# Run progress: 16.67% complete, ETA 00:02:35
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1.725 ops/us
+# Warmup Iteration   2: 1.846 ops/us
+# Warmup Iteration   3: 1.870 ops/us
+# Warmup Iteration   4: 1.830 ops/us
+# Warmup Iteration   5: 1.842 ops/us
+Iteration   1: 1.813 ops/us
+Iteration   2: 1.847 ops/us
+Iteration   3: 1.837 ops/us
+Iteration   4: 1.833 ops/us
+Iteration   5: 1.833 ops/us
+Iteration   6: 1.823 ops/us
+Iteration   7: 1.727 ops/us
+Iteration   8: 1.833 ops/us
+Iteration   9: 1.815 ops/us
+Iteration  10: 1.849 ops/us
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog":
+  1.821 ±(99.9%) 0.053 ops/us [Average]
+  (min, avg, max) = (1.727, 1.821, 1.849), stdev = 0.035
+  CI (99.9%): [1.768, 1.874] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog
+# Parameters: (includeThrowable = true)
+
+# Run progress: 25.00% complete, ETA 00:02:19
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.449 ops/us
+# Warmup Iteration   2: 0.480 ops/us
+# Warmup Iteration   3: 0.486 ops/us
+# Warmup Iteration   4: 0.474 ops/us
+# Warmup Iteration   5: 0.480 ops/us
+Iteration   1: 0.477 ops/us
+Iteration   2: 0.482 ops/us
+Iteration   3: 0.477 ops/us
+Iteration   4: 0.479 ops/us
+Iteration   5: 0.482 ops/us
+Iteration   6: 0.479 ops/us
+Iteration   7: 0.483 ops/us
+Iteration   8: 0.478 ops/us
+Iteration   9: 0.479 ops/us
+Iteration  10: 0.440 ops/us
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog":
+  0.476 ±(99.9%) 0.019 ops/us [Average]
+  (min, avg, max) = (0.440, 0.476, 0.483), stdev = 0.013
+  CI (99.9%): [0.457, 0.495] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog
+# Parameters: (includeThrowable = false)
+
+# Run progress: 33.33% complete, ETA 00:02:04
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1.797 ops/us
+# Warmup Iteration   2: 1.929 ops/us
+# Warmup Iteration   3: 1.935 ops/us
+# Warmup Iteration   4: 1.820 ops/us
+# Warmup Iteration   5: 1.903 ops/us
+Iteration   1: 1.892 ops/us
+Iteration   2: 1.911 ops/us
+Iteration   3: 1.883 ops/us
+Iteration   4: 1.889 ops/us
+Iteration   5: 1.887 ops/us
+Iteration   6: 1.895 ops/us
+Iteration   7: 1.899 ops/us
+Iteration   8: 1.899 ops/us
+Iteration   9: 1.921 ops/us
+Iteration  10: 1.606 ops/us
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog":
+  1.868 ±(99.9%) 0.140 ops/us [Average]
+  (min, avg, max) = (1.606, 1.868, 1.921), stdev = 0.093
+  CI (99.9%): [1.728, 2.008] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog
+# Parameters: (includeThrowable = true)
+
+# Run progress: 41.67% complete, ETA 00:01:48
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.483 ops/us
+# Warmup Iteration   2: 0.524 ops/us
+# Warmup Iteration   3: 0.512 ops/us
+# Warmup Iteration   4: 0.515 ops/us
+# Warmup Iteration   5: 0.516 ops/us
+Iteration   1: 0.515 ops/us
+Iteration   2: 0.513 ops/us
+Iteration   3: 0.511 ops/us
+Iteration   4: 0.514 ops/us
+Iteration   5: 0.515 ops/us
+Iteration   6: 0.514 ops/us
+Iteration   7: 0.514 ops/us
+Iteration   8: 0.518 ops/us
+Iteration   9: 0.460 ops/us
+Iteration  10: 0.471 ops/us
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog":
+  0.505 ±(99.9%) 0.032 ops/us [Average]
+  (min, avg, max) = (0.460, 0.505, 0.518), stdev = 0.021
+  CI (99.9%): [0.473, 0.536] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog
+# Parameters: (includeThrowable = false)
+
+# Run progress: 50.00% complete, ETA 00:01:33
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.140 us/op
+# Warmup Iteration   2: 0.131 us/op
+# Warmup Iteration   3: 0.135 us/op
+# Warmup Iteration   4: 0.137 us/op
+# Warmup Iteration   5: 0.138 us/op
+Iteration   1: 0.136 us/op
+Iteration   2: 0.139 us/op
+Iteration   3: 0.137 us/op
+Iteration   4: 0.136 us/op
+Iteration   5: 0.136 us/op
+Iteration   6: 0.136 us/op
+Iteration   7: 0.137 us/op
+Iteration   8: 0.136 us/op
+Iteration   9: 0.169 us/op
+Iteration  10: 0.138 us/op
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog":
+  0.140 ±(99.9%) 0.015 us/op [Average]
+  (min, avg, max) = (0.136, 0.140, 0.169), stdev = 0.010
+  CI (99.9%): [0.125, 0.155] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog
+# Parameters: (includeThrowable = true)
+
+# Run progress: 58.33% complete, ETA 00:01:17
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1.711 us/op
+# Warmup Iteration   2: 1.550 us/op
+# Warmup Iteration   3: 1.575 us/op
+# Warmup Iteration   4: 1.603 us/op
+# Warmup Iteration   5: 1.599 us/op
+Iteration   1: 1.618 us/op
+Iteration   2: 1.607 us/op
+Iteration   3: 1.624 us/op
+Iteration   4: 1.617 us/op
+Iteration   5: 1.622 us/op
+Iteration   6: 1.619 us/op
+Iteration   7: 1.599 us/op
+Iteration   8: 1.724 us/op
+Iteration   9: 1.856 us/op
+Iteration  10: 1.710 us/op
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog":
+  1.660 ±(99.9%) 0.123 us/op [Average]
+  (min, avg, max) = (1.599, 1.660, 1.856), stdev = 0.081
+  CI (99.9%): [1.537, 1.782] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog
+# Parameters: (includeThrowable = false)
+
+# Run progress: 66.67% complete, ETA 00:01:02
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.587 us/op
+# Warmup Iteration   2: 0.555 us/op
+# Warmup Iteration   3: 0.560 us/op
+# Warmup Iteration   4: 0.620 us/op
+# Warmup Iteration   5: 0.587 us/op
+Iteration   1: 0.585 us/op
+Iteration   2: 0.565 us/op
+Iteration   3: 0.565 us/op
+Iteration   4: 0.566 us/op
+Iteration   5: 0.589 us/op
+Iteration   6: 0.567 us/op
+Iteration   7: 0.561 us/op
+Iteration   8: 0.678 us/op
+Iteration   9: 0.582 us/op
+Iteration  10: 0.566 us/op
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog":
+  0.582 ±(99.9%) 0.053 us/op [Average]
+  (min, avg, max) = (0.561, 0.582, 0.678), stdev = 0.035
+  CI (99.9%): [0.530, 0.635] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog
+# Parameters: (includeThrowable = true)
+
+# Run progress: 75.00% complete, ETA 00:00:46
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2.211 us/op
+# Warmup Iteration   2: 2.224 us/op
+# Warmup Iteration   3: 2.423 us/op
+# Warmup Iteration   4: 2.543 us/op
+# Warmup Iteration   5: 2.121 us/op
+Iteration   1: 2.108 us/op
+Iteration   2: 2.104 us/op
+Iteration   3: 2.099 us/op
+Iteration   4: 2.095 us/op
+Iteration   5: 2.091 us/op
+Iteration   6: 2.095 us/op
+Iteration   7: 2.316 us/op
+Iteration   8: 2.306 us/op
+Iteration   9: 2.090 us/op
+Iteration  10: 2.107 us/op
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog":
+  2.141 ±(99.9%) 0.136 us/op [Average]
+  (min, avg, max) = (2.090, 2.141, 2.316), stdev = 0.090
+  CI (99.9%): [2.005, 2.277] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog
+# Parameters: (includeThrowable = false)
+
+# Run progress: 83.33% complete, ETA 00:00:31
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.543 us/op
+# Warmup Iteration   2: 0.515 us/op
+# Warmup Iteration   3: 0.516 us/op
+# Warmup Iteration   4: 0.530 us/op
+# Warmup Iteration   5: 0.531 us/op
+Iteration   1: 0.529 us/op
+Iteration   2: 0.526 us/op
+Iteration   3: 0.527 us/op
+Iteration   4: 0.527 us/op
+Iteration   5: 0.532 us/op
+Iteration   6: 0.527 us/op
+Iteration   7: 0.618 us/op
+Iteration   8: 0.538 us/op
+Iteration   9: 0.530 us/op
+Iteration  10: 0.537 us/op
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog":
+  0.539 ±(99.9%) 0.042 us/op [Average]
+  (min, avg, max) = (0.526, 0.539, 0.618), stdev = 0.028
+  CI (99.9%): [0.497, 0.581] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog
+# Parameters: (includeThrowable = true)
+
+# Run progress: 91.67% complete, ETA 00:00:15
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2.031 us/op
+# Warmup Iteration   2: 1.913 us/op
+# Warmup Iteration   3: 1.931 us/op
+# Warmup Iteration   4: 1.943 us/op
+# Warmup Iteration   5: 1.936 us/op
+Iteration   1: 2.159 us/op
+Iteration   2: 1.938 us/op
+Iteration   3: 1.929 us/op
+Iteration   4: 1.909 us/op
+Iteration   5: 1.909 us/op
+Iteration   6: 2.114 us/op
+Iteration   7: 2.205 us/op
+Iteration   8: 1.954 us/op
+Iteration   9: 1.947 us/op
+Iteration  10: 2.012 us/op
+
+
+Result "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog":
+  2.008 ±(99.9%) 0.167 us/op [Average]
+  (min, avg, max) = (1.909, 2.008, 2.205), stdev = 0.111
+  CI (99.9%): [1.840, 2.175] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:03:06
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                           (includeThrowable)   Mode  Cnt  Score   Error   Units
+LogbackWriterComparisonBenchmark.defaultPatternLog               false  thrpt   10  6.372 ± 0.674  ops/us
+LogbackWriterComparisonBenchmark.defaultPatternLog                true  thrpt   10  0.930 ± 0.043  ops/us
+LogbackWriterComparisonBenchmark.jacksonEncoderLog               false  thrpt   10  1.821 ± 0.053  ops/us
+LogbackWriterComparisonBenchmark.jacksonEncoderLog                true  thrpt   10  0.476 ± 0.019  ops/us
+LogbackWriterComparisonBenchmark.optimizedJsonLog                false  thrpt   10  1.868 ± 0.140  ops/us
+LogbackWriterComparisonBenchmark.optimizedJsonLog                 true  thrpt   10  0.505 ± 0.032  ops/us
+LogbackWriterComparisonBenchmark.defaultPatternLog               false   avgt   10  0.140 ± 0.015   us/op
+LogbackWriterComparisonBenchmark.defaultPatternLog                true   avgt   10  1.660 ± 0.123   us/op
+LogbackWriterComparisonBenchmark.jacksonEncoderLog               false   avgt   10  0.582 ± 0.053   us/op
+LogbackWriterComparisonBenchmark.jacksonEncoderLog                true   avgt   10  2.141 ± 0.136   us/op
+LogbackWriterComparisonBenchmark.optimizedJsonLog                false   avgt   10  0.539 ± 0.042   us/op
+LogbackWriterComparisonBenchmark.optimizedJsonLog                 true   avgt   10  2.008 ± 0.167   us/op
+
+Benchmark result is saved to D:\wrk\java\dia-log\bench-results-tight-20260825-211525\LogbackWriterComparisonBenchmark.json

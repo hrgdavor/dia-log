@@ -1,11 +1,9 @@
 package hr.hrg.dialog.logback;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import hr.hrg.dialog.core.EscapedJsonStringWriter;
+import hr.hrg.dialog.core.WriteOps;
 import org.slf4j.event.KeyValuePair;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,24 +36,32 @@ public class JsonLogWriterDev extends JsonLogWriter {
     private static final Pattern NAMED_PLACEHOLDER = Pattern.compile("(?<!\\{)\\{([^{}]+)\\}(?!\\})");
     public static final List<String> EMPTY_LIST_STRING = List.of();
 
+    /// Headroom for the missingKeys field's stores; the field is small, so on
+    /// no-room it is skipped entirely (the caller closes the object).
+    private static final int LIMIT_MARGIN = 1024;
+
     @Override
-    protected void writeExtraFields(ILoggingEvent event, OutputStream out, List<KeyValuePair> pairs, Map<String, String> mdcMap) throws IOException {
+    protected int writeExtraFields(ILoggingEvent event, byte[] buf, int pos, int limit,
+            List<KeyValuePair> pairs, Map<String, String> mdcMap) {
         List<String> missing = findMissingKeys(event, pairs, mdcMap);
         if (missing.isEmpty()) {
-            return;
+            return pos;
         }
-
-        out.write(',');
-        EscapedJsonStringWriter.writeJsonStringOrNull(out, "missingKeys");
-        out.write(':');
-        out.write('[');
+        int fieldStart = pos;                       // before the leading comma
+        // Single margin check — missingKeys is small; on no-room, skip the field.
+        if (pos + LIMIT_MARGIN > limit) return pos;
+        pos = WriteOps.writeByte(buf, pos, ',');
+        pos = WriteOps.writeEscapedJsonStringNoGrow(buf, pos, limit, "missingKeys");
+        if (pos < 0) return -fieldStart;
+        pos = WriteOps.writeByte(buf, pos, ':');
+        pos = WriteOps.writeByte(buf, pos, '[');
         for (int i = 0; i < missing.size(); i++) {
-            if (i > 0) {
-                out.write(',');
-            }
-            EscapedJsonStringWriter.writeJsonStringOrNull(out, missing.get(i));
+            if (i > 0) pos = WriteOps.writeByte(buf, pos, ',');
+            pos = WriteOps.writeEscapedJsonStringNoGrow(buf, pos, limit, missing.get(i));
+            if (pos < 0) return -fieldStart;
         }
-        out.write(']');
+        pos = WriteOps.writeByte(buf, pos, ']');
+        return pos;
     }
 
     /**

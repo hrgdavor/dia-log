@@ -204,7 +204,9 @@ class ForyPerfComparisonTest {
             assertEquals(expected, stream.toString(StandardCharsets.UTF_8), "new-stream len=" + latin1.length);
 
             // New SWAR path, direct mode (ReusableByteArrayOutputStream).
-            ReusableByteArrayOutputStream direct = new ReusableByteArrayOutputStream(16);
+            // Capacity 4096: comfortably above the worst battery case (a 90-byte
+            // control-char string escapes to ~540 bytes); the buffer is no-grow.
+            ReusableByteArrayOutputStream direct = new ReusableByteArrayOutputStream(4096);
             EscapedJsonStringWriter.writeJsonStringOrNull(direct, s);
             assertEquals(expected, new String(direct.buffer(), 0, direct.size(), StandardCharsets.UTF_8),
                     "new-direct len=" + latin1.length);
@@ -224,7 +226,7 @@ class ForyPerfComparisonTest {
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
             StringByteExtractor.writeLatin1(stream, latin1);
 
-            ReusableByteArrayOutputStream direct = new ReusableByteArrayOutputStream(16);
+            ReusableByteArrayOutputStream direct = new ReusableByteArrayOutputStream(4096);
             StringByteExtractor.writeLatin1(direct, latin1);
 
             byte[] expected = classic.toByteArray();

@@ -4,9 +4,11 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.LoggingEvent;
+import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -84,5 +86,21 @@ class JsonAppenderRollingTest {
         JsonAppenderRolling appender = new JsonAppenderRolling();
         assertThrows(IllegalArgumentException.class,
                 () -> appender.setStackTraceFilter("no.such.Class"));
+    }
+
+    @Test
+    void setEventBufferCapacity_valid_setsBufferSize() throws Exception {
+        JsonAppenderRolling appender = new JsonAppenderRolling();
+        appender.setEventBufferCapacity(256);
+        Field bufferField = JsonAppenderRolling.class.getDeclaredField("eventBuffer");
+        bufferField.setAccessible(true);
+        ReusableByteArrayOutputStream buffer = (ReusableByteArrayOutputStream) bufferField.get(appender);
+        assertEquals(256, buffer.buffer().length);
+    }
+
+    @Test
+    void setEventBufferCapacity_tooSmall_throws() {
+        JsonAppenderRolling appender = new JsonAppenderRolling();
+        assertThrows(IllegalArgumentException.class, () -> appender.setEventBufferCapacity(63));
     }
 }

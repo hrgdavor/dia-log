@@ -21,11 +21,11 @@ import java.util.Map;
 /// confirm it produces the same bytes. Not part of the published API.
 ///
 /// <p>Value-type dispatch ({@code String}, {@code Long}, {@code RawValue}, ...) is
-/// delegated to the writer's own {@link JsonLogWriter#addKey protected addKey}
-/// (same-package access), so this class never replicates the type switch. The
-/// {@link JsonLogWriter#writeExtraFields extension point} is invoked through the
-/// writer, so the {@link JsonLogWriterDev dev variant}'s {@code missingKeys} field
-/// is still emitted.
+/// handled by this class's own {@link #addKey} switch, mirroring the direct path
+/// exactly. The {@link JsonLogWriterDev dev variant}'s {@code missingKeys} field
+/// cannot be delegated anymore (the writer's extension point now writes straight
+/// into the no-grow buffer), so the stream path replicates it via
+/// {@link JsonLogWriterDev#findMissingKeys} and the stream escaping writers.
 ///
 /// <p>The hasher is caller-owned and passed in (single-pass methods reset it
 /// internally) — exactly the reusable-state discipline the production writer uses.
@@ -113,7 +113,23 @@ public final class JsonLogWriterStream {
             JsonNumberWriter.writeLong(out, fingerPrint);
         }
 
-        writer.writeExtraFields(event, out, pairs, mdcMap);
+        // Dev extension point: the writer's writeExtraFields now writes into the
+        // direct buffer, so the stream path replicates the dev variant's
+        // missingKeys field byte-identically.
+        if (writer instanceof JsonLogWriterDev dev) {
+            List<String> missing = JsonLogWriterDev.findMissingKeys(event, pairs, mdcMap);
+            if (!missing.isEmpty()) {
+                out.write(',');
+                EscapedJsonStringWriter.writeJsonStringOrNull(out, "missingKeys");
+                out.write(':');
+                out.write('[');
+                for (int i = 0; i < missing.size(); i++) {
+                    if (i > 0) out.write(',');
+                    EscapedJsonStringWriter.writeJsonStringOrNull(out, missing.get(i));
+                }
+                out.write(']');
+            }
+        }
 
         out.write('}');
     }

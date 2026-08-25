@@ -19,14 +19,20 @@ public class JsonAppender extends OutputStreamAppender<ILoggingEvent> {
     private OutputStream activeStream;
     private final JsonLogWriter jsonLogWriter;
     /**
-     * Event buffer: the event JSON is assembled here (reusing the array across
-     * events, growing only to the longest event) and flushed to the real stream
+     * Event buffer: the event JSON is assembled here and flushed to the real stream
      * with one bulk write per event. Safe to share because logback 1.5.x
      * {@code AppenderBase.doAppend} is {@code synchronized}.
+     * <p>
+     * Capacity is configurable via {@link #setEventBufferCapacity(int)} (default
+     * 16 MiB). The backing array grows only when an event exceeds capacity.
      */
-    private final ReusableByteArrayOutputStream eventBuffer = new ReusableByteArrayOutputStream();
+    private ReusableByteArrayOutputStream eventBuffer = new ReusableByteArrayOutputStream(DEFAULT_EVENT_BUFFER_CAPACITY);
     /** Per-event JSON snapshot hook; defaults to {@link NoopEventSnapshotHandler#INSTANCE}. */
     private EventSnapshotHandler eventSnapshotHandler = NoopEventSnapshotHandler.INSTANCE;
+    /** Default event buffer capacity: 16 MiB. */
+    private static final int DEFAULT_EVENT_BUFFER_CAPACITY = 16 * 1024 * 1024;
+    /** Configured event buffer capacity in bytes. */
+    private int eventBufferCapacity = DEFAULT_EVENT_BUFFER_CAPACITY;
 
     public JsonAppender() {
         this.jsonLogWriter = createJsonLogWriter();
@@ -103,6 +109,33 @@ public class JsonAppender extends OutputStreamAppender<ILoggingEvent> {
      */
     public void setStackTraceFilter(String filterClassName) {
         jsonLogWriter.setStackTraceFilter(instantiateStackTraceFilter(filterClassName));
+    }
+
+    /**
+     * Configures the capacity of the per-event reusable byte buffer. The buffer
+     * is allocated once at this size and reused across events; it grows by
+     * doubling only when an event exceeds the configured capacity.
+     * <p>
+     * Default: {@value #DEFAULT_EVENT_BUFFER_CAPACITY} bytes (16 MiB). The
+     * practical ceiling is {@code Integer.MAX_VALUE} (≈2 GiB), the maximum
+     * {@code byte[]} length.
+     * <p>
+     * Example logback.xml:
+     * <pre>{@code
+     * <appender name="JSON" class="hr.hrg.dialog.logback.JsonAppender">
+     *     <eventBufferCapacity>262144</eventBufferCapacity>
+     * </appender>
+     * }</pre>
+     *
+     * @param bytes buffer capacity in bytes; must be >= 64
+     * @throws IllegalArgumentException if {@code bytes < 64}
+     */
+    public void setEventBufferCapacity(int bytes) {
+        if (bytes < 64) {
+            throw new IllegalArgumentException("eventBufferCapacity must be >= 64 bytes: " + bytes);
+        }
+        this.eventBufferCapacity = bytes;
+        this.eventBuffer = new ReusableByteArrayOutputStream(bytes);
     }
 
     /**
@@ -194,14 +227,18 @@ public class JsonAppender extends OutputStreamAppender<ILoggingEvent> {
     protected void writeOut(ILoggingEvent event) throws IOException {
         var activeStreamLoc = activeStream;
         eventBuffer.reset();
-        jsonLogWriter.writeJsonEventDirect(objectMapper, event, eventBuffer);
+        int pos = jsonLogWriter.writeJsonEventDirect(objectMapper, event, eventBuffer);
+        eventBuffer.pos = pos;
 
         EventSnapshotHandler handler = eventSnapshotHandler;
         if (handler.isEnabled()) {
             handler.onEvent(Arrays.copyOf(eventBuffer.buffer(), eventBuffer.size()));
         }
 
-        eventBuffer.write(JsonLogWriter.NL);
+        // The newline always fits: the no-grow assembly stops at
+        // buf.length - RESERVE (27), which reserves the newline slot.
+        eventBuffer.buf[pos] = JsonLogWriter.NL[0];
+        eventBuffer.setPosition(pos + 1);
         // One bulk write of the whole event (buffer reuses its array across events).
         eventBuffer.writeTo(activeStreamLoc);
     }

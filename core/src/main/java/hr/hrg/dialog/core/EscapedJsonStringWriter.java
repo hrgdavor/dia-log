@@ -195,15 +195,15 @@ public final class EscapedJsonStringWriter {
      * T1: 8-byte SWAR words are tested with one predicate; clean words (the
      * dominant case for log content) are emitted as one bulk chunk. T2: length
      * bands specialize the scan — one word (8..15), three overlapping words
-     * (16..24), four words (25..31), 16-byte block loop (>= 32). T4: when
-     * {@code out} is a {@link ReusableByteArrayOutputStream}, clean words are
-     * stored straight into its backing array through the direct-buffer API.
+     * (16..24), four words (25..31), 16-byte block loop (>= 32). When
+     * {@code out} is a {@link ReusableByteArrayOutputStream}, writes go through
+     * its no-grow write methods, which throw {@link BufferFullException} on
+     * overflow (the grow-based direct path was removed).
      */
     private static void writeEscapedLatin1(OutputStream out, byte[] internal) throws IOException {
-        if (out instanceof ReusableByteArrayOutputStream rbo) {
-            writeEscapedLatin1Direct(rbo, internal);
-            return;
-        }
+        // The OutputStream path: for a ReusableByteArrayOutputStream the writes now
+        // go straight through the no-grow write methods (which throw
+        // BufferFullException on overflow), so the grow-based direct path is gone.
         writeEscapedLatin1Stream(out, internal, 0, internal.length);
     }
 
@@ -310,156 +310,6 @@ public final class EscapedJsonStringWriter {
             // Latin-1 code point to UTF-8.
             writeUtf8CodePoint(out, b);
         }
-    }
-
-    // ---- direct-buffer mode (T4) ------------------------------------------
-
-    private static void writeEscapedLatin1Direct(ReusableByteArrayOutputStream rbo, byte[] bytes) throws IOException {
-        int to = bytes.length;
-        if (to < 8) {
-            writeEscapedLatin1PerByteDirect(rbo, bytes, 0, to);
-            return;
-        }
-        if (to <= 15) {
-            long word = (long) LE_WORD.get(bytes, 0);
-            if (isJsonAsciiWord(word) && isJsonAsciiTail(bytes, 8, to)) {
-                copyDirect(rbo, bytes, 0, to);
-                return;
-            }
-            writeEscapedLatin1PerByteDirect(rbo, bytes, 0, to);
-            return;
-        }
-        if (to <= 24) {
-            long w0 = (long) LE_WORD.get(bytes, 0);
-            long w1 = (long) LE_WORD.get(bytes, 8);
-            long w2 = (long) LE_WORD.get(bytes, to - 8);
-            if (isJsonAsciiWords3(w0, w1, w2)) {
-                // T2 three-word trick: 3 loads + 3 stores for any 16..24 byte
-                // string; the last store overlaps the first two but is byte-identical.
-                int pos = rbo.position();
-                byte[] buf = rbo.buffer();
-                if (pos + 16 > buf.length) {
-                    buf = rbo.grow(pos + 16);
-                }
-                putWordLE(buf, pos, w0);
-                putWordLE(buf, pos + 8, w1);
-                putWordLE(buf, pos + (to - 8), w2);
-                rbo.setPosition(pos + to);
-                return;
-            }
-            writeEscapedLatin1PerByteDirect(rbo, bytes, 0, to);
-            return;
-        }
-        if (to <= 31) {
-            long w0 = (long) LE_WORD.get(bytes, 0);
-            long w1 = (long) LE_WORD.get(bytes, 8);
-            long w2 = (long) LE_WORD.get(bytes, 16);
-            long w3 = (long) LE_WORD.get(bytes, to - 8);
-            if (isJsonAsciiWords4(w0, w1, w2, w3)) {
-                int pos = rbo.position();
-                byte[] buf = rbo.buffer();
-                if (pos + to > buf.length) {
-                    buf = rbo.grow(pos + to);
-                }
-                putWordLE(buf, pos, w0);
-                putWordLE(buf, pos + 8, w1);
-                putWordLE(buf, pos + 16, w2);
-                putWordLE(buf, pos + (to - 8), w3);
-                rbo.setPosition(pos + to);
-                return;
-            }
-            writeEscapedLatin1PerByteDirect(rbo, bytes, 0, to);
-            return;
-        }
-        // >= 32 bytes: 16-byte block loop, clean blocks stored with one capacity
-        // check per block; the < 16 tail is handled per-byte.
-        int i = 0;
-        for (; i + 16 <= to; i += 16) {
-            long w0 = (long) LE_WORD.get(bytes, i);
-            long w1 = (long) LE_WORD.get(bytes, i + 8);
-            if (isJsonAsciiWords2(w0, w1)) {
-                int pos = rbo.position();
-                byte[] buf = rbo.buffer();
-                if (pos + to > buf.length) {
-                    buf = rbo.grow(pos + to);
-                }
-                putWordLE(buf, pos, w0);
-                putWordLE(buf, pos + 8, w1);
-                rbo.setPosition(pos + 16);
-            } else {
-                writeEscapedLatin1PerByteDirect(rbo, bytes, i, i + 16);
-            }
-        }
-        if (i < to) {
-            writeEscapedLatin1PerByteDirect(rbo, bytes, i, to);
-        }
-    }
-
-    private static void writeEscapedLatin1PerByteDirect(ReusableByteArrayOutputStream rbo, byte[] bytes, int from, int to) {
-        int segmentStart = from;
-        for (int i = from; i < to; i++) {
-            int b = bytes[i] & 0xFF;
-            byte[] escape = escapeBytesForAsciiControl(b);
-            if (escape != null || b < 0x20 || b >= 0x80) {
-                copyDirect(rbo, bytes, segmentStart, i);
-                writeEscapedByteDirect(rbo, b);
-                segmentStart = i + 1;
-            }
-        }
-        if (segmentStart < to) {
-            copyDirect(rbo, bytes, segmentStart, to);
-        }
-    }
-
-    /** Stores one escaped byte (1..6 output bytes) with one inlined capacity check. */
-    private static void writeEscapedByteDirect(ReusableByteArrayOutputStream rbo, int b) {
-        int pos = rbo.position();
-        byte[] buf = rbo.buffer();
-        if (pos + 6 > buf.length) {
-            buf = rbo.grow(pos + 6);
-        }
-        switch (b) {
-            case '"': buf[pos++] = '\\'; buf[pos++] = '"'; break;
-            case '\\': buf[pos++] = '\\'; buf[pos++] = '\\'; break;
-            case '\b': buf[pos++] = '\\'; buf[pos++] = 'b'; break;
-            case '\f': buf[pos++] = '\\'; buf[pos++] = 'f'; break;
-            case '\n': buf[pos++] = '\\'; buf[pos++] = 'n'; break;
-            case '\r': buf[pos++] = '\\'; buf[pos++] = 'r'; break;
-            case '\t': buf[pos++] = '\\'; buf[pos++] = 't'; break;
-            default:
-                if (b < 0x20) {
-                    buf[pos++] = '\\';
-                    buf[pos++] = 'u';
-                    buf[pos++] = '0';
-                    buf[pos++] = '0';
-                    buf[pos++] = HEX_DIGITS[b >>> 4];
-                    buf[pos++] = HEX_DIGITS[b & 0xF];
-                } else {
-                    // Latin-1 code point to 2-byte UTF-8.
-                    buf[pos++] = (byte) (0xC0 | (b >> 6));
-                    buf[pos++] = (byte) (0x80 | (b & 0x3F));
-                }
-        }
-        rbo.setPosition(pos);
-    }
-
-    /** Copies {@code [from, to)} into the buffer with one inlined capacity check. */
-    private static void copyDirect(ReusableByteArrayOutputStream rbo, byte[] src, int from, int to) {
-        int len = to - from;
-        if (len <= 0) {
-            return;
-        }
-        int pos = rbo.position();
-        byte[] buf = rbo.buffer();
-        if (pos + len > buf.length) {
-            buf = rbo.grow(pos + len);
-        }
-        System.arraycopy(src, from, buf, pos, len);
-        rbo.setPosition(pos + len);
-    }
-
-    private static void putWordLE(byte[] buf, int pos, long v) {
-        LE_WORD.set(buf, pos, v);
     }
 
     // ---- SWAR predicates (ported from Fory Utf8JsonWriter) -----------------

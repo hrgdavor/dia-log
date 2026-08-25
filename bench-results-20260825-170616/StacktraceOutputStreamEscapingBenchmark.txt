@@ -1,0 +1,161 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.logback.StacktraceOutputStreamEscapingBenchmark.optimizedOutputStreamEscapedNewlines
+
+# Run progress: 0.00% complete, ETA 00:00:32
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1.892 ops/us
+# Warmup Iteration   2: 1.872 ops/us
+# Warmup Iteration   3: 1.914 ops/us
+Iteration   1: 1.855 ops/us
+Iteration   2: 1.904 ops/us
+Iteration   3: 1.895 ops/us
+Iteration   4: 1.646 ops/us
+Iteration   5: 1.804 ops/us
+
+
+Result "hr.hrg.dialog.logback.StacktraceOutputStreamEscapingBenchmark.optimizedOutputStreamEscapedNewlines":
+  1.821 ±(99.9%) 0.406 ops/us [Average]
+  (min, avg, max) = (1.646, 1.821, 1.904), stdev = 0.105
+  CI (99.9%): [1.415, 2.226] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.logback.StacktraceOutputStreamEscapingBenchmark.printStackTraceThenEscapedJsonStringWriter
+
+# Run progress: 25.00% complete, ETA 00:00:24
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.298 ops/us
+# Warmup Iteration   2: 0.322 ops/us
+# Warmup Iteration   3: 0.299 ops/us
+Iteration   1: 0.317 ops/us
+Iteration   2: 0.272 ops/us
+Iteration   3: 0.261 ops/us
+Iteration   4: 0.277 ops/us
+Iteration   5: 0.316 ops/us
+
+
+Result "hr.hrg.dialog.logback.StacktraceOutputStreamEscapingBenchmark.printStackTraceThenEscapedJsonStringWriter":
+  0.289 ±(99.9%) 0.101 ops/us [Average]
+  (min, avg, max) = (0.261, 0.289, 0.317), stdev = 0.026
+  CI (99.9%): [0.188, 0.389] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.logback.StacktraceOutputStreamEscapingBenchmark.optimizedOutputStreamEscapedNewlines
+
+# Run progress: 50.00% complete, ETA 00:00:16
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.534 us/op
+# Warmup Iteration   2: 0.539 us/op
+# Warmup Iteration   3: 0.509 us/op
+Iteration   1: 0.526 us/op
+Iteration   2: 0.542 us/op
+Iteration   3: 0.585 us/op
+Iteration   4: 0.542 us/op
+Iteration   5: 0.518 us/op
+
+
+Result "hr.hrg.dialog.logback.StacktraceOutputStreamEscapingBenchmark.optimizedOutputStreamEscapedNewlines":
+  0.543 ±(99.9%) 0.099 us/op [Average]
+  (min, avg, max) = (0.518, 0.543, 0.585), stdev = 0.026
+  CI (99.9%): [0.443, 0.642] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.logback.StacktraceOutputStreamEscapingBenchmark.printStackTraceThenEscapedJsonStringWriter
+
+# Run progress: 75.00% complete, ETA 00:00:08
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 3.517 us/op
+# Warmup Iteration   2: 3.196 us/op
+# Warmup Iteration   3: 2.996 us/op
+Iteration   1: 3.341 us/op
+Iteration   2: 4.010 us/op
+Iteration   3: 3.195 us/op
+Iteration   4: 3.389 us/op
+Iteration   5: 3.402 us/op
+
+
+Result "hr.hrg.dialog.logback.StacktraceOutputStreamEscapingBenchmark.printStackTraceThenEscapedJsonStringWriter":
+  3.467 ±(99.9%) 1.210 us/op [Average]
+  (min, avg, max) = (3.195, 3.467, 4.010), stdev = 0.314
+  CI (99.9%): [2.257, 4.677] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:33
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                                            Mode  Cnt  Score   Error   Units
+StacktraceOutputStreamEscapingBenchmark.optimizedOutputStreamEscapedNewlines        thrpt    5  1.821 ± 0.406  ops/us
+StacktraceOutputStreamEscapingBenchmark.printStackTraceThenEscapedJsonStringWriter  thrpt    5  0.289 ± 0.101  ops/us
+StacktraceOutputStreamEscapingBenchmark.optimizedOutputStreamEscapedNewlines         avgt    5  0.543 ± 0.099   us/op
+StacktraceOutputStreamEscapingBenchmark.printStackTraceThenEscapedJsonStringWriter   avgt    5  3.467 ± 1.210   us/op
+
+Benchmark result is saved to D:\wrk\java\dia-log\bench-results-20260825-170616\StacktraceOutputStreamEscapingBenchmark.json

@@ -5,10 +5,12 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.LoggingEvent;
+import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Predicate;
 
@@ -154,5 +156,43 @@ class JsonAppenderTest {
         String json = out.toString(StandardCharsets.UTF_8);
         assertTrue(json.contains("\"errHash\":"), "errHash missing: " + json);
         assertTrue(json.contains("\"stack\":"), "stack missing: " + json);
+    }
+
+    @Test
+    void defaultEventBufferCapacity_is16MiB() throws Exception {
+        Field bufferField = JsonAppender.class.getDeclaredField("eventBuffer");
+        bufferField.setAccessible(true);
+        ReusableByteArrayOutputStream buffer = (ReusableByteArrayOutputStream) bufferField.get(appender);
+        assertEquals(16 * 1024 * 1024, buffer.buffer().length);
+    }
+
+    @Test
+    void setEventBufferCapacity_valid_setsBufferSize() throws Exception {
+        appender.setEventBufferCapacity(256);
+        Field bufferField = JsonAppender.class.getDeclaredField("eventBuffer");
+        bufferField.setAccessible(true);
+        ReusableByteArrayOutputStream buffer = (ReusableByteArrayOutputStream) bufferField.get(appender);
+        assertEquals(256, buffer.buffer().length);
+    }
+
+    @Test
+    void setEventBufferCapacity_tooSmall_throws() {
+        assertThrows(IllegalArgumentException.class, () -> appender.setEventBufferCapacity(63));
+        assertThrows(IllegalArgumentException.class, () -> appender.setEventBufferCapacity(0));
+        assertThrows(IllegalArgumentException.class, () -> appender.setEventBufferCapacity(-1));
+    }
+
+    @Test
+    void append_smallEvent_doesNotGrowBuffer() throws Exception {
+        appender.setEventBufferCapacity(128);
+        Field bufferField = JsonAppender.class.getDeclaredField("eventBuffer");
+        bufferField.setAccessible(true);
+        ReusableByteArrayOutputStream buffer = (ReusableByteArrayOutputStream) bufferField.get(appender);
+        int lengthBefore = buffer.buffer().length;
+
+        appender.doAppend(event("small"));
+
+        int lengthAfter = buffer.buffer().length;
+        assertEquals(lengthBefore, lengthAfter, "buffer must not grow for events that fit within capacity");
     }
 }

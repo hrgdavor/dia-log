@@ -1,0 +1,676 @@
+[
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog",
+        "mode" : "thrpt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "false"
+        },
+        "primaryMetric" : {
+            "score" : 7.6356363294274825,
+            "scoreError" : 0.11189988485954314,
+            "scoreConfidence" : [
+                7.523736444567939,
+                7.747536214287026
+            ],
+            "scorePercentiles" : {
+                "0.0" : 7.597428053343491,
+                "50.0" : 7.642701551549796,
+                "90.0" : 7.665558336100661,
+                "95.0" : 7.665558336100661,
+                "99.0" : 7.665558336100661,
+                "99.9" : 7.665558336100661,
+                "99.99" : 7.665558336100661,
+                "99.999" : 7.665558336100661,
+                "99.9999" : 7.665558336100661,
+                "100.0" : 7.665558336100661
+            },
+            "scoreUnit" : "ops/us",
+            "rawData" : [
+                [
+                    7.642701551549796,
+                    7.665558336100661,
+                    7.614200502855426,
+                    7.65829320328804,
+                    7.597428053343491
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog",
+        "mode" : "thrpt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "true"
+        },
+        "primaryMetric" : {
+            "score" : 0.9427512538976224,
+            "scoreError" : 0.07429682326632285,
+            "scoreConfidence" : [
+                0.8684544306312996,
+                1.0170480771639452
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.9089062271474712,
+                "50.0" : 0.9487066142177584,
+                "90.0" : 0.9563749259814152,
+                "95.0" : 0.9563749259814152,
+                "99.0" : 0.9563749259814152,
+                "99.9" : 0.9563749259814152,
+                "99.99" : 0.9563749259814152,
+                "99.999" : 0.9563749259814152,
+                "99.9999" : 0.9563749259814152,
+                "100.0" : 0.9563749259814152
+            },
+            "scoreUnit" : "ops/us",
+            "rawData" : [
+                [
+                    0.9089062271474712,
+                    0.9531105522921877,
+                    0.9563749259814152,
+                    0.9487066142177584,
+                    0.9466579498492794
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog",
+        "mode" : "thrpt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "false"
+        },
+        "primaryMetric" : {
+            "score" : 1.8925856199580344,
+            "scoreError" : 0.008371612149183303,
+            "scoreConfidence" : [
+                1.8842140078088512,
+                1.9009572321072177
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.8897985175404137,
+                "50.0" : 1.892999746185123,
+                "90.0" : 1.8952113060888094,
+                "95.0" : 1.8952113060888094,
+                "99.0" : 1.8952113060888094,
+                "99.9" : 1.8952113060888094,
+                "99.99" : 1.8952113060888094,
+                "99.999" : 1.8952113060888094,
+                "99.9999" : 1.8952113060888094,
+                "100.0" : 1.8952113060888094
+            },
+            "scoreUnit" : "ops/us",
+            "rawData" : [
+                [
+                    1.8938806929864656,
+                    1.8897985175404137,
+                    1.892999746185123,
+                    1.8910378369893608,
+                    1.8952113060888094
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog",
+        "mode" : "thrpt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "true"
+        },
+        "primaryMetric" : {
+            "score" : 0.39852747221660817,
+            "scoreError" : 0.1529084144863438,
+            "scoreConfidence" : [
+                0.24561905773026438,
+                0.551435886702952
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.3361419691018772,
+                "50.0" : 0.3992111838200942,
+                "90.0" : 0.4453254935200453,
+                "95.0" : 0.4453254935200453,
+                "99.0" : 0.4453254935200453,
+                "99.9" : 0.4453254935200453,
+                "99.99" : 0.4453254935200453,
+                "99.999" : 0.4453254935200453,
+                "99.9999" : 0.4453254935200453,
+                "100.0" : 0.4453254935200453
+            },
+            "scoreUnit" : "ops/us",
+            "rawData" : [
+                [
+                    0.3992111838200942,
+                    0.4135274645384778,
+                    0.3984312501025465,
+                    0.4453254935200453,
+                    0.3361419691018772
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog",
+        "mode" : "thrpt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "false"
+        },
+        "primaryMetric" : {
+            "score" : 1.7812634298693282,
+            "scoreError" : 0.5498645823352964,
+            "scoreConfidence" : [
+                1.2313988475340318,
+                2.3311280122046245
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.5606851314599883,
+                "50.0" : 1.8054392607584098,
+                "90.0" : 1.9083231269330436,
+                "95.0" : 1.9083231269330436,
+                "99.0" : 1.9083231269330436,
+                "99.9" : 1.9083231269330436,
+                "99.99" : 1.9083231269330436,
+                "99.999" : 1.9083231269330436,
+                "99.9999" : 1.9083231269330436,
+                "100.0" : 1.9083231269330436
+            },
+            "scoreUnit" : "ops/us",
+            "rawData" : [
+                [
+                    1.8989334302987275,
+                    1.5606851314599883,
+                    1.9083231269330436,
+                    1.8054392607584098,
+                    1.7329361998964723
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog",
+        "mode" : "thrpt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "true"
+        },
+        "primaryMetric" : {
+            "score" : 0.5365829903782979,
+            "scoreError" : 0.012964480012927564,
+            "scoreConfidence" : [
+                0.5236185103653703,
+                0.5495474703912255
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.5312183805093482,
+                "50.0" : 0.5369881342486766,
+                "90.0" : 0.5404145217661175,
+                "95.0" : 0.5404145217661175,
+                "99.0" : 0.5404145217661175,
+                "99.9" : 0.5404145217661175,
+                "99.99" : 0.5404145217661175,
+                "99.999" : 0.5404145217661175,
+                "99.9999" : 0.5404145217661175,
+                "100.0" : 0.5404145217661175
+            },
+            "scoreUnit" : "ops/us",
+            "rawData" : [
+                [
+                    0.5404145217661175,
+                    0.5364113080066392,
+                    0.5378826073607085,
+                    0.5312183805093482,
+                    0.5369881342486766
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "false"
+        },
+        "primaryMetric" : {
+            "score" : 0.13554027025496396,
+            "scoreError" : 0.03365778657281385,
+            "scoreConfidence" : [
+                0.10188248368215011,
+                0.1691980568277778
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.1289493653320168,
+                "50.0" : 0.13395481618533622,
+                "90.0" : 0.15063462141126716,
+                "95.0" : 0.15063462141126716,
+                "99.0" : 0.15063462141126716,
+                "99.9" : 0.15063462141126716,
+                "99.99" : 0.15063462141126716,
+                "99.999" : 0.15063462141126716,
+                "99.9999" : 0.15063462141126716,
+                "100.0" : 0.15063462141126716
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    0.13009566087928023,
+                    0.13406688746691936,
+                    0.15063462141126716,
+                    0.1289493653320168,
+                    0.13395481618533622
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.defaultPatternLog",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "true"
+        },
+        "primaryMetric" : {
+            "score" : 1.6067894337782451,
+            "scoreError" : 0.06835743726650945,
+            "scoreConfidence" : [
+                1.5384319965117357,
+                1.6751468710447546
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.5891198994854614,
+                "50.0" : 1.5999309271915567,
+                "90.0" : 1.6333283954315183,
+                "95.0" : 1.6333283954315183,
+                "99.0" : 1.6333283954315183,
+                "99.9" : 1.6333283954315183,
+                "99.99" : 1.6333283954315183,
+                "99.999" : 1.6333283954315183,
+                "99.9999" : 1.6333283954315183,
+                "100.0" : 1.6333283954315183
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    1.6333283954315183,
+                    1.5891198994854614,
+                    1.5959104276777776,
+                    1.615657519104912,
+                    1.5999309271915567
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "false"
+        },
+        "primaryMetric" : {
+            "score" : 0.5532685982765119,
+            "scoreError" : 0.21202402727068845,
+            "scoreConfidence" : [
+                0.3412445710058234,
+                0.7652926255472003
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.5268282969421403,
+                "50.0" : 0.5299898654459336,
+                "90.0" : 0.6517254892260262,
+                "95.0" : 0.6517254892260262,
+                "99.0" : 0.6517254892260262,
+                "99.9" : 0.6517254892260262,
+                "99.99" : 0.6517254892260262,
+                "99.999" : 0.6517254892260262,
+                "99.9999" : 0.6517254892260262,
+                "100.0" : 0.6517254892260262
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    0.6517254892260262,
+                    0.5268282969421403,
+                    0.5304557862701226,
+                    0.5299898654459336,
+                    0.5273435534983367
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.jacksonEncoderLog",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "true"
+        },
+        "primaryMetric" : {
+            "score" : 2.038690560931902,
+            "scoreError" : 0.06961030240085701,
+            "scoreConfidence" : [
+                1.9690802585310452,
+                2.1083008633327593
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2.0228313090200603,
+                "50.0" : 2.030999893395124,
+                "90.0" : 2.061690464648696,
+                "95.0" : 2.061690464648696,
+                "99.0" : 2.061690464648696,
+                "99.9" : 2.061690464648696,
+                "99.99" : 2.061690464648696,
+                "99.999" : 2.061690464648696,
+                "99.9999" : 2.061690464648696,
+                "100.0" : 2.061690464648696
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    2.054252584985037,
+                    2.030999893395124,
+                    2.0228313090200603,
+                    2.023678552610594,
+                    2.061690464648696
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "false"
+        },
+        "primaryMetric" : {
+            "score" : 0.5304576295062339,
+            "scoreError" : 0.01744997443603507,
+            "scoreConfidence" : [
+                0.5130076550701989,
+                0.5479076039422689
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.525107714103297,
+                "50.0" : 0.5305882352941177,
+                "90.0" : 0.5371584136702299,
+                "95.0" : 0.5371584136702299,
+                "99.0" : 0.5371584136702299,
+                "99.9" : 0.5371584136702299,
+                "99.99" : 0.5371584136702299,
+                "99.999" : 0.5371584136702299,
+                "99.9999" : 0.5371584136702299,
+                "100.0" : 0.5371584136702299
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    0.5371584136702299,
+                    0.5305882352941177,
+                    0.5316545173052052,
+                    0.525107714103297,
+                    0.5277792671583197
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "hr.hrg.dialog.logback.LogbackWriterComparisonBenchmark.optimizedJsonLog",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe",
+        "jvmArgs" : [
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED"
+        ],
+        "jdkVersion" : "25.0.3",
+        "vmName" : "Java HotSpot(TM) 64-Bit Server VM",
+        "vmVersion" : "25.0.3+9-LTS-195",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "includeThrowable" : "true"
+        },
+        "primaryMetric" : {
+            "score" : 1.9133927771970907,
+            "scoreError" : 0.17071810754768146,
+            "scoreConfidence" : [
+                1.7426746696494093,
+                2.084110884744772
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.8811217653619576,
+                "50.0" : 1.894553719878725,
+                "90.0" : 1.9909745561184315,
+                "95.0" : 1.9909745561184315,
+                "99.0" : 1.9909745561184315,
+                "99.9" : 1.9909745561184315,
+                "99.99" : 1.9909745561184315,
+                "99.999" : 1.9909745561184315,
+                "99.9999" : 1.9909745561184315,
+                "100.0" : 1.9909745561184315
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    1.8811217653619576,
+                    1.8932029705675624,
+                    1.894553719878725,
+                    1.9071108740587768,
+                    1.9909745561184315
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    }
+]
+
+

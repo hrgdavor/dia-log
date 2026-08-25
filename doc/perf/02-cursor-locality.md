@@ -12,13 +12,16 @@ call, cannot see what bytes were written, and each call re-checks capacity.
 Writing a log event field-by-field through `OutputStream` costs a virtual call
 per token plus an `arraycopy` per token.
 
-The alternative: pull the buffer and cursor into **stack locals**. The
-capacity is always `buf.length` — the buffer object keeps no separate `limit`
-field, so there is nothing extra to fetch after a grow:
+The alternative: pull the buffer and cursor into **stack locals**. The event
+buffer is fixed-capacity (no-grow — see
+[`t12-no-grow-negated-position-buffer.md`](../perf-exploration/t12-no-grow-negated-position-buffer.md)):
+`limit` is computed once at the top of the assembly, and `buf`/`limit` never
+change, so there is nothing to re-fetch:
 
 ```java
-byte[] buf = rbo.buf;     // the reusable event buffer
-int pos = 0;              // the cursor
+byte[] buf = rbo.buf;        // the reusable event buffer (fixed capacity)
+int pos = 0;                 // the cursor
+int limit = buf.length - RESERVE;   // hard boundary, computed once (T12)
 
 // straight-line stores, all through the SAME locals
 buf[pos++] = ',';
@@ -27,24 +30,59 @@ pos += 8;
 ```
 
 Now C2 sees `buf` and `pos` as register-resident values for the whole event:
-stores are direct, capacity checks are one compare against `buf.length`, and
-the JIT can inline every small static helper. The cursor is published back to
+stores are direct, capacity checks are one compare against `limit`, and the
+JIT can inline every small static helper. The cursor is published back to
 the buffer object exactly once at the end.
 
 ## The pattern, concretely
 
-1. **Snap the cursor** at the start: `byte[] buf = rbo.buf; int pos = 0;`.
+1. **Snap the cursor** at the start: `byte[] buf = rbo.buf; int pos = 0;`
+   and compute the stable boundary `int limit = buf.length - RESERVE;`.
 2. **Check capacity inline before a store group**, not per byte:
-   `if (pos + need > buf.length) { buf = rbo.grow(pos + need); }`
-   — the grow is the cold path, inside the `if`, and `grow` returns the
-   (possibly reallocated) buffer so the local `buf` stays current without a
-   separate field read.
+   `if (pos + need > limit) { /* finalize — replace the value or close */ }`
+   The limit-aware writers do the check *between* SWAR blocks
+   (`pos + LIMIT_MARGIN > limit`, one compare per 16-byte block, never per
+   byte) and return the **negated position** (`-pos`) on overflow so the
+   caller restores its cursor and finalizes (T12).
 3. **Store directly** into `buf[pos..]` with byte stores and VarHandle word
    stores; advance `pos` by the bytes consumed.
-4. **Re-read the buffer** after any call that can grow or publish
-   (`buf = rbo.buf;`). The capacity is always `buf.length`, so no separate
-   `limit` re-read is needed.
+4. **Never re-read the buffer.** `buf`/`limit` are stable — the buffer never
+   reallocates, so there are no `buf = rbo.buf;` re-reads after a write.
 5. **Publish once** at the end (`rbo.pos = pos`).
+
+## The negated-position contract
+
+Every variable-length writer targeting the no-grow buffer
+(`WriteOps.writeEscapedJsonStringNoGrow`, `WriteOps.writeRawNoGrow`,
+`DirectJsonStringWriter.writeJsonStringNoGrow`, `StringByteExtractor.writeLatin1NoGrow`)
+returns the **new position** on success, or **`-pos`** (the pre-call
+position, negated) on overflow:
+
+```java
+pos = writeEscapedJsonStringNoGrow(buf, pos, limit, value);
+if (pos < 0) {
+    pos = -pos;                            // restore pre-call position
+    pos = writeTooLargeField(buf, pos);    // "V2BIG" — value overflow
+}
+```
+
+Why negated (not `-1` or an output parameter):
+
+- The caller accepts the result in the **same cursor local** — no separate
+  "did it overflow?" boolean, no conditional assign, no extra parameter.
+- On overflow, negating recovers the exact position before the write, so the
+  caller overwrites from the right offset.
+- **Partial buffer writes are harmless**: the chunked loop may store bytes
+  past the returned position before the margin check fires, but `pos` is
+  caller-owned and reverts to its pre-call value, so that buffer garbage is
+  never seen or flushed. The buffer is never overflown — the chunked
+  `pos + MARGIN > limit` check fires while a full chunk remains, and `MARGIN`
+  exceeds the worst-case expansion of one chunk.
+
+The intermediate body writers (`writeEscapedLatin1NoGrow`,
+`writeEscapedCharsNoGrow`) return `-internalPos` after partial writes; the
+quoted top-level (`writeJsonStringNoGrow`) normalizes to `-start`, which is
+the magnitude callers rely on.
 
 ## Why capacity is checked with the *whole word-slot* in mind
 
@@ -57,8 +95,8 @@ check must reserve **whole 8-byte word slots** — `packedKeyBytes(len) =
 constant *is* that rounded size, so the check reads a constant:
 
 ```java
-if (pos + 1 + KEY_LOGGER_LEN_BUF > buf.length) {
-    buf = rbo.grow(pos + 1 + KEY_LOGGER_LEN_BUF);
+if (pos + 1 + KEY_LOGGER_LEN_BUF > limit) {
+    throw new BufferFullException();       // no room for the ',' + key prefix
 }
 ```
 
@@ -70,6 +108,10 @@ if (pos + 1 + KEY_LOGGER_LEN_BUF > buf.length) {
   re-entrancy corruption.
 - **A helper method between the cursor and the byte stores in steady state** —
   the store path must be straight-line or a `static` method the JIT inlines.
+- **Growing the event buffer** — reallocation breaks `buf`/`limit`
+  register residency, allocates on the hot path, and forces re-reads. The
+  buffer is fixed; an oversized value is replaced with the `"V2BIG"`
+  placeholder or the object is closed (T12).
 
 ## What it buys, measured
 

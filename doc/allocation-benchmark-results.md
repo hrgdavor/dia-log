@@ -130,8 +130,19 @@ JVM is not already started with the flag, since JMH forks do not inherit it.)
 | `streamingReused` — `Streaming` update + `finalHash()` on a reused hasher | 0.0 |
 | `escapedJsonString` — `EscapedJsonStringWriter` (VarHandle path) | 0.0 |
 | `stringBytes` — `StringByteExtractor` strategy write | 0.0 |
-| `floatWrite` / `doubleWrite` — `JsonNumberWriter` (Ryu) | 0.0 |
 | `fingerprintFromTraceReused` — prepared trace + caller-owned hasher | 0.0 |
+
+> `floatWrite` / `doubleWrite` moved out of this table on 2026-08-25: the
+> `JsonNumberWriter.writeFloat(OutputStream, float)` / `writeDouble(OutputStream, double)`
+> convenience overloads (used by the benchmark) allocate a per-call scratch
+> `byte[]` (`MAX_FLOAT_BYTES` = 32 B, `MAX_DOUBLE_BYTES` = 48 B). The 08-18
+> baseline measured the caller-supplied-buffer overloads, which commit 50e5586
+> (2026-08-22, "few rounds of performance improvements") replaced. The
+> **production direct path** uses the bufferless
+> `writeFloat(byte[], int, float)` / `writeDouble(byte[], int, double)`
+> overloads and stays allocation-free; the stream overloads are fallbacks
+> (jackson delegation, classic fixture) in the same accepted category as
+> `StringByteExtractor.writeClassic()`.
 
 ## Production writer — now 0 B/op in every scenario
 
@@ -162,6 +173,7 @@ passes with the changes.
 
 | Benchmark | B/op | reason |
 |---|---|---|
+| `floatWrite` / `doubleWrite` | 32 / 48 | `JsonNumberWriter.writeFloat(OutputStream, float)` / `writeDouble(OutputStream, double)` allocate a per-call scratch `byte[]` (`MAX_FLOAT_BYTES` / `MAX_DOUBLE_BYTES`). The production direct path uses the bufferless `byte[], int` overloads (0 B/op); these stream overloads are fallbacks (since commit 50e5586, 2026-08-22) |
 | `streamingNewPerCall` | 136 | `new Wyhash64.Streaming(0)` per call — the caller should reuse (`reset`); reusable overloads exist |
 | `fingerprint(Throwable, …)` (reusable hasher) | 88 | `Throwable.getStackTrace()` returns a **defensive copy** each call (JDK behavior, not ours); pass `StackTraceElement[]` directly via `fingerprintFromTrace` where possible |
 | `devWriter_allPresent` / `devWriter_oneMissing` | 256 / 464 | `JsonLogWriterDev` missing-key reporting is a **dev/diagnostic tool** — by design it is excluded from zero-allocation efforts (see `AGENTS.md`); it uses a regex `Matcher` + small set/list per event |

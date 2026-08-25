@@ -8,7 +8,8 @@ byte-identity test. This page is the "how".
 1. **Byte-identical output is the contract.** Before any timing matters, the
    fast path must produce exactly the bytes of the plain-stream path for every
    event shape. `JsonLogWriterDirectBufferTest` enforces this (including
-   tiny-buffer cases that force every capacity-check grow branch).
+   tiny-buffer cases, which now assert the no-grow `BufferFullException`
+   contract instead of forcing grow branches).
 2. **Zero allocation is a property, not an aspiration.** Measure
    `gc.alloc.rate.norm` with `-prof gc`; the hot path must be ≈ 0 B/op.
    Allocating in a benchmark's *fallback* leg is a documented trade-off, never

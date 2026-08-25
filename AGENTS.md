@@ -123,8 +123,8 @@ position on success, or the negated position (`-pos`) on overflow**:
 pos = writeEscapedJsonString(buf, pos, limit, value);
 if (pos < 0) {
     pos = -pos;                              // restore pre-call position
-    pos = writeTooLargeAndClose(buf, pos);   // "VALUE_TOO_LARGE"}
-    return pos;                              // early exit — buffer never overflowed
+    pos = writeTooLargeField(buf, pos);      // "V2BIG" — value overflow, object stays open
+    // key overflow instead: pos = writeTooLargeAndClose(buf, pos);  // "}" — early exit
 }
 ```
 
@@ -140,12 +140,14 @@ Why negated (not `-1` or an output-parameter):
   `pos + MARGIN > limit` check fires while a full chunk remains, and `MARGIN`
   exceeds the worst-case expansion of one chunk.
 
-This contract applies to `WriteOps.writeEscapedJsonString(...)`,
-`WriteOps.writeRaw(...)`, `DirectJsonStringWriter` / `EscapedJsonStringWriter`
-limit-aware overloads, and `StringByteExtractor.writeLatin1Direct` when
+This contract applies to `WriteOps.writeEscapedJsonStringNoGrow(...)`,
+`WriteOps.writeRawNoGrow(...)`, `DirectJsonStringWriter` / `EscapedJsonStringWriter`
+limit-aware overloads, and `StringByteExtractor.writeLatin1NoGrow` when
 limit-aware. It is the standard way the no-grow event assembly (`JsonLogWriter.
-writeJsonEventDirect`) consumes variable-length writers and finalizes with
-`"VALUE_TOO_LARGE"}` + early exit on overflow.
+writeJsonEventDirect`) consumes variable-length writers and finalizes: a value
+overflow writes the packed `"V2BIG"` placeholder (`writeTooLargeField`, object
+stays open), a field key that no longer fits closes the object
+(`writeTooLargeAndClose` writes `}`) with an early return.
 
 ### Packed-Long String Writing (overwrite trick)
 
@@ -193,9 +195,10 @@ the full explanation.
 
 ### JSON Escape Discipline
 
-All string keys passed to `writeFieldPrefixRawKey()` in `JsonLogWriter.java` are **JSON-escaped**
-(quotes, backslash, control chars) via `EscapedJsonStringWriter`, because KV/MDC keys are user
-input. Raw unescaped bytes are written only where the caller explicitly requests raw JSON
+All string keys written by `JsonLogWriter` (the KV/MDC key path, via
+`WriteOps.writeEscapedJsonStringNoGrow`) are **JSON-escaped** (quotes,
+backslash, control chars), because KV/MDC keys are user input. Raw unescaped
+bytes are written only where the caller explicitly requests raw JSON
 (`RawValue` / `RawJsonBytes` passthrough).
 
 ### Java Markdown Comments (`///`)

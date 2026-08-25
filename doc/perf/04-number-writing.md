@@ -85,9 +85,9 @@ Two details make it work in practice:
   table (`TRAILING_TRIPLES`): one `LE_INT` store writes the significant digits
   first and a trailing `'0'` that is overwritten by the next group or lies past
   the returned position. The caller's buffer must leave ≥ 4 bytes of room at
-  the offset (the production callers already ensure `MAX_INT_BYTES` /
-  `MAX_LONG_BYTES`). This is the same "full-store/partial-advance" overwrite
-  trick as T8.
+  the offset (the production callers already check
+  `pos + MAX_INT_BYTES / MAX_LONG_BYTES > limit` before the store). This is the
+  same "full-store/partial-advance" overwrite trick as T8.
 
 The digit count is decided by a comparison ladder (`< 10 / < 100 / < 1000 /
 < 10000`) — for short values those 1–4 well-predicted branches are cheaper than

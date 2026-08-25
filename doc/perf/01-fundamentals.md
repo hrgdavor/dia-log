@@ -58,10 +58,13 @@ These are the project-wide rules that every technique below implements:
   documented, compelling reason. (`ThreadLocalRandom` is the standard JDK RNG
   and is *not* a `ThreadLocal`; it is fine to use for non-deterministic
   identifiers and benchmark data.)
-- **Capacity is checked inline, once, before the stores.** The classic pattern
-  is `if (pos + need > limit) grow();` — the cold grow is inside the `if`, and
-  the hot path is straight-line stores. Never return an array or an object from
-  a capacity check (that defeats register residency).
+- **Capacity is checked inline, once, before the stores.** The event buffer is
+  fixed-capacity (no-grow): the limit-aware writers check
+  `pos + need > limit` once per store group — or once per SWAR block via the
+  `LIMIT_MARGIN` guard — and on overflow return the **negated position** so the
+  caller finalizes (replaces the value with a placeholder, closes the object)
+  instead of growing. Never return an array or an object from a capacity check
+  (that defeats register residency).
 - **Static data is packed at build time.** Field prefixes, `null`/`true`/
   `false`, digit tables — anything fixed is precomputed (constants, generated
   literals) so the hot path does arithmetic and stores, not lookups and copies.

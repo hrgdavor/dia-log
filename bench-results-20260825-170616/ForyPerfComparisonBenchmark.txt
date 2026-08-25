@@ -1,0 +1,896 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingClassic
+
+# Run progress: 0.00% complete, ETA 00:03:20
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 54.966 ns/op
+# Warmup Iteration   2: 55.887 ns/op
+# Warmup Iteration   3: 38.415 ns/op
+Iteration   1: 39.655 ns/op
+Iteration   2: 39.819 ns/op
+Iteration   3: 39.846 ns/op
+Iteration   4: 39.604 ns/op
+Iteration   5: 39.563 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingClassic":
+  39.697 ±(99.9%) 0.492 ns/op [Average]
+  (min, avg, max) = (39.563, 39.697, 39.846), stdev = 0.128
+  CI (99.9%): [39.205, 40.189] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyClassic
+
+# Run progress: 4.00% complete, ETA 00:03:18
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 535.075 ns/op
+# Warmup Iteration   2: 520.600 ns/op
+# Warmup Iteration   3: 550.799 ns/op
+Iteration   1: 565.835 ns/op
+Iteration   2: 541.032 ns/op
+Iteration   3: 537.473 ns/op
+Iteration   4: 537.692 ns/op
+Iteration   5: 536.013 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyClassic":
+  543.609 ±(99.9%) 48.364 ns/op [Average]
+  (min, avg, max) = (536.013, 543.609, 565.835), stdev = 12.560
+  CI (99.9%): [495.246, 591.973] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewDirect
+
+# Run progress: 8.00% complete, ETA 00:03:10
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 147.531 ns/op
+# Warmup Iteration   2: 144.675 ns/op
+# Warmup Iteration   3: 145.915 ns/op
+Iteration   1: 156.473 ns/op
+Iteration   2: 151.106 ns/op
+Iteration   3: 150.413 ns/op
+Iteration   4: 151.088 ns/op
+Iteration   5: 150.773 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewDirect":
+  151.971 ±(99.9%) 9.752 ns/op [Average]
+  (min, avg, max) = (150.413, 151.971, 156.473), stdev = 2.533
+  CI (99.9%): [142.218, 161.723] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewStream
+
+# Run progress: 12.00% complete, ETA 00:03:02
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 894.938 ns/op
+# Warmup Iteration   2: 907.087 ns/op
+# Warmup Iteration   3: 900.760 ns/op
+Iteration   1: 918.196 ns/op
+Iteration   2: 908.066 ns/op
+Iteration   3: 903.602 ns/op
+Iteration   4: 908.525 ns/op
+Iteration   5: 925.440 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingHeavyNewStream":
+  912.766 ±(99.9%) 34.125 ns/op [Average]
+  (min, avg, max) = (903.602, 912.766, 925.440), stdev = 8.862
+  CI (99.9%): [878.641, 946.891] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingLongNewDirect
+
+# Run progress: 16.00% complete, ETA 00:02:53
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 42.558 ns/op
+# Warmup Iteration   2: 42.399 ns/op
+# Warmup Iteration   3: 42.105 ns/op
+Iteration   1: 43.462 ns/op
+Iteration   2: 43.360 ns/op
+Iteration   3: 43.771 ns/op
+Iteration   4: 43.529 ns/op
+Iteration   5: 48.621 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingLongNewDirect":
+  44.548 ±(99.9%) 8.785 ns/op [Average]
+  (min, avg, max) = (43.360, 44.548, 48.621), stdev = 2.281
+  CI (99.9%): [35.764, 53.333] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewDirect
+
+# Run progress: 20.00% complete, ETA 00:02:45
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 31.595 ns/op
+# Warmup Iteration   2: 30.953 ns/op
+# Warmup Iteration   3: 30.708 ns/op
+Iteration   1: 32.123 ns/op
+Iteration   2: 31.691 ns/op
+Iteration   3: 31.608 ns/op
+Iteration   4: 31.801 ns/op
+Iteration   5: 31.739 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewDirect":
+  31.793 ±(99.9%) 0.762 ns/op [Average]
+  (min, avg, max) = (31.608, 31.793, 32.123), stdev = 0.198
+  CI (99.9%): [31.031, 32.555] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewStream
+
+# Run progress: 24.00% complete, ETA 00:02:37
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 53.198 ns/op
+# Warmup Iteration   2: 52.073 ns/op
+# Warmup Iteration   3: 52.871 ns/op
+Iteration   1: 54.281 ns/op
+Iteration   2: 54.163 ns/op
+Iteration   3: 54.843 ns/op
+Iteration   4: 62.531 ns/op
+Iteration   5: 54.668 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.escapingNewStream":
+  56.097 ±(99.9%) 13.891 ns/op [Average]
+  (min, avg, max) = (54.163, 56.097, 62.531), stdev = 3.607
+  CI (99.9%): [42.207, 69.988] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.intClassic
+
+# Run progress: 28.00% complete, ETA 00:02:28
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 21.461 ns/op
+# Warmup Iteration   2: 21.451 ns/op
+# Warmup Iteration   3: 20.115 ns/op
+Iteration   1: 20.600 ns/op
+Iteration   2: 20.584 ns/op
+Iteration   3: 20.700 ns/op
+Iteration   4: 20.625 ns/op
+Iteration   5: 20.726 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.intClassic":
+  20.647 ±(99.9%) 0.241 ns/op [Average]
+  (min, avg, max) = (20.584, 20.647, 20.726), stdev = 0.063
+  CI (99.9%): [20.406, 20.888] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.intNew
+
+# Run progress: 32.00% complete, ETA 00:02:20
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 22.948 ns/op
+# Warmup Iteration   2: 22.548 ns/op
+# Warmup Iteration   3: 19.723 ns/op
+Iteration   1: 20.026 ns/op
+Iteration   2: 21.187 ns/op
+Iteration   3: 21.870 ns/op
+Iteration   4: 20.011 ns/op
+Iteration   5: 20.149 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.intNew":
+  20.649 ±(99.9%) 3.236 ns/op [Average]
+  (min, avg, max) = (20.011, 20.649, 21.870), stdev = 0.840
+  CI (99.9%): [17.413, 23.885] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.intSmallClassic
+
+# Run progress: 36.00% complete, ETA 00:02:12
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 16.164 ns/op
+# Warmup Iteration   2: 16.191 ns/op
+# Warmup Iteration   3: 14.731 ns/op
+Iteration   1: 15.533 ns/op
+Iteration   2: 20.866 ns/op
+Iteration   3: 15.818 ns/op
+Iteration   4: 15.219 ns/op
+Iteration   5: 15.084 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.intSmallClassic":
+  16.504 ±(99.9%) 9.453 ns/op [Average]
+  (min, avg, max) = (15.084, 16.504, 20.866), stdev = 2.455
+  CI (99.9%): [7.051, 25.957] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.intSmallNew
+
+# Run progress: 40.00% complete, ETA 00:02:04
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 17.073 ns/op
+# Warmup Iteration   2: 16.898 ns/op
+# Warmup Iteration   3: 17.109 ns/op
+Iteration   1: 19.269 ns/op
+Iteration   2: 17.372 ns/op
+Iteration   3: 17.563 ns/op
+Iteration   4: 17.214 ns/op
+Iteration   5: 17.294 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.intSmallNew":
+  17.742 ±(99.9%) 3.324 ns/op [Average]
+  (min, avg, max) = (17.214, 17.742, 19.269), stdev = 0.863
+  CI (99.9%): [14.418, 21.066] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1AccentedClassic
+
+# Run progress: 44.00% complete, ETA 00:01:55
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 409.564 ns/op
+# Warmup Iteration   2: 370.570 ns/op
+# Warmup Iteration   3: 368.921 ns/op
+Iteration   1: 375.550 ns/op
+Iteration   2: 387.014 ns/op
+Iteration   3: 375.485 ns/op
+Iteration   4: 379.236 ns/op
+Iteration   5: 380.812 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1AccentedClassic":
+  379.619 ±(99.9%) 18.256 ns/op [Average]
+  (min, avg, max) = (375.485, 379.619, 387.014), stdev = 4.741
+  CI (99.9%): [361.364, 397.875] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1AccentedNewDirect
+
+# Run progress: 48.00% complete, ETA 00:01:47
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 184.374 ns/op
+# Warmup Iteration   2: 185.159 ns/op
+# Warmup Iteration   3: 185.980 ns/op
+Iteration   1: 199.054 ns/op
+Iteration   2: 189.118 ns/op
+Iteration   3: 187.838 ns/op
+Iteration   4: 188.039 ns/op
+Iteration   5: 219.392 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1AccentedNewDirect":
+  196.688 ±(99.9%) 52.073 ns/op [Average]
+  (min, avg, max) = (187.838, 196.688, 219.392), stdev = 13.523
+  CI (99.9%): [144.615, 248.761] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1AccentedNewStream
+
+# Run progress: 52.00% complete, ETA 00:01:39
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 433.564 ns/op
+# Warmup Iteration   2: 429.175 ns/op
+# Warmup Iteration   3: 427.889 ns/op
+Iteration   1: 443.770 ns/op
+Iteration   2: 438.257 ns/op
+Iteration   3: 441.377 ns/op
+Iteration   4: 442.975 ns/op
+Iteration   5: 442.861 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1AccentedNewStream":
+  441.848 ±(99.9%) 8.416 ns/op [Average]
+  (min, avg, max) = (438.257, 441.848, 443.770), stdev = 2.186
+  CI (99.9%): [433.432, 450.264] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1Classic
+
+# Run progress: 56.00% complete, ETA 00:01:30
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 24.733 ns/op
+# Warmup Iteration   2: 24.419 ns/op
+# Warmup Iteration   3: 24.270 ns/op
+Iteration   1: 24.916 ns/op
+Iteration   2: 24.607 ns/op
+Iteration   3: 24.589 ns/op
+Iteration   4: 24.527 ns/op
+Iteration   5: 24.614 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1Classic":
+  24.651 ±(99.9%) 0.587 ns/op [Average]
+  (min, avg, max) = (24.527, 24.651, 24.916), stdev = 0.152
+  CI (99.9%): [24.064, 25.237] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1LongNewDirect
+
+# Run progress: 60.00% complete, ETA 00:01:22
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 14.115 ns/op
+# Warmup Iteration   2: 14.109 ns/op
+# Warmup Iteration   3: 14.208 ns/op
+Iteration   1: 14.666 ns/op
+Iteration   2: 15.003 ns/op
+Iteration   3: 14.727 ns/op
+Iteration   4: 15.482 ns/op
+Iteration   5: 16.926 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1LongNewDirect":
+  15.361 ±(99.9%) 3.590 ns/op [Average]
+  (min, avg, max) = (14.666, 15.361, 16.926), stdev = 0.932
+  CI (99.9%): [11.771, 18.951] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1NewDirect
+
+# Run progress: 64.00% complete, ETA 00:01:14
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 12.064 ns/op
+# Warmup Iteration   2: 11.955 ns/op
+# Warmup Iteration   3: 11.930 ns/op
+Iteration   1: 12.226 ns/op
+Iteration   2: 12.425 ns/op
+Iteration   3: 12.333 ns/op
+Iteration   4: 12.334 ns/op
+Iteration   5: 12.253 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1NewDirect":
+  12.314 ±(99.9%) 0.302 ns/op [Average]
+  (min, avg, max) = (12.226, 12.314, 12.425), stdev = 0.079
+  CI (99.9%): [12.012, 12.617] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1NewStream
+
+# Run progress: 68.00% complete, ETA 00:01:06
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 17.571 ns/op
+# Warmup Iteration   2: 17.261 ns/op
+# Warmup Iteration   3: 18.615 ns/op
+Iteration   1: 18.697 ns/op
+Iteration   2: 18.639 ns/op
+Iteration   3: 21.372 ns/op
+Iteration   4: 19.351 ns/op
+Iteration   5: 18.755 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.latin1NewStream":
+  19.363 ±(99.9%) 4.463 ns/op [Average]
+  (min, avg, max) = (18.639, 19.363, 21.372), stdev = 1.159
+  CI (99.9%): [14.900, 23.826] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.longClassic
+
+# Run progress: 72.00% complete, ETA 00:00:57
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 34.710 ns/op
+# Warmup Iteration   2: 34.627 ns/op
+# Warmup Iteration   3: 32.449 ns/op
+Iteration   1: 33.031 ns/op
+Iteration   2: 33.293 ns/op
+Iteration   3: 33.211 ns/op
+Iteration   4: 34.177 ns/op
+Iteration   5: 33.063 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.longClassic":
+  33.355 ±(99.9%) 1.816 ns/op [Average]
+  (min, avg, max) = (33.031, 33.355, 34.177), stdev = 0.472
+  CI (99.9%): [31.539, 35.171] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.longNew
+
+# Run progress: 76.00% complete, ETA 00:00:49
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 24.250 ns/op
+# Warmup Iteration   2: 22.927 ns/op
+# Warmup Iteration   3: 24.149 ns/op
+Iteration   1: 25.597 ns/op
+Iteration   2: 28.583 ns/op
+Iteration   3: 24.949 ns/op
+Iteration   4: 25.100 ns/op
+Iteration   5: 25.007 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.longNew":
+  25.847 ±(99.9%) 5.971 ns/op [Average]
+  (min, avg, max) = (24.949, 25.847, 28.583), stdev = 1.551
+  CI (99.9%): [19.876, 31.818] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.longSmallClassic
+
+# Run progress: 80.00% complete, ETA 00:00:41
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 22.589 ns/op
+# Warmup Iteration   2: 19.803 ns/op
+# Warmup Iteration   3: 19.860 ns/op
+Iteration   1: 20.543 ns/op
+Iteration   2: 20.523 ns/op
+Iteration   3: 20.301 ns/op
+Iteration   4: 20.296 ns/op
+Iteration   5: 22.553 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.longSmallClassic":
+  20.843 ±(99.9%) 3.709 ns/op [Average]
+  (min, avg, max) = (20.296, 20.843, 22.553), stdev = 0.963
+  CI (99.9%): [17.134, 24.552] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.longSmallNew
+
+# Run progress: 84.00% complete, ETA 00:00:33
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 16.527 ns/op
+# Warmup Iteration   2: 15.616 ns/op
+# Warmup Iteration   3: 16.669 ns/op
+Iteration   1: 16.668 ns/op
+Iteration   2: 16.111 ns/op
+Iteration   3: 16.110 ns/op
+Iteration   4: 16.055 ns/op
+Iteration   5: 15.992 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.longSmallNew":
+  16.187 ±(99.9%) 1.051 ns/op [Average]
+  (min, avg, max) = (15.992, 16.187, 16.668), stdev = 0.273
+  CI (99.9%): [15.136, 17.238] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.prefixesClassicFixture
+
+# Run progress: 88.00% complete, ETA 00:00:24
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 23.078 ns/op
+# Warmup Iteration   2: 27.193 ns/op
+# Warmup Iteration   3: 24.520 ns/op
+Iteration   1: 25.262 ns/op
+Iteration   2: 25.265 ns/op
+Iteration   3: 25.262 ns/op
+Iteration   4: 25.508 ns/op
+Iteration   5: 25.196 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.prefixesClassicFixture":
+  25.299 ±(99.9%) 0.463 ns/op [Average]
+  (min, avg, max) = (25.196, 25.299, 25.508), stdev = 0.120
+  CI (99.9%): [24.835, 25.762] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.prefixesPackedDirect
+
+# Run progress: 92.00% complete, ETA 00:00:16
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 3.531 ns/op
+# Warmup Iteration   2: 3.384 ns/op
+# Warmup Iteration   3: 3.145 ns/op
+Iteration   1: 3.213 ns/op
+Iteration   2: 3.214 ns/op
+Iteration   3: 3.215 ns/op
+Iteration   4: 3.196 ns/op
+Iteration   5: 3.184 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.prefixesPackedDirect":
+  3.204 ±(99.9%) 0.053 ns/op [Average]
+  (min, avg, max) = (3.184, 3.204, 3.215), stdev = 0.014
+  CI (99.9%): [3.151, 3.258] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.ForyPerfComparisonBenchmark.prefixesStreamMediated
+
+# Run progress: 96.00% complete, ETA 00:00:08
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 24.317 ns/op
+# Warmup Iteration   2: 27.200 ns/op
+# Warmup Iteration   3: 25.475 ns/op
+Iteration   1: 26.155 ns/op
+Iteration   2: 26.259 ns/op
+Iteration   3: 26.248 ns/op
+Iteration   4: 26.198 ns/op
+Iteration   5: 27.621 ns/op
+
+
+Result "hr.hrg.dialog.core.ForyPerfComparisonBenchmark.prefixesStreamMediated":
+  26.496 ±(99.9%) 2.427 ns/op [Average]
+  (min, avg, max) = (26.155, 26.496, 27.621), stdev = 0.630
+  CI (99.9%): [24.069, 28.923] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:03:26
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                            Mode  Cnt    Score    Error  Units
+ForyPerfComparisonBenchmark.escapingClassic          avgt    5   39.697 ±  0.492  ns/op
+ForyPerfComparisonBenchmark.escapingHeavyClassic     avgt    5  543.609 ± 48.364  ns/op
+ForyPerfComparisonBenchmark.escapingHeavyNewDirect   avgt    5  151.971 ±  9.752  ns/op
+ForyPerfComparisonBenchmark.escapingHeavyNewStream   avgt    5  912.766 ± 34.125  ns/op
+ForyPerfComparisonBenchmark.escapingLongNewDirect    avgt    5   44.548 ±  8.785  ns/op
+ForyPerfComparisonBenchmark.escapingNewDirect        avgt    5   31.793 ±  0.762  ns/op
+ForyPerfComparisonBenchmark.escapingNewStream        avgt    5   56.097 ± 13.891  ns/op
+ForyPerfComparisonBenchmark.intClassic               avgt    5   20.647 ±  0.241  ns/op
+ForyPerfComparisonBenchmark.intNew                   avgt    5   20.649 ±  3.236  ns/op
+ForyPerfComparisonBenchmark.intSmallClassic          avgt    5   16.504 ±  9.453  ns/op
+ForyPerfComparisonBenchmark.intSmallNew              avgt    5   17.742 ±  3.324  ns/op
+ForyPerfComparisonBenchmark.latin1AccentedClassic    avgt    5  379.619 ± 18.256  ns/op
+ForyPerfComparisonBenchmark.latin1AccentedNewDirect  avgt    5  196.688 ± 52.073  ns/op
+ForyPerfComparisonBenchmark.latin1AccentedNewStream  avgt    5  441.848 ±  8.416  ns/op
+ForyPerfComparisonBenchmark.latin1Classic            avgt    5   24.651 ±  0.587  ns/op
+ForyPerfComparisonBenchmark.latin1LongNewDirect      avgt    5   15.361 ±  3.590  ns/op
+ForyPerfComparisonBenchmark.latin1NewDirect          avgt    5   12.314 ±  0.302  ns/op
+ForyPerfComparisonBenchmark.latin1NewStream          avgt    5   19.363 ±  4.463  ns/op
+ForyPerfComparisonBenchmark.longClassic              avgt    5   33.355 ±  1.816  ns/op
+ForyPerfComparisonBenchmark.longNew                  avgt    5   25.847 ±  5.971  ns/op
+ForyPerfComparisonBenchmark.longSmallClassic         avgt    5   20.843 ±  3.709  ns/op
+ForyPerfComparisonBenchmark.longSmallNew             avgt    5   16.187 ±  1.051  ns/op
+ForyPerfComparisonBenchmark.prefixesClassicFixture   avgt    5   25.299 ±  0.463  ns/op
+ForyPerfComparisonBenchmark.prefixesPackedDirect     avgt    5    3.204 ±  0.053  ns/op
+ForyPerfComparisonBenchmark.prefixesStreamMediated   avgt    5   26.496 ±  2.427  ns/op
+
+Benchmark result is saved to D:\wrk\java\dia-log\bench-results-20260825-170616\ForyPerfComparisonBenchmark.json

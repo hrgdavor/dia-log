@@ -97,14 +97,17 @@ public class ForyPerfEventBenchmark {
         event.getFormattedMessage();
 
         // Sanity: the classic fixture must emit exactly what the production writer emits.
+        // 64 KiB buffers — the no-grow LIMIT_MARGIN guard (1024 B) rejects long
+        // strings once the free space drops below 1024 bytes, so a sanity buffer
+        // must be well above that (the measured legs use 16 KiB).
         try {
-            ReusableByteArrayOutputStream a = new ReusableByteArrayOutputStream(1024);
+            ReusableByteArrayOutputStream a = new ReusableByteArrayOutputStream(64 * 1024);
             classicWriter.writeEvent(event, a);
-            ReusableByteArrayOutputStream b = new ReusableByteArrayOutputStream(1024);
-            writer.writeJsonEventDirect(mapper, event, b);
+            ReusableByteArrayOutputStream b = new ReusableByteArrayOutputStream(64 * 1024);
+            int bPos = writer.writeJsonEventDirect(mapper, event, b);
             assertArrayEquals(
                     java.util.Arrays.copyOf(a.buffer(), a.size()),
-                    java.util.Arrays.copyOf(b.buffer(), b.size()),
+                    java.util.Arrays.copyOf(b.buffer(), bPos),
                     "classic fixture output must equal production output");
         } catch (IOException e) {
             throw new IllegalStateException("setup sanity check failed", e);

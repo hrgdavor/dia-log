@@ -33,13 +33,17 @@ emit the escaped JSON.
 
 ## Two shapes
 
-- The **stream shape** writes through the grow-capable buffer (used by the
-  direct path's value writers and the stack-trace path). Clean runs must be
+- The **stream shape** writes through `OutputStream` (an
+  `ReusableByteArrayOutputStream` target now goes through its no-grow write
+  methods, which throw `BufferFullException` on overflow). Used by the
+  stack-trace path and the dev/classic variants. Clean runs must be
   batched into bulk `write(byte[], off, len)` calls — per-byte `write(int)` is
   measured ≈51× slower and was the dominant stack-trace-write cost.
 - The **cursor shape** (`writeEscapedJsonString(byte[] buf, int pos, String)`)
   stores straight into the caller's buffer at `pos` and returns the advanced
-  position, keeping the cursor in registers.
+  position, keeping the cursor in registers. The no-grow event assembly uses
+  the limit-aware variant `writeEscapedJsonStringNoGrow(buf, pos, limit, s)`,
+  which returns `-pos` on overflow.
 
 ## JIT lesson (worth repeating)
 

@@ -26,9 +26,11 @@ import java.nio.charset.StandardCharsets;
  *       already ensured capacity (the single cold-path check); they only store
  *       and return the advanced position. Used by the benchmark and by writers
  *       that pre-size their buffer.</li>
- *   <li><b>Grow-capable {@link ReusableByteArrayOutputStream} overloads</b> — used by the JSON
- *       direct path; they perform the inlined {@code ensure} via the cursor and
- *       are byte-identical to calling the optimized backends directly.</li>
+ *   <li><b>Limit-aware {@code byte[] buf, int pos, int limit}</b> overloads (the
+ *       {@code NoGrow} suffix) — check against {@code limit} and return the new
+ *       position, or the <b>negated position</b> ({@code -pos}) on overflow, so
+ *       the caller restores its cursor from the magnitude and finalizes. Used by
+ *       the no-grow event assembly; the backing buffer never reallocates.</li>
  * </ul>
  *
  * <p>Do <b>not</b> add naive shift-and-store number formatting here: the digit
@@ -36,7 +38,11 @@ import java.nio.charset.StandardCharsets;
  */
 public final class WriteOps {
 
-    private static final byte[] JSON_NULL = "null".getBytes(StandardCharsets.UTF_8);
+    // @CB.StrPacker private static final JSON_NULL = `null`
+    private static final long JSON_NULL_W0 = 0x000000006c6c756eL;  // "null"
+    private static final int JSON_NULL_LEN = 4;
+    private static final int JSON_NULL_LEN_BUF = 8;
+
     private static final byte[] HEX_DIGITS = "0123456789ABCDEF".getBytes(StandardCharsets.US_ASCII);
 
     /**
@@ -72,8 +78,8 @@ public final class WriteOps {
      */
     public static int writeEscapedJsonString(byte[] buf, int pos, String s) {
         if (s == null) {
-            System.arraycopy(JSON_NULL, 0, buf, pos, JSON_NULL.length);
-            return pos + JSON_NULL.length;
+            LE_LONG.set(buf, pos, JSON_NULL_W0);   // full 8-byte store, advance 4
+            return pos + JSON_NULL_LEN;
         }
         buf[pos++] = '"';
         int len = s.length();
@@ -159,26 +165,33 @@ public final class WriteOps {
     }
 
     // =========================================================================
-    // Grow-capable ReusableByteArrayOutputStream overloads (used by the JSON direct path)
+    // Limit-aware (no-grow) overloads — negated-position contract.
     // =========================================================================
 
-    /** Bulk copy through the grow-capable cursor. */
-    public static int writeRaw(ReusableByteArrayOutputStream c, byte[] src, int off, int len) {
-        c.writeRaw(src, off, len);
-        return c.position();
+    /**
+     * Writes a fully quoted, JSON-escaped string (or {@code null} literal) into
+     * {@code buf} at {@code pos}, checking against {@code limit}. Returns the new
+     * position, or {@code -pos} on overflow. The null branch stays here (so
+     * {@link DirectJsonStringWriter} needs no packed-null constants); the
+     * non-null branch delegates to {@link DirectJsonStringWriter#writeJsonStringNoGrow}.
+     */
+    public static int writeEscapedJsonStringNoGrow(byte[] buf, int pos, int limit, String s) {
+        if (s == null) {
+            if (pos + JSON_NULL_LEN_BUF > limit) return -pos;
+            LE_LONG.set(buf, pos, JSON_NULL_W0);      // full 8-byte store, advance 4
+            return pos + JSON_NULL_LEN;
+        }
+        return DirectJsonStringWriter.writeJsonStringNoGrow(buf, pos, limit, s);
     }
 
     /**
-     * Writes a fully quoted, JSON-escaped string (or {@code null} literal)
-     * through the grow-capable cursor, reusing the SWAR {@link
-     * DirectJsonStringWriter} path.
+     * Bulk copy with a limit (not {@code buf.length}) check. All-or-nothing:
+     * checks first, then copies. Returns the new position, or {@code -pos} on
+     * overflow.
      */
-    public static int writeEscapedJsonString(ReusableByteArrayOutputStream c, String s) {
-        if (s == null) {
-            c.writeRaw(JSON_NULL, 0, JSON_NULL.length);
-            return c.position();
-        }
-        DirectJsonStringWriter.writeJsonString(c, s);
-        return c.position();
+    public static int writeRawNoGrow(byte[] buf, int pos, int limit, byte[] src, int off, int len) {
+        if (pos + len > limit) return -pos;
+        System.arraycopy(src, off, buf, pos, len);
+        return pos + len;
     }
 }

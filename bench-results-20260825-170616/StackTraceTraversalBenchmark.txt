@@ -1,0 +1,371 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkStackWalkerEAFriendly
+
+# Run progress: 0.00% complete, ETA 00:01:20
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.267 ops/us
+# Warmup Iteration   2: 0.238 ops/us
+# Warmup Iteration   3: 0.270 ops/us
+Iteration   1: 0.243 ops/us
+Iteration   2: 0.237 ops/us
+Iteration   3: 0.223 ops/us
+Iteration   4: 0.240 ops/us
+Iteration   5: 0.232 ops/us
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkStackWalkerEAFriendly":
+  0.235 ±(99.9%) 0.031 ops/us [Average]
+  (min, avg, max) = (0.223, 0.235, 0.243), stdev = 0.008
+  CI (99.9%): [0.204, 0.266] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkStackWalkerNonEAFriendly
+
+# Run progress: 10.00% complete, ETA 00:01:14
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.263 ops/us
+# Warmup Iteration   2: 0.240 ops/us
+# Warmup Iteration   3: 0.275 ops/us
+Iteration   1: 0.210 ops/us
+Iteration   2: 0.236 ops/us
+Iteration   3: 0.193 ops/us
+Iteration   4: 0.206 ops/us
+Iteration   5: 0.217 ops/us
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkStackWalkerNonEAFriendly":
+  0.212 ±(99.9%) 0.061 ops/us [Average]
+  (min, avg, max) = (0.193, 0.212, 0.236), stdev = 0.016
+  CI (99.9%): [0.151, 0.274] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArray
+
+# Run progress: 20.00% complete, ETA 00:01:06
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.307 ops/us
+# Warmup Iteration   2: 0.281 ops/us
+# Warmup Iteration   3: 0.297 ops/us
+Iteration   1: 0.275 ops/us
+Iteration   2: 0.256 ops/us
+Iteration   3: 0.220 ops/us
+Iteration   4: 0.254 ops/us
+Iteration   5: 0.262 ops/us
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArray":
+  0.253 ±(99.9%) 0.077 ops/us [Average]
+  (min, avg, max) = (0.220, 0.253, 0.275), stdev = 0.020
+  CI (99.9%): [0.176, 0.330] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashFallback
+
+# Run progress: 30.00% complete, ETA 00:00:58
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.256 ops/us
+# Warmup Iteration   2: 0.268 ops/us
+# Warmup Iteration   3: 0.225 ops/us
+Iteration   1: 0.227 ops/us
+Iteration   2: 0.187 ops/us
+Iteration   3: 0.214 ops/us
+Iteration   4: 0.185 ops/us
+Iteration   5: 0.230 ops/us
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashFallback":
+  0.209 ±(99.9%) 0.082 ops/us [Average]
+  (min, avg, max) = (0.185, 0.209, 0.230), stdev = 0.021
+  CI (99.9%): [0.127, 0.291] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashZeroAlloc
+
+# Run progress: 40.00% complete, ETA 00:00:49
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.267 ops/us
+# Warmup Iteration   2: 0.278 ops/us
+# Warmup Iteration   3: 0.242 ops/us
+Iteration   1: 0.219 ops/us
+Iteration   2: 0.223 ops/us
+Iteration   3: 0.187 ops/us
+Iteration   4: 0.209 ops/us
+Iteration   5: 0.234 ops/us
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashZeroAlloc":
+  0.214 ±(99.9%) 0.069 ops/us [Average]
+  (min, avg, max) = (0.187, 0.214, 0.234), stdev = 0.018
+  CI (99.9%): [0.146, 0.283] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkStackWalkerEAFriendly
+
+# Run progress: 50.00% complete, ETA 00:00:41
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 3.785 us/op
+# Warmup Iteration   2: 3.491 us/op
+# Warmup Iteration   3: 4.078 us/op
+Iteration   1: 4.772 us/op
+Iteration   2: 4.744 us/op
+Iteration   3: 4.475 us/op
+Iteration   4: 3.836 us/op
+Iteration   5: 4.021 us/op
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkStackWalkerEAFriendly":
+  4.370 ±(99.9%) 1.633 us/op [Average]
+  (min, avg, max) = (3.836, 4.370, 4.772), stdev = 0.424
+  CI (99.9%): [2.736, 6.003] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkStackWalkerNonEAFriendly
+
+# Run progress: 60.00% complete, ETA 00:00:33
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 3.720 us/op
+# Warmup Iteration   2: 3.577 us/op
+# Warmup Iteration   3: 3.561 us/op
+Iteration   1: 3.654 us/op
+Iteration   2: 3.609 us/op
+Iteration   3: 4.039 us/op
+Iteration   4: 3.844 us/op
+Iteration   5: 3.591 us/op
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkStackWalkerNonEAFriendly":
+  3.747 ±(99.9%) 0.737 us/op [Average]
+  (min, avg, max) = (3.591, 3.747, 4.039), stdev = 0.192
+  CI (99.9%): [3.010, 4.485] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArray
+
+# Run progress: 70.00% complete, ETA 00:00:24
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 3.149 us/op
+# Warmup Iteration   2: 3.818 us/op
+# Warmup Iteration   3: 3.314 us/op
+Iteration   1: 4.585 us/op
+Iteration   2: 4.887 us/op
+Iteration   3: 4.210 us/op
+Iteration   4: 4.276 us/op
+Iteration   5: 3.826 us/op
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArray":
+  4.357 ±(99.9%) 1.544 us/op [Average]
+  (min, avg, max) = (3.826, 4.357, 4.887), stdev = 0.401
+  CI (99.9%): [2.813, 5.901] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashFallback
+
+# Run progress: 80.00% complete, ETA 00:00:16
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 3.912 us/op
+# Warmup Iteration   2: 4.287 us/op
+# Warmup Iteration   3: 3.884 us/op
+Iteration   1: 5.748 us/op
+Iteration   2: 4.974 us/op
+Iteration   3: 4.993 us/op
+Iteration   4: 4.523 us/op
+Iteration   5: 4.573 us/op
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashFallback":
+  4.962 ±(99.9%) 1.888 us/op [Average]
+  (min, avg, max) = (4.523, 4.962, 5.748), stdev = 0.490
+  CI (99.9%): [3.074, 6.851] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, Java HotSpot(TM) 64-Bit Server VM, 25.0.3+9-LTS-195
+# VM invoker: C:\Program Files\Java\jdk-25\bin\java.exe
+# VM options: --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashZeroAlloc
+
+# Run progress: 90.00% complete, ETA 00:00:08
+# Fork: 1 of 1
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/C:/Users/hrg/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 3.758 us/op
+# Warmup Iteration   2: 4.212 us/op
+# Warmup Iteration   3: 3.716 us/op
+Iteration   1: 4.689 us/op
+Iteration   2: 4.975 us/op
+Iteration   3: 4.358 us/op
+Iteration   4: 3.761 us/op
+Iteration   5: 3.727 us/op
+
+
+Result "hr.hrg.dialog.core.StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashZeroAlloc":
+  4.302 ±(99.9%) 2.135 us/op [Average]
+  (min, avg, max) = (3.727, 4.302, 4.975), stdev = 0.554
+  CI (99.9%): [2.167, 6.437] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:01:22
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                                       Mode  Cnt  Score   Error   Units
+StackTraceTraversalBenchmark.benchmarkStackWalkerEAFriendly                    thrpt    5  0.235 ± 0.031  ops/us
+StackTraceTraversalBenchmark.benchmarkStackWalkerNonEAFriendly                 thrpt    5  0.212 ± 0.061  ops/us
+StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArray                 thrpt    5  0.253 ± 0.077  ops/us
+StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashFallback   thrpt    5  0.209 ± 0.082  ops/us
+StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashZeroAlloc  thrpt    5  0.214 ± 0.069  ops/us
+StackTraceTraversalBenchmark.benchmarkStackWalkerEAFriendly                     avgt    5  4.370 ± 1.633   us/op
+StackTraceTraversalBenchmark.benchmarkStackWalkerNonEAFriendly                  avgt    5  3.747 ± 0.737   us/op
+StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArray                  avgt    5  4.357 ± 1.544   us/op
+StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashFallback    avgt    5  4.962 ± 1.888   us/op
+StackTraceTraversalBenchmark.benchmarkThrowableStackTraceArrayWyhashZeroAlloc   avgt    5  4.302 ± 2.135   us/op
+
+Benchmark result is saved to D:\wrk\java\dia-log\bench-results-20260825-170616\StackTraceTraversalBenchmark.json

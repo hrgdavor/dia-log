@@ -27,8 +27,6 @@ import java.nio.charset.StandardCharsets;
 @ThreadSafe
 public final class DirectJsonStringWriter {
 
-    private static final byte[] JSON_NULL = "null".getBytes(StandardCharsets.UTF_8);
-
     // =========================================================================
     // SWAR word scanning (T1/T2) — same predicates and constants as
     // EscapedJsonStringWriter (see its header for the math).
@@ -62,6 +60,16 @@ public final class DirectJsonStringWriter {
 
     private static final byte[] HEX_DIGITS = "0123456789ABCDEF".getBytes(StandardCharsets.US_ASCII);
 
+    /// Headroom reserved at the tail of the buffer for one worst-case SWAR block.
+    /// A 16-byte SWAR block expands to at most 96 output bytes (all control chars
+    /// → a 6-byte backslash-uXXXX escape each) for the JSON-escape path, or 32
+    /// bytes (2-byte UTF-8 each) for the Latin-1→UTF-8 path. LIMIT_MARGIN = 1024
+    /// far exceeds both, so a single {@code pos + LIMIT_MARGIN > limit} check
+    /// between SWAR blocks guarantees the tight inner loop cannot overflow. The
+    /// SWAR band boundaries (<8, 8-15, 16-24, 25-31, ≥32) are the chunk
+    /// boundaries — do not subdivide them.
+    private static final int LIMIT_MARGIN = 1024;
+
     // Zero-copy String access handles; non-null only with --add-opens.
     private static final VarHandle STRING_VALUE_HANDLE;
     private static final VarHandle STRING_CODER_HANDLE;
@@ -90,212 +98,6 @@ public final class DirectJsonStringWriter {
     }
 
     private DirectJsonStringWriter() {}
-
-    /** Writes a fully quoted JSON string (or {@code null} literal) into the cursor. */
-    public static void writeJsonStringOrNull(ReusableByteArrayOutputStream buf, String value) {
-        if (value == null) {
-            buf.writeRaw(JSON_NULL, 0, JSON_NULL.length);
-            return;
-        }
-        writeJsonString(buf, value);
-    }
-
-    /**
-     * Writes a fully quoted, JSON-escaped string into the cursor. Holds the
-     * cursor (pos + backing array) locally for the whole string and publishes it
-     * once at the end; grow only delegates to {@code buf.grow} on the cold path.
-     */
-    public static void writeJsonString(ReusableByteArrayOutputStream buf, String value) {
-        int pos = writeByteDirect(buf, buf.position(), '"');
-        if (STRING_CODER_HANDLE != null) {
-            byte[] internal = (byte[]) STRING_VALUE_HANDLE.get(value);
-            if (internal != null && ((byte) STRING_CODER_HANDLE.get(value)) == 0) {
-                pos = writeEscapedLatin1Cursor(buf, pos, internal);
-                pos = writeByteDirect(buf, pos, '"');
-                buf.setPosition(pos);
-                return;
-            }
-        }
-        pos = writeEscapedCharsCursor(buf, pos, value);
-        pos = writeByteDirect(buf, pos, '"');
-        buf.setPosition(pos);
-    }
-
-    /** Inline single-byte store with an inlined capacity check; returns the advanced position. */
-    private static int writeByteDirect(ReusableByteArrayOutputStream c, int pos, int b) {
-        byte[] buf = c.buffer();
-        if (pos >= buf.length) {
-            buf = c.grow(pos + 1);
-        }
-        buf[pos] = (byte) b;
-        return pos + 1;
-    }
-
-    /** Inline bulk copy with an inlined capacity check; returns the advanced position. */
-    private static int writeRawDirect(ReusableByteArrayOutputStream c, int pos, byte[] src, int off, int len) {
-        byte[] buf = c.buffer();
-        if (pos + len > buf.length) {
-            buf = c.grow(pos + len);
-        }
-        System.arraycopy(src, off, buf, pos, len);
-        return pos + len;
-    }
-
-    /** SWAR band scan writing straight into the cursor (Latin-1 content). */
-    private static int writeEscapedLatin1Cursor(ReusableByteArrayOutputStream c, int pos, byte[] bytes) {
-        int to = bytes.length;
-        if (to < 8) {
-            return writeEscapedLatin1PerByteCursor(c, pos, bytes, 0, to);
-        }
-        if (to <= 15) {
-            long word = (long) LE_WORD.get(bytes, 0);
-            if (isJsonAsciiWord(word) && isJsonAsciiTail(bytes, 8, to)) {
-                return writeRawDirect(c, pos, bytes, 0, to);
-            }
-            return writeEscapedLatin1PerByteCursor(c, pos, bytes, 0, to);
-        }
-        if (to <= 24) {
-            long w0 = (long) LE_WORD.get(bytes, 0);
-            long w1 = (long) LE_WORD.get(bytes, 8);
-            long w2 = (long) LE_WORD.get(bytes, to - 8);
-            if (isJsonAsciiWords3(w0, w1, w2)) {
-                // T2 three-word trick: 3 loads + 3 stores; the last store at
-                // start + (to - 8) overlaps the first two but is byte-identical.
-                byte[] buf = c.buffer();
-                if (pos + to > buf.length) {
-                    buf = c.grow(pos + to);
-                }
-                LE_WORD.set(buf, pos, w0);
-                LE_WORD.set(buf, pos + 8, w1);
-                LE_WORD.set(buf, pos + (to - 8), w2);
-                return pos + to;
-            }
-            return writeEscapedLatin1PerByteCursor(c, pos, bytes, 0, to);
-        }
-        if (to <= 31) {
-            long w0 = (long) LE_WORD.get(bytes, 0);
-            long w1 = (long) LE_WORD.get(bytes, 8);
-            long w2 = (long) LE_WORD.get(bytes, 16);
-            long w3 = (long) LE_WORD.get(bytes, to - 8);
-            if (isJsonAsciiWords4(w0, w1, w2, w3)) {
-                byte[] buf = c.buffer();
-                if (pos + to > buf.length) {
-                    buf = c.grow(pos + to);
-                }
-                LE_WORD.set(buf, pos, w0);
-                LE_WORD.set(buf, pos + 8, w1);
-                LE_WORD.set(buf, pos + 16, w2);
-                LE_WORD.set(buf, pos + (to - 8), w3);
-                return pos + to;
-            }
-            return writeEscapedLatin1PerByteCursor(c, pos, bytes, 0, to);
-        }
-        int i = 0;
-        for (; i + 16 <= to; i += 16) {
-            long w0 = (long) LE_WORD.get(bytes, i);
-            long w1 = (long) LE_WORD.get(bytes, i + 8);
-            if (isJsonAsciiWords2(w0, w1)) {
-                byte[] buf = c.buffer();
-                if (pos + 16 > buf.length) {
-                    buf = c.grow(pos + 16);
-                }
-                LE_WORD.set(buf, pos, w0);
-                LE_WORD.set(buf, pos + 8, w1);
-                pos += 16;
-            } else {
-                pos = writeEscapedLatin1PerByteCursor(c, pos, bytes, i, i + 16);
-            }
-        }
-        if (i < to) {
-            pos = writeEscapedLatin1PerByteCursor(c, pos, bytes, i, to);
-        }
-        return pos;
-    }
-
-    private static int writeEscapedLatin1PerByteCursor(ReusableByteArrayOutputStream c, int pos, byte[] bytes, int from, int to) {
-        int segmentStart = from;
-        for (int i = from; i < to; i++) {
-            int b = bytes[i] & 0xFF;
-            byte[] escape = escapeBytesForAsciiControl(b);
-            if (escape != null || b < 0x20 || b >= 0x80) {
-                if (i > segmentStart) {
-                    pos = writeRawDirect(c, pos, bytes, segmentStart, i - segmentStart);
-                }
-                pos = writeEscapedByteCursor(c, pos, b);
-                segmentStart = i + 1;
-            }
-        }
-        if (segmentStart < to) {
-            pos = writeRawDirect(c, pos, bytes, segmentStart, to - segmentStart);
-        }
-        return pos;
-    }
-
-    private static int writeEscapedByteCursor(ReusableByteArrayOutputStream c, int pos, int b) {
-        switch (b) {
-            case '"': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, '"');
-            case '\\': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, '\\');
-            case '\b': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 'b');
-            case '\f': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 'f');
-            case '\n': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 'n');
-            case '\r': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 'r');
-            case '\t': pos = writeByteDirect(c, pos, '\\'); return writeByteDirect(c, pos, 't');
-            default:
-                if (b < 0x20) {
-                    pos = writeByteDirect(c, pos, '\\');
-                    pos = writeByteDirect(c, pos, 'u');
-                    pos = writeByteDirect(c, pos, '0');
-                    pos = writeByteDirect(c, pos, '0');
-                    pos = writeByteDirect(c, pos, HEX_DIGITS[b >>> 4]);
-                    return writeByteDirect(c, pos, HEX_DIGITS[b & 0xF]);
-                } else {
-                    // Latin-1 code point to 2-byte UTF-8.
-                    pos = writeByteDirect(c, pos, 0xC0 | (b >> 6));
-                    return writeByteDirect(c, pos, 0x80 | (b & 0x3F));
-                }
-        }
-    }
-
-    /** Char-scanning UTF-8 writer for UTF-16 content or when add-opens is unavailable. */
-    private static int writeEscapedCharsCursor(ReusableByteArrayOutputStream c, int pos, String value) {
-        int len = value.length();
-        for (int i = 0; i < len; i++) {
-            char ch = value.charAt(i);
-            byte[] escape = escapeBytesForAsciiControl(ch);
-            if (escape != null) {
-                pos = writeRawDirect(c, pos, escape, 0, escape.length);
-            } else if (ch < 0x20) {
-                pos = writeByteDirect(c, pos, '\\');
-                pos = writeByteDirect(c, pos, 'u');
-                pos = writeByteDirect(c, pos, '0');
-                pos = writeByteDirect(c, pos, '0');
-                pos = writeByteDirect(c, pos, HEX_DIGITS[(ch >>> 4) & 0xF]);
-                pos = writeByteDirect(c, pos, HEX_DIGITS[ch & 0xF]);
-            } else if (ch <= 0x7F) {
-                pos = writeByteDirect(c, pos, ch);
-            } else if (ch <= 0x7FF) {
-                pos = writeByteDirect(c, pos, 0xC0 | (ch >> 6));
-                pos = writeByteDirect(c, pos, 0x80 | (ch & 0x3F));
-            } else if (Character.isHighSurrogate(ch) && i + 1 < len && Character.isLowSurrogate(value.charAt(i + 1))) {
-                int codePoint = Character.toCodePoint(ch, value.charAt(i + 1));
-                pos = writeByteDirect(c, pos, 0xF0 | (codePoint >> 18));
-                pos = writeByteDirect(c, pos, 0x80 | ((codePoint >> 12) & 0x3F));
-                pos = writeByteDirect(c, pos, 0x80 | ((codePoint >> 6) & 0x3F));
-                pos = writeByteDirect(c, pos, 0x80 | (codePoint & 0x3F));
-                i++;
-            } else if (Character.isHighSurrogate(ch) || Character.isLowSurrogate(ch)) {
-                // Lone surrogate → U+FFFD, matching the classic path.
-                pos = writeByteDirect(c, pos, 0xEF);
-                pos = writeByteDirect(c, pos, 0xBF);
-                pos = writeByteDirect(c, pos, 0xBD);
-            } else {
-                pos = writeByteDirect(c, pos, 0xE0 | (ch >> 12));
-                pos = writeByteDirect(c, pos, 0x80 | ((ch >> 6) & 0x3F));
-                pos = writeByteDirect(c, pos, 0x80 | (ch & 0x3F));
-            }
-        }
-        return pos;
-    }
 
     // ---- escape byte table (shared with the char-scan path) ----------------
 
@@ -474,5 +276,217 @@ public final class DirectJsonStringWriter {
     private static boolean isJsonAsciiByte(byte value) {
         int ch = value & 0xff;
         return ch > 0x1F && ch < 0x80 && ch != '"' && ch != '\\';
+    }
+
+    // =========================================================================
+    // Limit-aware (no-grow) overloads — return new pos, or -pos on overflow.
+    // SWAR band structure is preserved unchanged; only the capacity check
+    // between blocks is replaced by a limit check (see step 3 of the no-grow plan).
+    // =========================================================================
+
+    /// Writes a JSON-escaped Latin-1 string directly into buf[pos..limit).
+    /// Returns the new position, or -pos on overflow (the caller restores pos
+    /// from the magnitude and writes "V2BIG").
+    public static int writeEscapedLatin1NoGrow(byte[] buf, int pos, int limit, byte[] bytes) {
+        int to = bytes.length;
+        if (to < 8) {
+            return writeEscapedLatin1PerByteNoGrow(buf, pos, limit, bytes, 0, to);
+        }
+        if (to <= 15) {
+            long word = (long) LE_WORD.get(bytes, 0);
+            if (isJsonAsciiWord(word) && isJsonAsciiTail(bytes, 8, to)) {
+                if (pos + to > limit) return -pos;
+                LE_WORD.set(buf, pos, word);
+                if (to > 8) LE_WORD.set(buf, pos + (to - 8), LE_WORD.get(bytes, to - 8));
+                return pos + to;
+            }
+            return writeEscapedLatin1PerByteNoGrow(buf, pos, limit, bytes, 0, to);
+        }
+        if (to <= 24) {
+            long w0 = (long) LE_WORD.get(bytes, 0);
+            long w1 = (long) LE_WORD.get(bytes, 8);
+            long w2 = (long) LE_WORD.get(bytes, to - 8);
+            if (isJsonAsciiWords3(w0, w1, w2)) {
+                if (pos + to > limit) return -pos;
+                LE_WORD.set(buf, pos, w0);
+                LE_WORD.set(buf, pos + 8, w1);
+                LE_WORD.set(buf, pos + (to - 8), w2);
+                return pos + to;
+            }
+            return writeEscapedLatin1PerByteNoGrow(buf, pos, limit, bytes, 0, to);
+        }
+        if (to <= 31) {
+            long w0 = (long) LE_WORD.get(bytes, 0);
+            long w1 = (long) LE_WORD.get(bytes, 8);
+            long w2 = (long) LE_WORD.get(bytes, 16);
+            long w3 = (long) LE_WORD.get(bytes, to - 8);
+            if (isJsonAsciiWords4(w0, w1, w2, w3)) {
+                if (pos + to > limit) return -pos;
+                LE_WORD.set(buf, pos, w0);
+                LE_WORD.set(buf, pos + 8, w1);
+                LE_WORD.set(buf, pos + 16, w2);
+                LE_WORD.set(buf, pos + (to - 8), w3);
+                return pos + to;
+            }
+            return writeEscapedLatin1PerByteNoGrow(buf, pos, limit, bytes, 0, to);
+        }
+        // >= 32 bytes: 16-byte block loop, LIMIT_MARGIN check between blocks.
+        int i = 0;
+        for (; i + 16 <= to; i += 16) {
+            if (pos + LIMIT_MARGIN > limit) return -pos;
+            long w0 = (long) LE_WORD.get(bytes, i);
+            long w1 = (long) LE_WORD.get(bytes, i + 8);
+            if (isJsonAsciiWords2(w0, w1)) {
+                LE_WORD.set(buf, pos, w0);
+                LE_WORD.set(buf, pos + 8, w1);
+                pos += 16;
+            } else {
+                pos = writeEscapedLatin1PerByteNoGrow(buf, pos, limit, bytes, i, i + 16);
+                if (pos < 0) return pos;   // propagate negated overflow
+            }
+        }
+        if (i < to) {
+            if (pos + LIMIT_MARGIN > limit) return -pos;
+            pos = writeEscapedLatin1PerByteNoGrow(buf, pos, limit, bytes, i, to);
+            if (pos < 0) return pos;       // propagate negated overflow
+        }
+        return pos;
+    }
+
+    private static int writeEscapedLatin1PerByteNoGrow(byte[] buf, int pos, int limit,
+            byte[] bytes, int from, int to) {
+        int segmentStart = from;
+        for (int i = from; i < to; i++) {
+            int b = bytes[i] & 0xFF;
+            if (b < 0x20 || b == '"' || b == '\\' || b >= 0x80) {
+                if (i > segmentStart) {
+                    pos = writeRawNoGrow(buf, pos, limit, bytes, segmentStart, i - segmentStart);
+                    if (pos < 0) return pos;
+                }
+                pos = writeEscapedByteNoGrow(buf, pos, limit, b);
+                if (pos < 0) return pos;
+                segmentStart = i + 1;
+            }
+        }
+        if (segmentStart < to) {
+            pos = writeRawNoGrow(buf, pos, limit, bytes, segmentStart, to - segmentStart);
+        }
+        return pos;
+    }
+
+    /// Limit-aware variant of writeJsonString (non-null value only; null is handled
+    /// by WriteOps.writeEscapedJsonStringNoGrow via the packed "null" literal).
+    /// Returns new pos or -pos on overflow.
+    public static int writeJsonStringNoGrow(byte[] buf, int pos, int limit, String value) {
+        int start = pos;
+        // Room for the opening AND closing quotes: an empty body still writes
+        // the closing quote, so a single byte of headroom would return a result
+        // past limit. With this check the result is always <= limit or -start.
+        if (pos + 2 > limit) return -pos;
+        buf[pos++] = '"';
+        int bodyLimit = limit - 2;                  // reserve closing quote + 1 B headroom
+        int bodyPos;
+        if (STRING_CODER_HANDLE != null) {
+            byte[] internal = (byte[]) STRING_VALUE_HANDLE.get(value);
+            if (internal != null && ((byte) STRING_CODER_HANDLE.get(value)) == 0) {
+                bodyPos = writeEscapedLatin1NoGrow(buf, pos, bodyLimit, internal);
+            } else {
+                bodyPos = writeEscapedCharsNoGrow(buf, pos, bodyLimit, value);
+            }
+        } else {
+            bodyPos = writeEscapedCharsNoGrow(buf, pos, bodyLimit, value);
+        }
+        if (bodyPos < 0) return -start;             // overflow: revert to before opening quote
+        buf[bodyPos++] = '"';                       // always fits: bodyPos <= limit - 2
+        return bodyPos;
+    }
+
+    private static int writeRawNoGrow(byte[] buf, int pos, int limit, byte[] src, int off, int len) {
+        if (pos + len > limit) return -pos;
+        System.arraycopy(src, off, buf, pos, len);
+        return pos + len;
+    }
+
+    private static int writeByteNoGrow(byte[] buf, int pos, int limit, int b) {
+        if (pos >= limit) return -pos;
+        buf[pos] = (byte) b;
+        return pos + 1;
+    }
+
+    private static int writeEscapedByteNoGrow(byte[] buf, int pos, int limit, int b) {
+        if (pos + 6 > limit) return -pos;
+        switch (b) {
+            case '"': buf[pos++] = '\\'; buf[pos++] = '"'; break;
+            case '\\': buf[pos++] = '\\'; buf[pos++] = '\\'; break;
+            case '\b': buf[pos++] = '\\'; buf[pos++] = 'b'; break;
+            case '\f': buf[pos++] = '\\'; buf[pos++] = 'f'; break;
+            case '\n': buf[pos++] = '\\'; buf[pos++] = 'n'; break;
+            case '\r': buf[pos++] = '\\'; buf[pos++] = 'r'; break;
+            case '\t': buf[pos++] = '\\'; buf[pos++] = 't'; break;
+            default:
+                if (b < 0x20) {
+                    buf[pos++] = '\\';
+                    buf[pos++] = 'u';
+                    buf[pos++] = '0';
+                    buf[pos++] = '0';
+                    buf[pos++] = HEX_DIGITS[b >>> 4];
+                    buf[pos++] = HEX_DIGITS[b & 0xF];
+                } else {
+                    buf[pos++] = (byte) (0xC0 | (b >> 6));
+                    buf[pos++] = (byte) (0x80 | (b & 0x3F));
+                }
+        }
+        return pos;
+    }
+
+    /// Returns new pos or -pos on overflow. Byte-identical to writeEscapedCharsCursor,
+    /// adding only the per-char capacity check (this is the slow fallback path — it
+    /// already does per-char charAt + switch, so a per-char compare is negligible).
+    private static int writeEscapedCharsNoGrow(byte[] buf, int pos, int limit, String value) {
+        int len = value.length();
+        for (int i = 0; i < len; i++) {
+            char ch = value.charAt(i);
+            byte[] escape = escapeBytesForAsciiControl(ch);
+            if (escape != null) {
+                if (pos + 2 > limit) return -pos;
+                buf[pos++] = escape[0];
+                buf[pos++] = escape[1];
+            } else if (ch < 0x20) {
+                if (pos + 6 > limit) return -pos;
+                buf[pos++] = '\\';
+                buf[pos++] = 'u';
+                buf[pos++] = '0';
+                buf[pos++] = '0';
+                buf[pos++] = HEX_DIGITS[(ch >>> 4) & 0xF];
+                buf[pos++] = HEX_DIGITS[ch & 0xF];
+            } else if (ch <= 0x7F) {
+                if (pos + 1 > limit) return -pos;
+                buf[pos++] = (byte) ch;
+            } else if (ch <= 0x7FF) {
+                if (pos + 2 > limit) return -pos;
+                buf[pos++] = (byte) (0xC0 | (ch >> 6));
+                buf[pos++] = (byte) (0x80 | (ch & 0x3F));
+            } else if (Character.isHighSurrogate(ch) && i + 1 < len
+                    && Character.isLowSurrogate(value.charAt(i + 1))) {
+                if (pos + 4 > limit) return -pos;
+                int codePoint = Character.toCodePoint(ch, value.charAt(i + 1));
+                buf[pos++] = (byte) (0xF0 | (codePoint >> 18));
+                buf[pos++] = (byte) (0x80 | ((codePoint >> 12) & 0x3F));
+                buf[pos++] = (byte) (0x80 | ((codePoint >> 6) & 0x3F));
+                buf[pos++] = (byte) (0x80 | (codePoint & 0x3F));
+                i++;
+            } else if (Character.isHighSurrogate(ch) || Character.isLowSurrogate(ch)) {
+                if (pos + 3 > limit) return -pos;
+                buf[pos++] = (byte) 0xEF;
+                buf[pos++] = (byte) 0xBF;
+                buf[pos++] = (byte) 0xBD;
+            } else {
+                if (pos + 3 > limit) return -pos;
+                buf[pos++] = (byte) (0xE0 | (ch >> 12));
+                buf[pos++] = (byte) (0x80 | ((ch >> 6) & 0x3F));
+                buf[pos++] = (byte) (0x80 | (ch & 0x3F));
+            }
+        }
+        return pos;
     }
 }

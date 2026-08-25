@@ -80,6 +80,15 @@ public final class StringByteExtractor {
             MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
     private static final long HIGH_BITS = 0x8080808080808080L;
 
+    /// Headroom reserved at the tail of the buffer for one worst-case SWAR block.
+    /// An 8-byte word expands to at most 16 output bytes (2-byte UTF-8 each) for
+    /// the Latin-1→UTF-8 path; the JSON-escape path needs at most 96 B per
+    /// 16-byte block. LIMIT_MARGIN = 1024 far exceeds both, so a single
+    /// {@code pos + LIMIT_MARGIN > limit} check between words guarantees the
+    /// tight inner loop cannot overflow. The 8-byte word is the chunk boundary
+    /// — do not subdivide it.
+    private static final int LIMIT_MARGIN = 1024;
+
     /**
      * Returns true if the JVM is running the String value/coder VarHandle probe
      * (add-opens) — retained for API compatibility.
@@ -135,7 +144,9 @@ public final class StringByteExtractor {
      */
     public static void writeLatin1(OutputStream out, byte[] latin1Bytes) throws IOException {
         if (out instanceof ReusableByteArrayOutputStream rbo) {
-            writeLatin1Direct(rbo, latin1Bytes);
+            int newPos = writeLatin1NoGrow(rbo.buf, rbo.pos, rbo.buf.length, latin1Bytes);
+            if (newPos < 0) throw new BufferFullException();
+            rbo.pos = newPos;
             return;
         }
         writeLatin1Stream(out, latin1Bytes, 0, latin1Bytes.length);
@@ -188,71 +199,77 @@ public final class StringByteExtractor {
         }
     }
 
-    private static void writeLatin1Direct(ReusableByteArrayOutputStream rbo, byte[] bytes) throws IOException {
+    /**
+     * Limit-aware Latin-1→UTF-8 core: 8-byte word loop with a LIMIT_MARGIN check
+     * between words (worst case 2 B/byte, so 1024 B covers 512 source bytes per
+     * check). Returns new pos or -pos on overflow; never grows.
+     */
+    public static int writeLatin1NoGrow(byte[] buf, int pos, int limit, byte[] bytes) {
         int to = bytes.length;
         int i = 0;
         int wordEnd = to - 7;
         int segmentStart = 0;
         for (; i < wordEnd; i += 8) {
+            // Limit check between words (never inside): clean words only
+            // accumulate into the pending segment, a dirty word emits at most
+            // 16 bytes, so the margin covers the worst case.
+            if (pos + LIMIT_MARGIN > limit) return -pos;
             long word = (long) LE_WORD.get(bytes, i);
             if ((word & HIGH_BITS) == 0) {
                 continue; // clean ASCII word stays inside the pending segment
             }
             // Dirty word: copy the pending clean segment, then emit escapes for the
             // 0x80..0xFF bytes, batching any clean runs inside the word.
-            copyDirect(rbo, bytes, segmentStart, i);
+            pos = copyNoGrow(buf, pos, limit, bytes, segmentStart, i);
+            if (pos < 0) return pos;
             int runStart = i;
             for (int j = i; j < i + 8; j++) {
                 int v = bytes[j] & 0xFF;
                 if (v >= 0x80) {
-                    copyDirect(rbo, bytes, runStart, j);
-                    int pos = rbo.position();
-                    byte[] buf = rbo.buffer();
-                    if (pos + 2 > buf.length) {
-                        buf = rbo.grow(pos + 2);
-                    }
+                    pos = copyNoGrow(buf, pos, limit, bytes, runStart, j);
+                    if (pos < 0) return pos;
+                    if (pos + 2 > limit) return -pos;
                     buf[pos] = (byte) (0xC0 | (v >> 6));   // 110xxxxx
                     buf[pos + 1] = (byte) (0x80 | (v & 0x3F)); // 10xxxxxx
-                    rbo.setPosition(pos + 2);
+                    pos += 2;
                     runStart = j + 1;
                 }
             }
-            copyDirect(rbo, bytes, runStart, i + 8);
+            pos = copyNoGrow(buf, pos, limit, bytes, runStart, i + 8);
+            if (pos < 0) return pos;
             segmentStart = i + 8;
         }
-        // Tail (< 8 bytes): per-byte
+        // Tail (< 8 bytes): per-byte with exact checks — no margin needed (the
+        // tail is bounded: at most 8 source bytes → 16 output bytes).
         for (; i < to; i++) {
             int v = bytes[i] & 0xFF;
             if (v >= 0x80) {
-                copyDirect(rbo, bytes, segmentStart, i);
-                int pos = rbo.position();
-                byte[] buf = rbo.buffer();
-                if (pos + 2 > buf.length) {
-                    buf = rbo.grow(pos + 2);
-                }
+                pos = copyNoGrow(buf, pos, limit, bytes, segmentStart, i);
+                if (pos < 0) return pos;
+                if (pos + 2 > limit) return -pos;
                 buf[pos] = (byte) (0xC0 | (v >> 6));   // 110xxxxx
                 buf[pos + 1] = (byte) (0x80 | (v & 0x3F)); // 10xxxxxx
-                rbo.setPosition(pos + 2);
+                pos += 2;
                 segmentStart = i + 1;
             }
         }
         if (segmentStart < to) {
-            copyDirect(rbo, bytes, segmentStart, to);
+            pos = copyNoGrow(buf, pos, limit, bytes, segmentStart, to);
+            if (pos < 0) return pos;
         }
+        return pos;
     }
 
-    private static void copyDirect(ReusableByteArrayOutputStream rbo, byte[] src, int from, int to) {
+    private static int copyNoGrow(byte[] buf, int pos, int limit, byte[] src, int from, int to) {
         int len = to - from;
         if (len <= 0) {
-            return;
+            return pos;
         }
-        int pos = rbo.position();
-        byte[] buf = rbo.buffer();
-        if (pos + len > buf.length) {
-            buf = rbo.grow(pos + len);
+        if (pos + len > limit) {
+            return -pos;
         }
         System.arraycopy(src, from, buf, pos, len);
-        rbo.setPosition(pos + len);
+        return pos + len;
     }
 
     // =========================================================================

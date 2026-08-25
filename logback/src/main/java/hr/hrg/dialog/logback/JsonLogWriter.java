@@ -13,6 +13,7 @@ import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import hr.hrg.dialog.core.*;
 import org.slf4j.event.KeyValuePair;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.util.RawValue;
 
@@ -146,6 +147,18 @@ public class JsonLogWriter {
     public static final int JSON_FALSE_LEN = 5;
     public static final int JSON_FALSE_LEN_BUF = 8;
 
+    /// Tail reserve for the no-grow event assembly (T12):
+    /// JsonNumberWriter.MAX_DOUBLE_BYTES (25) + '}' (1) + '\n' (1) = 27.
+    /// `limit = buf.length - RESERVE` is the hard boundary the limit-aware
+    /// writers check against, so the closing '}' and the appender's newline
+    /// always fit in the reserved tail. RESERVE also exceeds the "V2BIG"
+    /// placeholder length (7), so a placeholder and any number both fit.
+    private static final int RESERVE = JsonNumberWriter.MAX_DOUBLE_BYTES + 2;
+
+    // @CB.StrPacker private static final PLACEHOLDER = `"V2BIG"`
+    private static final long PLACEHOLDER_W0 = 0x0022474942325622L; // "V2BIG"
+    private static final int PLACEHOLDER_LEN = 7;
+
     /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
     private Predicate<String> stackTraceFilter = null;
 
@@ -188,15 +201,24 @@ public class JsonLogWriter {
      * buf} and {@code int pos} live for the whole event: fixed prefixes are
      * packed-long stores, strings are escaped straight into the buffer, numbers
      * are built and copied with one bulk write — all with inlined capacity
-     * checks. Only stream-only delegations (jackson, raw values, the generated
-     * stack-trace writers, dev {@code writeExtraFields}) publish the cursor,
-     * write through the stream, then resync.
+     * checks against the stable {@code limit = buf.length - RESERVE}.
+     * <p>
+     * The buffer is fixed-capacity (no-grow, see T12): a value that overflows
+     * is replaced by the packed {@code "V2BIG"} literal and the object stays
+     * open for subsequent fields; a field key that no longer fits closes the
+     * object with {@code '}'}, leaving the already-written fields valid JSON.
+     * Only stream-only delegations (jackson, raw values, the generated
+     * stack-trace writers) commit the cursor and write through the stream.
+     * <p>
+     * The caller resets the buffer before calling and stores the returned
+     * position into {@code rbo.pos}; this method starts at {@code pos = 0}.
+     *
+     * @return the position after the closing {@code '}'}
      */
-    public void writeJsonEventDirect(ObjectMapper mapper, ILoggingEvent event, ReusableByteArrayOutputStream rbo) throws IOException {
-        rbo.reset();
+    public int writeJsonEventDirect(ObjectMapper mapper, ILoggingEvent event, ReusableByteArrayOutputStream rbo) throws IOException {
         byte[] buf = rbo.buf;
         int pos = 0;
-        int limit = buf.length;
+        int limit = buf.length - RESERVE;
         // @CB.StrPackerWrite.config buffer=buf, position=pos, limit=limit
 
         // T7 caller-owns-cursor: '{' + "ts": + timestamp are one combined
@@ -205,8 +227,11 @@ public class JsonLogWriter {
         // packed prefix is reserved as whole 8-byte word slots (KEY_TS_LEN_BUF):
         // a 6-byte key still occupies one full word.
         if (pos + KEY_TS_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES > limit) {
-            buf = rbo.grow(pos + KEY_TS_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES);
-            limit = buf.length;
+            // Unreachable at the 64-byte minimum (limit >= 37 > 0 + 8 + 20 = 28);
+            // defensive only. If it ever fired at pos == 0, emit a minimal "{}".
+            buf[pos] = '{';
+            buf[pos + 1] = '}';
+            return pos + 2;
         }
         // timestamp field ts includes starting { for object: one full 8-byte
         // word store; the cursor advances by the 6-byte key length.
@@ -217,55 +242,57 @@ public class JsonLogWriter {
         // Fixed string fields: the ',' + packed key prefix is stored inline
         // with its own range check (field names are static constants, so the
         // check is constant-foldable); the value is written separately through
-        // the grow-capable string writer. Re-read buf/limit after each (grow
-        // may reallocate).
+        // the limit-aware string writer. A key that no longer fits closes the
+        // object (writeTooLargeAndClose); a value overflow writes "V2BIG"
+        // (writeTooLargeField) and the loop continues with the next field.
         if (pos + 1 + KEY_LEVEL_LEN_BUF > limit) {
-            buf = rbo.grow(pos + 1 + KEY_LEVEL_LEN_BUF);
-            limit = buf.length;
+            return writeTooLargeAndClose(buf, pos);
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_LEVEL_W0);
         pos += 8;
-        pos = writeStringDirect(rbo, pos, event.getLevel() != null ? event.getLevel().toString() : null);
-        buf = rbo.buf;
-        limit = buf.length;
+        pos = writeEscapedJsonString(buf, pos, limit,
+                event.getLevel() != null ? event.getLevel().toString() : null);
+        if (pos < 0) {
+            pos = writeTooLargeField(buf, -pos);
+        }
 
         if (pos + 1 + KEY_LOGGER_LEN_BUF > limit) {
-            buf = rbo.grow(pos + 1 + KEY_LOGGER_LEN_BUF);
-            limit = buf.length;
+            return writeTooLargeAndClose(buf, pos);
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_LOGGER_W0);
         pos += 8;
         WriteOps.LE_LONG.set(buf, pos, KEY_LOGGER_W1); // tail: full 8-byte store
         pos += 1;                                      // advance by the 1-byte tail
-        pos = writeStringDirect(rbo, pos, event.getLoggerName());
-        buf = rbo.buf;
-        limit = buf.length;
+        pos = writeEscapedJsonString(buf, pos, limit, event.getLoggerName());
+        if (pos < 0) {
+            pos = writeTooLargeField(buf, -pos);
+        }
 
         if (pos + 1 + KEY_THREAD_LEN_BUF > limit) {
-            buf = rbo.grow(pos + 1 + KEY_THREAD_LEN_BUF);
-            limit = buf.length;
+            return writeTooLargeAndClose(buf, pos);
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_THREAD_W0);
         pos += 8;
         WriteOps.LE_LONG.set(buf, pos, KEY_THREAD_W1); // tail: full 8-byte store
         pos += 1;                                      // advance by the 1-byte tail
-        pos = writeStringDirect(rbo, pos, event.getThreadName());
-        buf = rbo.buf;
-        limit = buf.length;
+        pos = writeEscapedJsonString(buf, pos, limit, event.getThreadName());
+        if (pos < 0) {
+            pos = writeTooLargeField(buf, -pos);
+        }
 
         if (pos + 1 + KEY_MSG_LEN_BUF > limit) {
-            buf = rbo.grow(pos + 1 + KEY_MSG_LEN_BUF);
-            limit = buf.length;
+            return writeTooLargeAndClose(buf, pos);
         }
         buf[pos++] = ',';
         WriteOps.LE_LONG.set(buf, pos, KEY_MSG_W0); // 6-byte key: full store, partial advance
         pos += KEY_MSG_LEN;
-        pos = writeStringDirect(rbo, pos, event.getFormattedMessage());
-        buf = rbo.buf;
-        limit = buf.length;
+        pos = writeEscapedJsonString(buf, pos, limit, event.getFormattedMessage());
+        if (pos < 0) {
+            pos = writeTooLargeField(buf, -pos);
+        }
 
         Map<String, String> mdcMap = null;
         try {
@@ -273,28 +300,31 @@ public class JsonLogWriter {
         } catch (Exception ignored) {}
 
         // Structured key-value pairs. The caller keeps buf/pos/limit live across
-        // the loop: ','/':' are inline stores; the variable-length key/value run
-        // through the grow-capable helpers (publish + re-read after each).
+        // the loop. Keys are user input and variable-length: ',' + key + ':' is
+        // written through the limit-aware escaped writer; a key that no longer
+        // fits restores to before the ',' and closes the object, a value
+        // overflow writes "V2BIG" and the loop continues.
         List<KeyValuePair> pairs = event.getKeyValuePairs();
         if (pairs != null && !pairs.isEmpty()) {
             for (KeyValuePair kvPair : pairs) {
                 if (kvPair.key != null && kvPair.value != null) {
+                    int fieldStart = pos;                   // before the ','
                     if (pos >= limit) {
-                        buf = rbo.grow(pos + 1);
-                        limit = buf.length;
+                        return writeTooLargeAndClose(buf, fieldStart);
                     }
                     buf[pos++] = ',';
-                    pos = writeStringDirect(rbo, pos, kvPair.key);
-                    buf = rbo.buf;
-                    limit = buf.length;
+                    pos = writeEscapedJsonString(buf, pos, limit, kvPair.key);
+                    if (pos < 0) {
+                        return writeTooLargeAndClose(buf, fieldStart);
+                    }
                     if (pos >= limit) {
-                        buf = rbo.grow(pos + 1);
-                        limit = buf.length;
+                        return writeTooLargeAndClose(buf, fieldStart);
                     }
                     buf[pos++] = ':';
-                    pos = writeValueDirect(rbo, pos, kvPair.value, mapper);
-                    buf = rbo.buf;
-                    limit = buf.length;
+                    pos = writeValueDirect(buf, pos, limit, rbo, kvPair.value, mapper);
+                    if (pos < 0) {
+                        pos = writeTooLargeField(buf, -pos);   // "V2BIG" — stays open
+                    }
                 }
             }
         }
@@ -303,22 +333,23 @@ public class JsonLogWriter {
             for (Map.Entry<String, String> entry : mdcMap.entrySet()) {
                 String key = entry.getKey();
                 if (key != null && !isReserved(key)) {
+                    int fieldStart = pos;                   // before the ','
                     if (pos >= limit) {
-                        buf = rbo.grow(pos + 1);
-                        limit = buf.length;
+                        return writeTooLargeAndClose(buf, fieldStart);
                     }
                     buf[pos++] = ',';
-                    pos = writeStringDirect(rbo, pos, key);
-                    buf = rbo.buf;
-                    limit = buf.length;
+                    pos = writeEscapedJsonString(buf, pos, limit, key);
+                    if (pos < 0) {
+                        return writeTooLargeAndClose(buf, fieldStart);
+                    }
                     if (pos >= limit) {
-                        buf = rbo.grow(pos + 1);
-                        limit = buf.length;
+                        return writeTooLargeAndClose(buf, fieldStart);
                     }
                     buf[pos++] = ':';
-                    pos = writeStringDirect(rbo, pos, entry.getValue());
-                    buf = rbo.buf;
-                    limit = buf.length;
+                    pos = writeEscapedJsonString(buf, pos, limit, entry.getValue());
+                    if (pos < 0) {
+                        pos = writeTooLargeField(buf, -pos);   // "V2BIG" — stays open
+                    }
                 }
             }
         }
@@ -331,78 +362,89 @@ public class JsonLogWriter {
 
             // errClass: inline ',' + packed key prefix, value written separately.
             if (pos + 1 + KEY_ERR_CLASS_LEN_BUF > limit) {
-                buf = rbo.grow(pos + 1 + KEY_ERR_CLASS_LEN_BUF);
-                limit = buf.length;
+                return writeTooLargeAndClose(buf, pos);
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_CLASS_W0);
             pos += 8;
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_CLASS_W1); // tail: full 8-byte store
             pos += 3;                                         // advance by the 3-byte tail
-            pos = writeStringDirect(rbo, pos, throwableClassName);
-            buf = rbo.buf;
-            limit = buf.length;
+            pos = writeEscapedJsonString(buf, pos, limit, throwableClassName);
+            if (pos < 0) {
+                pos = writeTooLargeField(buf, -pos);
+            }
 
             // errMessage: inline ',' + packed key prefix, value written separately.
             if (pos + 1 + KEY_ERR_MESSAGE_LEN_BUF > limit) {
-                buf = rbo.grow(pos + 1 + KEY_ERR_MESSAGE_LEN_BUF);
-                limit = buf.length;
+                return writeTooLargeAndClose(buf, pos);
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_MESSAGE_W0);
             pos += 8;
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_MESSAGE_W1); // tail: full 8-byte store
             pos += 5;                                           // advance by the 5-byte tail
-            pos = writeStringDirect(rbo, pos, throwableMessage);
-            buf = rbo.buf;
-            limit = buf.length;
+            pos = writeEscapedJsonString(buf, pos, limit, throwableMessage);
+            if (pos < 0) {
+                pos = writeTooLargeField(buf, -pos);
+            }
 
             // The stack-trace writers are OutputStream-based (generated
-            // sanitizer derivatives — see AGENTS.md); commit the cursor, write
-            // the stack through the stream, then re-read.
+            // sanitizer derivatives — see AGENTS.md); commit the cursor and
+            // write the stack through the stream. The no-grow RBO write methods
+            // throw BufferFullException at buf.length; a thrown or reserve-
+            // overrunning stack is replaced by "V2BIG" for the whole field.
             if (pos + 1 + KEY_STACK_LEN_BUF > limit) {
-                buf = rbo.grow(pos + 1 + KEY_STACK_LEN_BUF);
-                limit = buf.length;
+                return writeTooLargeAndClose(buf, pos);
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_STACK_W0);
             pos += 8;
+            int stackFieldStart = pos;          // position of the stack VALUE
+            long fingerPrint = 0L;
             rbo.pos = pos;
-            rbo.write('"');
-            if (throwableClassName != null) {
-                STRING_STRATEGY.write(rbo, throwableClassName);
+            try {
+                rbo.write('"');
+                if (throwableClassName != null) {
+                    STRING_STRATEGY.write(rbo, throwableClassName);
+                }
+                StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
+                // Reuse this writer's hasher (owned like the number buffers) so
+                // exception events allocate nothing — the single-pass methods
+                // reset the stream internally.
+                Wyhash64.Streaming stream = fingerprintStream;
+                // micro optimization to call variant without filter
+                fingerPrint = stackTraceFilter == null ?
+                JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                    arrProxy,
+                    rbo,
+                    throwableClassName,
+                    stream
+                ) :
+                JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
+                    arrProxy,
+                    stackTraceFilter,
+                    rbo,
+                    throwableClassName,
+                    stream
+                );
+                rbo.write('"');
+                pos = rbo.pos;
+            } catch (BufferFullException e) {
+                // The stack trace exceeded the fixed buffer: replace the whole
+                // value with "V2BIG" — no '}', the object stays open.
+                pos = writeTooLargeField(buf, stackFieldStart);
             }
-            StackTraceElementProxy[] arrProxy = tp.getStackTraceElementProxyArray();
-            // Reuse this writer's hasher (owned like the number buffers) so
-            // exception events allocate nothing â€” the single-pass methods
-            // reset the stream internally.
-            Wyhash64.Streaming stream = fingerprintStream;
-            // micro optimization to call variant without filter
-            long fingerPrint = stackTraceFilter == null ?
-            JavaStackWriterLogback.addFromTraceToOutputStreamJsonAndFingerprint(
-                arrProxy,
-                rbo,
-                throwableClassName,
-                stream
-            ) : 
-            JavaStackSanitizerLogback.addFromTraceToOutputStreamJsonAndFingerprint(
-                arrProxy,
-                stackTraceFilter,
-                rbo,
-                throwableClassName,
-                stream
-            );
-            rbo.write('"');
-            rbo.resync();
-            pos = rbo.pos;
-            buf = rbo.buf;
-            limit = buf.length;
+            if (pos > limit) {
+                // The stack writers throw only at rbo.buf.length, not at the
+                // event limit — a stack that fits the buffer but overruns the
+                // reserve is also treated as overflow.
+                pos = writeTooLargeField(buf, stackFieldStart);
+            }
 
             // errHash: inline prefix + bounded long (like ts); the prefix is
             // reserved as whole 8-byte word slots.
             if (pos + 1 + KEY_ERR_HASH_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES > limit) {
-                buf = rbo.grow(pos + 1 + KEY_ERR_HASH_LEN_BUF + JsonNumberWriter.MAX_LONG_BYTES);
-                limit = buf.length;
+                return writeTooLargeAndClose(buf, pos);
             }
             buf[pos++] = ',';
             WriteOps.LE_LONG.set(buf, pos, KEY_ERR_HASH_W0);
@@ -412,21 +454,38 @@ public class JsonLogWriter {
             pos = JsonNumberWriter.writeLong(buf, pos, fingerPrint);
         }
 
-        // Dev/diagnostic extension point — OutputStream-based; commit + resync.
-        rbo.pos = pos;
-        rbo.publish();
-        writeExtraFields(event, rbo, pairs, mdcMap);
-        rbo.resync();
-        pos = rbo.pos;
-        buf = rbo.buf;
-        limit = buf.length;
-
-        // closing brace (inline)
-        if (pos >= limit) {
-            buf = rbo.grow(pos + 1);
+        // Dev/diagnostic extension point — direct-buffer; returns the new
+        // position, or the negated field-start on overflow (the caller
+        // restores to before the partial field and closes with '}').
+        int extraPos = writeExtraFields(event, buf, pos, limit, pairs, mdcMap);
+        if (extraPos < 0) {
+            pos = -extraPos;
+            pos = writeTooLargeAndClose(buf, pos);
+        } else {
+            pos = extraPos;
         }
+
+        // closing brace — RESERVE guarantees room
         buf[pos] = '}';
-        rbo.pos = pos + 1;
+        return pos + 1;
+    }
+
+    /** Writes {@code '}'} (closes the object). Used when a {@code ','} + key
+     *  prefix no longer fits; the previous field is already complete, so
+     *  closing is valid. The caller guarantees room (pos <= buf.length - 1). */
+    private static int writeTooLargeAndClose(byte[] buf, int pos) {
+        buf[pos] = '}';
+        return pos + 1;
+    }
+
+    /// Writes the packed "V2BIG" placeholder (7 bytes) without closing the
+    /// object. Used when a value overflows but its key prefix was already
+    /// written — subsequent fields can continue. The caller guarantees the
+    /// placeholder fits (the value start is <= limit, and RESERVE = 27 > 7),
+    /// so no capacity check is needed here.
+    private static int writeTooLargeField(byte[] buf, int pos) {
+        WriteOps.LE_LONG.set(buf, pos, PLACEHOLDER_W0);
+        return pos + PLACEHOLDER_LEN;
     }
 
     /**
@@ -434,15 +493,23 @@ public class JsonLogWriter {
      * warnings). Called after all regular fields but before the closing brace.
      * The default implementation writes nothing, so production output is
      * unaffected; implementations must write a complete field including its own
-     * leading comma (like {@code writeFieldPrefix}) when they want to add data.
+     * leading comma when they want to add data.
+     * <p>
+     * Returns the new position, or the negated field-start ({@code -pos}, the
+     * position before the leading comma) on overflow — the caller restores and
+     * closes the object with {@code '}'}, dropping the partial field cleanly.
      *
      * @param event  the event being serialized
-     * @param out    the target stream, positioned after the last regular field
+     * @param buf    the event buffer
+     * @param pos    the cursor, after the last regular field
+     * @param limit  the hard boundary ({@code buf.length - RESERVE})
      * @param pairs  the event's statement key/value pairs, or {@code null}
      * @param mdcMap MDC map, or {@code null} if none was available
+     * @return the new position, or {@code -pos} on overflow
      */
-    protected void writeExtraFields(ILoggingEvent event, OutputStream out, List<KeyValuePair> pairs, Map<String, String> mdcMap) throws IOException {
-        // no-op in the production writer
+    protected int writeExtraFields(ILoggingEvent event, byte[] buf, int pos, int limit,
+            List<KeyValuePair> pairs, Map<String, String> mdcMap) {
+        return pos;  // no-op
     }
 
     private boolean isReserved(String key) {
@@ -450,19 +517,6 @@ public class JsonLogWriter {
             case "ts", "level", "logger", "thread", "msg", "errClass", "errHash", "errMessage" -> true;
             default -> false;
         };
-    }
-
-    /** Writes {@code ','} + the packed key's naive String form (stream fallback path only). */
-    private static void writeFieldPrefix(OutputStream out, String key) throws IOException {
-        out.write(',');
-        out.write(key.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static void writeFieldPrefixRawKey(OutputStream out, String key) throws IOException {
-        out.write(',');
-        // Keys are user input â€” JSON-escape them (quotes, backslash, control chars).
-        EscapedJsonStringWriter.writeJsonStringOrNull(out, key);
-        out.write(':');
     }
 
     public static void writeRawValue(OutputStream out, RawValue raw, ObjectMapper mapper) throws IOException {
@@ -478,148 +532,166 @@ public class JsonLogWriter {
         mapper.writeValue(out, raw);
     }
 
-    private static void writeJsonStringOrNull(OutputStream out, String value) throws IOException {
-        EscapedJsonStringWriter.writeJsonStringOrNull(out, value);
-    }
-
     // =========================================================================
     // T4 option 2 — direct-buffer helpers
     // =========================================================================
 
-    /** Commits the local cursor, writes a JSON string through rbo, returns the new position. */
-    private static int writeStringDirect(ReusableByteArrayOutputStream rbo, int pos, String value) {
-        rbo.pos = pos;
-        return WriteOps.writeEscapedJsonString(rbo, value);
-    }
-
     /**
-     * Writes a JSON value straight into {@code rbo}, returning the advanced cursor.
-     * The cursor {@code pos} is a primitive caller-owned local: the caller passes
-     * it in and takes the new value back, so C2 keeps {@code pos} in a register
-     * across the whole serialize sequence — see {@code
-     * doc/perf-exploration/t7-cursor-locality-buffer-writer.md}. The grow-capable
-     * backend helpers ({@code WriteOps}, {@code JsonNumberWriter}) still operate on
-     * the {@code rbo.pos} field, so each branch commits the local cursor to the
-     * field once (via {@code rbo.pos = pos}) before a grow/publish, then reads the
-     * advanced value back — a single sync per value, not a field round-trip per
-     * byte. Only the stream-mediated delegations (jackson, raw values,
-     * self-writers) commit, write through the stream, resync, and return the new
-     * {@code rbo.pos}.
+     * Writes a JSON value straight into {@code buf[pos..limit)}, returning the
+     * advanced cursor. The cursor {@code pos} is a primitive caller-owned local:
+     * the caller passes it in and takes the new value back, so C2 keeps {@code
+     * pos} in a register across the whole serialize sequence — see {@code
+     * doc/perf-exploration/t7-cursor-locality-buffer-writer.md}. Scalar branches
+     * write directly into {@code buf} with an inlined capacity check against
+     * {@code limit} and return {@code -pos} on overflow; the stream-mediated
+     * delegations (jackson, raw values, self-writers) commit the local cursor to
+     * {@code rbo.pos}, write through the no-grow stream, and return
+     * {@code -valueStart} on {@link BufferFullException} or when the write lands
+     * past {@code limit}. The caller finalizes: {@code "V2BIG"} (field loop) or
+     * a close with {@code '}'}.
      */
-    private static int writeValueDirect(ReusableByteArrayOutputStream rbo, int pos, Object value, ObjectMapper mapper) throws IOException {
+    private static int writeValueDirect(byte[] buf, int pos, int limit,
+            ReusableByteArrayOutputStream rbo, Object value, ObjectMapper mapper) throws IOException {
         switch (value) {
-            case String s -> pos = writeEscapedJsonString(rbo, pos, s);
-            case CharSequence cs -> pos = writeEscapedJsonString(rbo, pos, cs.toString());
-            case Character ch -> pos = writeEscapedJsonString(rbo, pos, ch.toString());
-            case Enum<?> e -> pos = writeEscapedJsonString(rbo, pos, e.name());
-            case RawValue raw -> pos = writeRawValueDirect(rbo, pos, raw, mapper);
-            case Long l -> pos = writeLongDirect(rbo, pos, l);
-            case Integer i -> pos = writeIntDirect(rbo, pos, i);
-            case Short s -> pos = writeIntDirect(rbo, pos, s.intValue());
-            case Byte b -> pos = writeIntDirect(rbo, pos, b.intValue());
-            case Float f -> pos = writeFloatDirect(rbo, pos, f);
-            case Double d -> pos = writeDoubleDirect(rbo, pos, d);
-            case Number n -> pos = writeNumberDirect(rbo, pos, n);
+            case String s -> pos = writeEscapedJsonString(buf, pos, limit, s);
+            case CharSequence cs -> pos = writeEscapedJsonString(buf, pos, limit, cs.toString());
+            case Character ch -> pos = writeEscapedJsonString(buf, pos, limit, ch.toString());
+            case Enum<?> e -> pos = writeEscapedJsonString(buf, pos, limit, e.name());
+            case RawValue raw -> pos = writeRawValueDirect(buf, pos, limit, rbo, raw, mapper);
+            case Long l -> pos = writeLongDirect(buf, pos, limit, l);
+            case Integer i -> pos = writeIntDirect(buf, pos, limit, i);
+            case Short s -> pos = writeIntDirect(buf, pos, limit, s.intValue());
+            case Byte b -> pos = writeIntDirect(buf, pos, limit, b.intValue());
+            case Float f -> pos = writeFloatDirect(buf, pos, limit, f);
+            case Double d -> pos = writeDoubleDirect(buf, pos, limit, d);
+            case Number n -> pos = writeNumberDirect(buf, pos, limit, rbo, n);
             case Boolean b -> {
-                rbo.pos = pos;
                 if (b) {
-                    rbo.ensure(JSON_TRUE_LEN_BUF);
-                    WriteOps.LE_LONG.set(rbo.buf, pos, JSON_TRUE_W0);
+                    if (pos + JSON_TRUE_LEN_BUF > limit) return -pos;
+                    WriteOps.LE_LONG.set(buf, pos, JSON_TRUE_W0);
                     pos += JSON_TRUE_LEN;
                 } else {
-                    rbo.ensure(JSON_FALSE_LEN_BUF);
-                    WriteOps.LE_LONG.set(rbo.buf, pos, JSON_FALSE_W0);
+                    if (pos + JSON_FALSE_LEN_BUF > limit) return -pos;
+                    WriteOps.LE_LONG.set(buf, pos, JSON_FALSE_W0);
                     pos += JSON_FALSE_LEN;
                 }
             }
             case RawJsonSelfWriter w -> {
+                int valueStart = pos;
                 rbo.pos = pos;
-                rbo.publish();
-                w.writeJson(rbo);
-                rbo.resync();
-                pos = rbo.pos;
+                try {
+                    w.writeJson(rbo);
+                    pos = rbo.pos;
+                } catch (BufferFullException e) {
+                    return -valueStart;
+                }
+                if (pos > limit) return -valueStart;   // wrote into the reserve
             }
-            case RawJsonBytes b -> pos = writeRawJsonBytes(rbo, pos, b);
+            case RawJsonBytes b -> pos = writeRawJsonBytes(buf, pos, limit, b);
             default -> {
+                // jackson 3 wraps the no-grow BufferFullException in its own
+                // unchecked exception (JacksonException / DatabindException), so
+                // the catch must cover both: an unsized value that cannot be
+                // written is replaced by "V2BIG".
+                int valueStart = pos;
                 rbo.pos = pos;
-                rbo.publish();
-                mapper.writeValue(rbo, value);
-                rbo.resync();
-                pos = rbo.pos;
+                try {
+                    mapper.writeValue(rbo, value);
+                    pos = rbo.pos;
+                } catch (JacksonException | BufferFullException e) {
+                    return -valueStart;
+                }
+                if (pos > limit) return -valueStart;    // wrote into the reserve
             }
         }
         return pos;
     }
 
-    /** Commits the local cursor, writes an escaped JSON string through rbo, returns the new position. */
-    private static int writeEscapedJsonString(ReusableByteArrayOutputStream rbo, int pos, String value) {
-        rbo.pos = pos;
-        return WriteOps.writeEscapedJsonString(rbo, value);
+    /** Writes an escaped JSON string into {@code buf[pos..limit)}, returns the
+     *  new position, or {@code -pos} on overflow (the caller restores and
+     *  finalizes). */
+    private static int writeEscapedJsonString(byte[] buf, int pos, int limit, String value) {
+        return WriteOps.writeEscapedJsonStringNoGrow(buf, pos, limit, value);
     }
 
-    /** Commits the local cursor, bulk-copies pre-encoded raw JSON bytes through rbo, returns the new position. */
-    private static int writeRawJsonBytes(ReusableByteArrayOutputStream rbo, int pos, RawJsonBytes b) {
-        rbo.pos = pos;
-        return WriteOps.writeRaw(rbo, b.bytes(), 0, b.bytes().length);
+    /** Bulk-copies pre-encoded raw JSON bytes into {@code buf[pos..limit)};
+     *  returns the new position, or {@code -pos} on overflow. */
+    private static int writeRawJsonBytes(byte[] buf, int pos, int limit, RawJsonBytes b) {
+        return WriteOps.writeRawNoGrow(buf, pos, limit, b.bytes(), 0, b.bytes().length);
     }
 
-    private static int writeRawValueDirect(ReusableByteArrayOutputStream rbo, int pos, RawValue raw, ObjectMapper mapper) throws IOException {
+    /** Non-null {@link RawValue} → stream write through {@code rbo} (String
+     *  backing stays raw via {@code writeRawValue}/{@code STRING_STRATEGY},
+     *  matching current semantics); null backing → the packed {@code "null"}
+     *  literal. Returns the new position, or {@code -valueStart} on overflow. */
+    private static int writeRawValueDirect(byte[] buf, int pos, int limit,
+            ReusableByteArrayOutputStream rbo, RawValue raw, ObjectMapper mapper) throws IOException {
         Object backing = raw.rawValue();
         if (backing == null) {
-            rbo.pos = pos;
-            rbo.ensure(JSON_NULL_LEN_BUF);
-            WriteOps.LE_LONG.set(rbo.buf, pos, JSON_NULL_W0);
-            pos += JSON_NULL_LEN;
-            return pos;
+            if (pos + JSON_NULL_LEN_BUF > limit) return -pos;
+            WriteOps.LE_LONG.set(buf, pos, JSON_NULL_W0);
+            return pos + JSON_NULL_LEN;
         }
+        int valueStart = pos;
         rbo.pos = pos;
-        rbo.publish();
-        writeRawValue(rbo, raw, mapper);
-        rbo.resync();
-        return rbo.pos;
+        try {
+            writeRawValue(rbo, raw, mapper);
+            pos = rbo.pos;
+        } catch (JacksonException | BufferFullException e) {
+            // String backing throws BufferFullException directly; jackson wraps
+            // it in its own unchecked exception. Either way the value is
+            // replaced by "V2BIG".
+            return -valueStart;
+        }
+        if (pos > limit) return -valueStart;    // wrote into the reserve
+        return pos;
     }
 
-    private static int writeNumberDirect(ReusableByteArrayOutputStream rbo, int pos, Number n) throws IOException {
+    /** Arbitrary {@link Number} → stream-mediated through {@code rbo}; the
+     *  wrapper types are caught by the caller's dispatch. Returns the new
+     *  position, or {@code -valueStart} on overflow. */
+    private static int writeNumberDirect(byte[] buf, int pos, int limit,
+            ReusableByteArrayOutputStream rbo, Number n) throws IOException {
         switch (n) {
-            case Integer i -> pos = writeIntDirect(rbo, pos, i);
-            case Long l -> pos = writeLongDirect(rbo, pos, l);
-            case Short s -> pos = writeIntDirect(rbo, pos, s.intValue());
-            case Byte b -> pos = writeIntDirect(rbo, pos, b.intValue());
-            case Float f -> pos = writeFloatDirect(rbo, pos, f);
-            case Double d -> pos = writeDoubleDirect(rbo, pos, d);
+            case Integer i -> pos = writeIntDirect(buf, pos, limit, i);
+            case Long l -> pos = writeLongDirect(buf, pos, limit, l);
+            case Short s -> pos = writeIntDirect(buf, pos, limit, s.intValue());
+            case Byte b -> pos = writeIntDirect(buf, pos, limit, b.intValue());
+            case Float f -> pos = writeFloatDirect(buf, pos, limit, f);
+            case Double d -> pos = writeDoubleDirect(buf, pos, limit, d);
             default -> {
+                int valueStart = pos;
                 rbo.pos = pos;
-                rbo.publish();
-                JsonNumberWriter.writeNumber(rbo, n);
-                rbo.resync();
-                pos = rbo.pos;
+                try {
+                    JsonNumberWriter.writeNumber(rbo, n);
+                    pos = rbo.pos;
+                } catch (BufferFullException e) {
+                    return -valueStart;
+                }
+                if (pos > limit) return -valueStart;    // wrote into the reserve
             }
         }
         return pos;
     }
 
-    private static int writeIntDirect(ReusableByteArrayOutputStream rbo, int pos, int value) {
-        rbo.pos = pos;
-        rbo.ensure(JsonNumberWriter.MAX_INT_BYTES);
-        return JsonNumberWriter.writeInt(rbo.buf, pos, value);
+    private static int writeIntDirect(byte[] buf, int pos, int limit, int value) {
+        if (pos + JsonNumberWriter.MAX_INT_BYTES > limit) return -pos;
+        return JsonNumberWriter.writeInt(buf, pos, value);
     }
 
-    private static int writeLongDirect(ReusableByteArrayOutputStream rbo, int pos, long value) {
-        rbo.pos = pos;
-        rbo.ensure(JsonNumberWriter.MAX_LONG_BYTES);
-        return JsonNumberWriter.writeLong(rbo.buf, pos, value);
+    private static int writeLongDirect(byte[] buf, int pos, int limit, long value) {
+        if (pos + JsonNumberWriter.MAX_LONG_BYTES > limit) return -pos;
+        return JsonNumberWriter.writeLong(buf, pos, value);
     }
 
-    private static int writeFloatDirect(ReusableByteArrayOutputStream rbo, int pos, float value) {
-        rbo.pos = pos;
-        rbo.ensure(JsonNumberWriter.MAX_FLOAT_BYTES);
-        return JsonNumberWriter.writeFloat(rbo.buf, pos, value);
+    private static int writeFloatDirect(byte[] buf, int pos, int limit, float value) {
+        if (pos + JsonNumberWriter.MAX_FLOAT_BYTES > limit) return -pos;
+        return JsonNumberWriter.writeFloat(buf, pos, value);
     }
 
-    private static int writeDoubleDirect(ReusableByteArrayOutputStream rbo, int pos, double value) {
-        rbo.pos = pos;
-        rbo.ensure(JsonNumberWriter.MAX_DOUBLE_BYTES);
-        return JsonNumberWriter.writeDouble(rbo.buf, pos, value);
+    private static int writeDoubleDirect(byte[] buf, int pos, int limit, double value) {
+        if (pos + JsonNumberWriter.MAX_DOUBLE_BYTES > limit) return -pos;
+        return JsonNumberWriter.writeDouble(buf, pos, value);
     }
 
     /** Packs up to 8 bytes starting at {@code off} little-endian into one long. */

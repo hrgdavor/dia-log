@@ -7,21 +7,22 @@ import java.io.OutputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
-import java.util.Arrays;
 
 /**
- * Reusable, grow-only in-memory output stream with cursor-locality write helpers.
+ * Reusable, fixed-capacity in-memory output stream with cursor-locality write
+ * helpers.
  * <p>
  * Merged from {@code CursorBuffer} (generic cursor-locality abstraction) and
  * {@code ReusableByteArrayOutputStream} (sink/IO). A single class that owns a
- * backing {@code byte[]} for one event/batch and exposes direct-cursor primitives
- * so writers can pull {@code buf}/{@code pos} into stack locals for the whole
- * hot loop — C2 keeps them in registers.
+ * fixed-size backing {@code byte[]} for one event/batch and exposes
+ * direct-cursor primitives so writers can pull {@code buf}/{@code pos} into stack
+ * locals for the whole hot loop — C2 keeps them in registers.
  * <p>
- * The backing array is allocated once and never shrinks: {@link #reset()} reuses
- * it, and it grows only when an event exceeds capacity (doubling). Hot-path
- * writers perform inlined capacity checks; the common no-grow case is a single
- * compare + branch with no virtual dispatch.
+ * The backing array is allocated once at a fixed capacity and never reallocates.
+ * When a write would exceed capacity it throws {@link BufferFullException}
+ * instead of growing, so the event assembly can replace an overflowing value with
+ * the {@code "V2BIG"} placeholder and keep going. {@link #reset()} reuses the
+ * array across events; it never shrinks.
  * <p>
  * Thread safety: not thread-safe. Safe to share per stream/worker thread via
  * logback's {@code doAppend} guard, or wrap in your own synchronization.
@@ -48,8 +49,7 @@ public class ReusableByteArrayOutputStream extends OutputStream {
     }
 
     /**
-     * Creates a buffer with the given initial capacity (grows by doubling if an
-     * event ever exceeds it).
+     * Creates a buffer with the given fixed initial capacity (never reallocates).
      */
     public ReusableByteArrayOutputStream(int initialCapacity) {
         if (initialCapacity <= 0) {
@@ -67,7 +67,7 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         byte[] buf = this.buf;
         int pos = this.pos;
         if (pos >= buf.length) {
-            buf = grow(pos + 1);
+            throw new BufferFullException();
         }
         buf[pos] = (byte) b;
         this.pos = pos + 1;
@@ -80,12 +80,13 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         }
         byte[] buf = this.buf;
         int pos = this.pos;
-        int need = pos + len;
-        if (need > buf.length) {
-            buf = grow(need);
+        // All-or-nothing: check before any copy, so an over-long write leaves the
+        // buffer untouched (the caller reverts its cursor on the thrown signal).
+        if (pos + len > buf.length) {
+            throw new BufferFullException();
         }
         System.arraycopy(b, off, buf, pos, len);
-        this.pos = need;
+        this.pos = pos + len;
     }
 
     // =========================================================================
@@ -144,45 +145,37 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         pos += n;
     }
 
-    /** Publishes the cursor to the underlying sink (no-op — this class is its own sink). */
-    public void publish() {}
-
-    /** Re-reads buffer/position after the underlying stream was written directly (no-op). */
-    public void resync() {}
+    // =========================================================================
+    // Cursor-locality helpers: writePackedLE / putPackedLE (merged from CursorBuffer).
+    // =========================================================================
 
     /**
-     * Inlined capacity check: guarantees {@code pos + additional} bytes are
-     * available. The common no-grow case is one compare; only the cold path
-     * grows the backing array.
+     * Appends one byte. Throws {@link BufferFullException} (no-grow) if the
+     * buffer is full — the caller reverts its cursor and finalizes the event.
      */
-    public void ensure(int additional) {
-        int pos = this.pos;
-        if (pos + additional > this.buf.length) {
-            grow(pos + additional);
-        }
-    }
-
-    /** Appends one byte with an inlined capacity check. */
     public void writeByte(int b) {
         byte[] buf = this.buf;
         int pos = this.pos;
         if (pos >= buf.length) {
-            buf = grow(pos + 1);
+            throw new BufferFullException();
         }
         buf[pos] = (byte) b;
         this.pos = pos + 1;
     }
 
-    /** Bulk copy with an inlined capacity check. */
+    /**
+     * Bulk copy. All-or-nothing: if the copy would overflow the fixed capacity,
+     * throws {@link BufferFullException} without writing any bytes, so the
+     * caller's cursor reverts cleanly.
+     */
     public void writeRaw(byte[] src, int off, int len) {
         byte[] buf = this.buf;
         int pos = this.pos;
-        int need = pos + len;
-        if (need > buf.length) {
-            buf = grow(need);
+        if (pos + len > buf.length) {
+            throw new BufferFullException();
         }
         System.arraycopy(src, off, buf, pos, len);
-        this.pos = need;
+        this.pos = pos + len;
     }
 
     /** Stores the low {@code n} bytes of {@code value} little-endian (n in 0..8). */
@@ -192,16 +185,13 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         }
         byte[] buf = this.buf;
         int pos = this.pos;
+        if (pos + n > buf.length) {
+            throw new BufferFullException();
+        }
         if (n == 8) {
-            if (pos + 8 > buf.length) {
-                buf = grow(pos + 8);
-            }
             LE_LONG.set(buf, pos, value);
             this.pos = pos + 8;
             return;
-        }
-        if (pos + n > buf.length) {
-            buf = grow(pos + n);
         }
         switch (n) {
             case 7: buf[pos + 6] = (byte) (value >>> 48);
@@ -225,7 +215,7 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         byte[] buf = this.buf;
         int pos = this.pos;
         if (pos + n > buf.length) {
-            buf = grow(pos + n);
+            throw new BufferFullException();
         }
         switch (n) {
             case 4: buf[pos + 3] = (byte) (value >>> 24);
@@ -238,24 +228,17 @@ public class ReusableByteArrayOutputStream extends OutputStream {
         this.pos = pos + n;
     }
 
-    // =========================================================================
-    // Cursor-locality helpers: writePackedLE / putPackedLE (merged from CursorBuffer).
-    // =========================================================================
-
     /** Stores the low {@code n} bytes of {@code value} little-endian (n in 0..8). */
     public void writePackedLE(long value, int n) {
         byte[] buf = this.buf;
         int pos = this.pos;
+        if (pos + n > buf.length) {
+            throw new BufferFullException();
+        }
         if (n == 8) {
-            if (pos + 8 > buf.length) {
-                buf = grow(pos + 8);
-            }
             LE_LONG.set(buf, pos, value);
             this.pos = pos + 8;
             return;
-        }
-        if (pos + n > buf.length) {
-            buf = grow(pos + n);
         }
         switch (n) {
             case 7: buf[pos + 6] = (byte) (value >>> 48);
@@ -275,16 +258,13 @@ public class ReusableByteArrayOutputStream extends OutputStream {
     public void writePackedLE(int value, int n) {
         byte[] buf = this.buf;
         int pos = this.pos;
+        if (pos + n > buf.length) {
+            throw new BufferFullException();
+        }
         if (n == 4) {
-            if (pos + 4 > buf.length) {
-                buf = grow(pos + 4);
-            }
             LE_INT.set(buf, pos, value);
             this.pos = pos + 4;
             return;
-        }
-        if (pos + n > buf.length) {
-            buf = grow(pos + n);
         }
         switch (n) {
             case 3: buf[pos + 2] = (byte) (value >>> 16);
@@ -301,7 +281,9 @@ public class ReusableByteArrayOutputStream extends OutputStream {
      * absolute {@code offset} (which must already be within the ensured
      * capacity) without moving the cursor — used for overlapping-store patterns,
      * where the last word is stored at {@code start + (len - 8)} over bytes an
-     * earlier word already wrote.
+     * earlier word already wrote. A misuse (offset out of bounds) surfaces as the
+     * JDK's {@link ArrayIndexOutOfBoundsException}, which is acceptable and
+     * defensive.
      */
     public void putPackedLE(int offset, long value, int n) {
         byte[] buf = this.buf;
@@ -320,30 +302,5 @@ public class ReusableByteArrayOutputStream extends OutputStream {
             case 0: break;
             default: throw new IllegalArgumentException("n must be in 0..8: " + n);
         }
-    }
-
-    // =========================================================================
-    // Growth (package-private so direct-buffer writers can inline the check).
-    // =========================================================================
-
-    /**
-     * Grows the backing array so it holds at least {@code need} bytes
-     * (absolute). Public so direct-buffer writers (T4/T7, e.g.
-     * {@code JsonLogWriter} in the logback module) can perform the inlined
-     * local capacity check + grow themselves and keep the cursor in registers.
-     * <p>
-     * Returns the (possibly reallocated) backing array so callers can refresh
-     * their {@code buf} local with the return value — the capacity is always
-     * {@code buf.length}, so there is no separate {@code limit} to fetch.
-     *
-     * @return the backing array after growth (the new {@code buf})
-     */
-    public byte[] grow(int need) {
-        int newCap = buf.length * 2;
-        while (newCap < need) {
-            newCap *= 2;
-        }
-        buf = Arrays.copyOf(buf, newCap);
-        return buf;
     }
 }

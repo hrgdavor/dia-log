@@ -22,7 +22,8 @@ go"; this one explains.
 
 1. **The hot path is zero-allocation.** No `String`, no boxed number, no scratch
    `byte[]`, no per-call object — the only allocation on the hot path is the
-   reusable event buffer itself (grown only when an event exceeds it).
+   reusable event buffer itself, allocated once at a fixed capacity and reused
+   across events (it never reallocates).
 2. **Write straight into a caller-owned `byte[]` cursor.** `buf`/`pos`/`limit`
    live in registers across the whole event; `OutputStream` virtual dispatch and
    `arraycopy` are bypassed.

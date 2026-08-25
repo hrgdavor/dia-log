@@ -26,8 +26,9 @@ import java.util.concurrent.TimeUnit;
  * <ul>
  *   <li>{@code pure} — the composable {@link WriteOps} facade on a plain
  *       {@code byte[] buf, int pos} (the generalized cursor-locality shape).</li>
- *   <li>{@code cursor} — {@link WriteOps} over a grow-capable {@link ReusableByteArrayOutputStream}
- *       (what {@code JsonLogWriter}'s direct path now uses).</li>
+ *   <li>{@code cursor} — {@link WriteOps} over the fixed-capacity
+ *       {@link ReusableByteArrayOutputStream} backing array, using the same
+ *       limit-aware no-grow overloads as the production direct path.</li>
  *   <li>{@code stream} — the baseline {@link ByteArrayOutputStream} with
  *       stream-mediated {@link JsonNumberWriter}/{@link EscapedJsonStringWriter}
  *       calls (per-value virtual dispatch, no cursor locality).</li>
@@ -102,13 +103,15 @@ public class CursorBufferWriterBenchmark {
     @Benchmark
     public void cursorWriteOps(Blackhole bh) {
         rbo.reset();
+        byte[] buf = rbo.buffer();
+        int pos = 0;
+        int limit = buf.length;
         for (int i = 0; i < N; i++) {
-            rbo.ensure(JsonNumberWriter.MAX_INT_BYTES);
-            rbo.pos = JsonNumberWriter.writeInt(rbo.buf, rbo.pos, ints[i]);
-            rbo.ensure(JsonNumberWriter.MAX_LONG_BYTES);
-            rbo.pos = JsonNumberWriter.writeLong(rbo.buf, rbo.pos, longs[i]);
-            WriteOps.writeEscapedJsonString(rbo, strings[i]);
+            pos = JsonNumberWriter.writeInt(buf, pos, ints[i]);
+            pos = JsonNumberWriter.writeLong(buf, pos, longs[i]);
+            pos = WriteOps.writeEscapedJsonStringNoGrow(buf, pos, limit, strings[i]);
         }
+        rbo.setPosition(pos);
         bh.consume(rbo.position());
     }
 
