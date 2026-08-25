@@ -113,6 +113,40 @@ Why:
 The dev/diagnostic variants (`JsonLogWriterDev`, `JsonLogWriterClassic`, benchmark
 fixtures) follow the dev-variant policy above and are not held to this rule.
 
+### Negated-Position Contract for Limit-Aware Writers
+
+Hot-path writers whose output size is not statically bounded (strings, raw JSON,
+stack trace) take `(byte[] buf, int pos, int limit, …)` and **return the new
+position on success, or the negated position (`-pos`) on overflow**:
+
+```java
+pos = writeEscapedJsonString(buf, pos, limit, value);
+if (pos < 0) {
+    pos = -pos;                              // restore pre-call position
+    pos = writeTooLargeAndClose(buf, pos);   // "VALUE_TOO_LARGE"}
+    return pos;                              // early exit — buffer never overflowed
+}
+```
+
+Why negated (not `-1` or an output-parameter):
+- The caller accepts the result in the **same cursor local** — no separate
+  "did it overflow?" boolean, no conditional assign, no extra param.
+- On overflow, negating recovers the exact position before the write, so the
+  caller overwrites from the right offset.
+- **Partial buffer writes are harmless**: the chunked loop may store bytes past
+  the returned position before detecting the margin breach, but `pos` is
+  caller-owned and reverts to its pre-call value, so that buffer garbage is
+  never seen or flushed. The buffer is never overflown — the chunked
+  `pos + MARGIN > limit` check fires while a full chunk remains, and `MARGIN`
+  exceeds the worst-case expansion of one chunk.
+
+This contract applies to `WriteOps.writeEscapedJsonString(...)`,
+`WriteOps.writeRaw(...)`, `DirectJsonStringWriter` / `EscapedJsonStringWriter`
+limit-aware overloads, and `StringByteExtractor.writeLatin1Direct` when
+limit-aware. It is the standard way the no-grow event assembly (`JsonLogWriter.
+writeJsonEventDirect`) consumes variable-length writers and finalizes with
+`"VALUE_TOO_LARGE"}` + early exit on overflow.
+
 ### Packed-Long String Writing (overwrite trick)
 
 Fixed string prefixes are precomputed into little-endian `long` words
