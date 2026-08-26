@@ -31,8 +31,8 @@ import ch.qos.logback.classic.spi.IThrowableProxy;
 @NotThreadSafe
 public class JsonLogWriter {
 
-    /** Newline bytes (UTF-8) - strictly Unix LF (\n). */
-    public static final byte[] NL = new byte[]{ 0x0A };
+    /** Newline byte (UTF-8) - strictly Unix LF (\n). */
+    public static final byte NL = 0x0A;
 
     /**
      * A value whose JSON representation has already been computed and encoded

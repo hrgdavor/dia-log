@@ -237,7 +237,7 @@ public class JsonAppender extends OutputStreamAppender<ILoggingEvent> {
 
         // The newline always fits: the no-grow assembly stops at
         // buf.length - RESERVE (27), which reserves the newline slot.
-        eventBuffer.buf[pos] = JsonLogWriter.NL[0];
+        eventBuffer.buf[pos] = JsonLogWriter.NL;
         eventBuffer.setPosition(pos + 1);
         // One bulk write of the whole event (buffer reuses its array across events).
         eventBuffer.writeTo(activeStreamLoc);
