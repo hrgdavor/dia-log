@@ -160,13 +160,26 @@ public final class JsonLogWriterStream {
         writeValue(out, value, mapper);
     }
 
+    public static void writeRawValue(OutputStream out, RawValue raw, ObjectMapper mapper) throws IOException {
+        Object backing = raw.rawValue();
+        if (backing == null) {
+            out.write(JsonLogWriter.JSON_NULL.getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        if (backing instanceof String s) {
+            JsonLogWriter.STRING_STRATEGY.write(out, s);
+            return;
+        }
+        mapper.writeValue(out, raw);
+    }
+
     private static void writeValue(OutputStream out, Object value, ObjectMapper mapper) throws IOException {
         switch (value) {
             case String s -> EscapedJsonStringWriter.writeJsonStringOrNull(out, s);
             case CharSequence cs -> EscapedJsonStringWriter.writeJsonStringOrNull(out, cs.toString());
             case Character c -> EscapedJsonStringWriter.writeJsonStringOrNull(out, c.toString());
             case Enum<?> e -> EscapedJsonStringWriter.writeJsonStringOrNull(out, e.name());
-            case RawValue raw -> JsonLogWriter.writeRawValue(out, raw, mapper);
+            case RawValue raw -> writeRawValue(out, raw, mapper);
             case Long l -> JsonNumberWriter.writeLong(out, l);
             case Integer i -> JsonNumberWriter.writeInt(out, i);
             case Short s -> JsonNumberWriter.writeInt(out, s.intValue());
