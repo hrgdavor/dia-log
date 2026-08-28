@@ -1,4 +1,31 @@
-# Dia-Log Performance Guide
+# Some conclusions
+
+- Use MemorySegment (OutputStream, ByteBuffer only if not avoidable for some areas)
+- Write into MMAP Memory Mapped File
+- Hold ring of 8192 file offsets
+- Can send log lines to network or websocket to user for debug from MMAP
+- log sending is best effort, should not fall behind so much to not fit 8192 ring
+- `{"ts":` - is first thing written to log line
+
+- large JSON is partially written
+- writers accept a limit that is intentionally smaller than buffer size
+- the reserved space is intended to allow closing JSON properly
+  - "V2BIG" - placeholder for values too large to fit spece left in buffer
+  - largest number is double with 25 digits
+  - plus space for end bracket and newline
+- 16MB or some other buffer limit is needed regardless if reserving a scratch buffer 
+ - we could write to MMAP beyong 16MB but is still not a good idea
+
+# To decide
+
+- write JSON direct to MMAP or use a scratch buffer
+- Maybe have a separate byte[] scratch if necessary 
+- Separate native memory segment to cache string keys (plus delims: `"key":`)
+  - NOPE - calculating hash to find cached data is slower than jsut writing and escaping
+- too large value is skipped, but for strings we may allow writing size the half of leftover space
+
+
+# Performance Guide files
 
 This folder is the **consolidated performance advice** for the dia-log hot
 path: teaching-oriented, basics-first documents that explain *why* the code is
@@ -44,3 +71,4 @@ Fory commit analysis, the benchmark artifacts. When a new technique lands, its
 `t{N}` record goes there, and its explanation is folded into the relevant
 numbered topic here. If a topic here is ever in conflict with a `t{N}` record,
 the topic is the current explanation and the record is the historical note.
+
