@@ -85,6 +85,9 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <configuration>
                     <skip>true</skip>
+                    <additionalOptions>
+                        <additionalOption>--no-fonts</additionalOption>
+                    </additionalOptions>
                 </configuration>
             </plugin>
             <plugin>
