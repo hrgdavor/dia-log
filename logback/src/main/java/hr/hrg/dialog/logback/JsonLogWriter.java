@@ -129,11 +129,11 @@ public class JsonLogWriter {
     private static final int KEY_STACK_LEN = 8;
     private static final int KEY_STACK_LEN_BUF = 8;
 
-    // @CB.StrPacker private static final JSON_NULL = `null`
+    // @CB.StrPacker public static final JSON_NULL = `null`
     public static final String JSON_NULL = "null";
-    private static final long JSON_NULL_W0 = 0x000000006c6c756eL;
-    private static final int JSON_NULL_LEN = 4;
-    private static final int JSON_NULL_LEN_BUF = 8;
+    public static final long JSON_NULL_W0 = 0x000000006c6c756eL;
+    public static final int JSON_NULL_LEN = 4;
+    public static final int JSON_NULL_LEN_BUF = 8;
 
     // @CB.StrPacker public static final JSON_TRUE = `true`
     public static final String JSON_TRUE = "true";
@@ -156,8 +156,10 @@ public class JsonLogWriter {
     private static final int RESERVE = JsonNumberWriter.MAX_DOUBLE_BYTES + 2;
 
     // @CB.StrPacker private static final PLACEHOLDER = `"V2BIG"`
-    private static final long PLACEHOLDER_W0 = 0x0022474942325622L; // "V2BIG"
+    private static final String PLACEHOLDER = "\"V2BIG\"";
+    private static final long PLACEHOLDER_W0 = 0x0022474942325622L;
     private static final int PLACEHOLDER_LEN = 7;
+    private static final int PLACEHOLDER_LEN_BUF = 8;
 
     /** Filter applied to stack trace frame class names during fingerprinting. Defaults to accepting all frames. */
     private Predicate<String> stackTraceFilter = null;

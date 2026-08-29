@@ -163,7 +163,7 @@ public final class JsonLogWriterStream {
     public static void writeRawValue(OutputStream out, RawValue raw, ObjectMapper mapper) throws IOException {
         Object backing = raw.rawValue();
         if (backing == null) {
-            out.write(JsonLogWriter.JSON_NULL.getBytes(StandardCharsets.UTF_8));
+            out.write("null".getBytes(StandardCharsets.UTF_8));
             return;
         }
         if (backing instanceof String s) {
