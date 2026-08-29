@@ -23,30 +23,56 @@ The `dia-log-example` module is **not** published.
 4. **Central Portal credentials** in `~/.m2/settings.xml`. Generate a token in
    the Central Portal UI (Account → User Token) and add it as a server entry:
 
-   ```xml
-   <settings>
-     <servers>
-       <server>
-         <id>central</id>
-         <username>YOUR_TOKEN_USERNAME</username>
-         <password>YOUR_TOKEN_PASSWORD</password>
-       </server>
-     </servers>
-     <profiles>
-       <profile>
-         <id>central</id>
-         <activation><activeByDefault>true</activeByDefault></activation>
-         <properties>
-           <gpg.executable>gpg</gpg.executable>
-           <gpg.keyname>YOUR_GPG_KEY_ID</gpg.keyname>
-         </properties>
-       </profile>
-     </profiles>
-   </settings>
-   ```
+    ```xml
+    <settings>
+      <servers>
+        <server>
+          <id>central</id>
+          <username>YOUR_TOKEN_USERNAME</username>
+          <password>YOUR_TOKEN_PASSWORD</password>
+        </server>
+        <!-- maven-gpg-plugin reads the signing passphrase from here
+             (configured via <passphraseServerId>gpg</passphraseServerId>). -->
+        <server>
+          <id>gpg</id>
+          <passphrase>YOUR_GPG_PASSPHRASE</passphrase>
+        </server>
+      </servers>
+      <profiles>
+        <profile>
+          <id>central</id>
+          <activation><activeByDefault>true</activeByDefault></activation>
+          <properties>
+            <gpg.executable>gpg</gpg.executable>
+            <gpg.keyname>YOUR_GPG_KEY_ID</gpg.keyname>
+          </properties>
+        </profile>
+      </profiles>
+    </settings>
+    ```
 
-   > **Security note:** never commit `settings.xml` or tokens to the repository.
-   > A `.github/workflows` release uses GitHub secrets instead (see below).
+    > **Security note:** never commit `settings.xml` or tokens to the repository.
+    > A `.github/workflows` release uses GitHub secrets instead (see below).
+
+### Windows: avoid the GPG passphrase prompt stall
+
+On Windows the default `pinentry` pops a GUI dialog that does not render in a
+non-interactive console, so signing hangs. The build already passes
+`--pinentry-mode loopback`, but GPG only honors loopback when the agent allows
+it. Enable it once in your GnuPG home (`%APPDATA%\gnupg\gpg-agent.conf`):
+
+```
+allow-loopback-pinentry
+```
+
+Then restart the agent:
+
+```powershell
+gpgconf --kill gpg-agent
+```
+
+With the `gpg` server entry above supplying the passphrase, signing proceeds
+without any prompt.
 
 ## One-time release (local)
 
@@ -55,8 +81,27 @@ The `maven-gpg-plugin` runs at the `verify` phase and the
 
 ```bash
 export JAVA_HOME=<path-to-jdk-25>
-mvn clean deploy -DskipTests
+mvn clean deploy -pl core,logback -am -DskipTests -Dgpg.skip=false
 ```
+
+> **Use the `-pl core,logback -am` form, not a bare `mvn clean deploy`.**
+> This plugin creates the deployment only on the *last* module in the reactor
+> that has the publishing mojo, and it honors that module's `skipPublishing`
+> flag. `example` and `project-automation` set `skipPublishing=true` and would
+> otherwise be the last modules in the reactor, so a bare `mvn clean deploy`
+> builds the bundle but then prints "Skipping Central Publishing at user's
+> request." and never uploads it. Targeting `core,logback` with `-am` (also
+> make) builds and publishes the parent POM plus `core` and `logback`, and
+> leaves `example`/`project-automation` out of the deploy reactor entirely.
+>
+> Also note: the `mvn` on your PATH is an **mvnd** shim that silently skips the
+> publishing mojo. Invoke the real Maven binary directly, e.g.
+> `D:\programs\mvn\bin\mvn.cmd` on Windows.
+
+> `gpg.skip` defaults to `true` so local dev builds don't stall on signing;
+> pass `-Dgpg.skip=false` only for a real release.
+
+
 
 The plugin bundles the artifacts, signs them, deploys to Central Portal, and
 auto-publishes them (because `autoPublish` is `true`).

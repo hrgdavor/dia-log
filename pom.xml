@@ -65,6 +65,9 @@
         <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
         <jacoco.version>0.8.14</jacoco.version>
         <jsr305.version>3.0.2</jsr305.version>
+        <!-- gpg signing is off by default for local dev (avoids the interactive
+             GPG passphrase stall); pass -Dgpg.skip=false for a real release. -->
+        <gpg.skip>true</gpg.skip>
     </properties>
 
     <dependencyManagement>
@@ -295,7 +298,11 @@
                             <goal>sign</goal>
                         </goals>
                         <configuration>
-                            <skip>true</skip>
+                            <skip>${gpg.skip}</skip>
+                            <!-- Read the passphrase from a <server> entry in
+                                 settings.xml (id "gpg") so signing never prompts
+                                 for a passphrase on headless / Windows builds. -->
+                            <passphraseServerId>gpg</passphraseServerId>
                             <gpgArguments>
                                 <arg>--pinentry-mode</arg>
                                 <arg>loopback</arg>
@@ -303,6 +310,19 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- Take over the deploy phase. With extensions=true this plugin
+                 registers the publishing lifecycle and suppresses the default
+                 maven-deploy-plugin, which would otherwise push artifacts
+                 straight to the legacy maven-releases URL (and fail). -->
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>true</autoPublish>
+                </configuration>
             </plugin>
         </plugins>
     </build>
