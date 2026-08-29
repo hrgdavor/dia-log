@@ -275,6 +275,9 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <configuration>
                     <doclint>none</doclint>
+                    <additionalOptions>
+                        <additionalOption>--no-fonts</additionalOption>
+                    </additionalOptions>
                     <source>${maven.compiler.release}</source>
                 </configuration>
                 <executions>
