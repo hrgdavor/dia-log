@@ -75,3 +75,11 @@ The **traceparent** header format is `00-{traceId}-{spanId}-{flags}`. W3C standa
 Client generates **TraceId** `4bf92f3577b34da6a3ce929d0e0e4736` and calls Microservice A with header `00-4bf92f...-00f067...-01`. Microservice A extracts it, does its own work with **SpanId** `88a123...`, then calls Microservice B with header `00-4bf92f...-88a123...-01`. **TraceId** remains identical across all three services; **SpanId** changes at each hop to identify the caller.
 
 [Full document](traceid.flow.md)
+
+---
+
+## Troubleshooting
+
+Common issues and solutions:
+
+- [Troubleshooting Guide](troubleshooting.md) — Error patterns, configuration validation, performance tips

@@ -339,6 +339,16 @@ See
 [`EventSnapshotHandler`](logback/src/main/java/hr/hrg/dialog/logback/EventSnapshotHandler.java)
 for the full contract.
 
+## Troubleshooting
+
+Common issues and solutions are documented in [`doc/troubleshooting.md`](doc/troubleshooting.md):
+
+- "No MDC adapter configured" — Initialize LoggerContext properly
+- "GZIP fallback instead of XZ" — Add `org.tukaani:xz` dependency
+- "BufferFullException" — Increase event buffer capacity
+- "Stack trace not appearing" — Set log level to TRACE
+- "Performance degradation" — Review allocation patterns and stack trace filtering
+
 ## Build
 
 ```bash
