@@ -86,14 +86,36 @@ field-prefix `getBytes` + bufferless-number scratch are real but off the hot
 path. **There is no production allocation regression**: `writeJsonEventDirect`
 is ≈330 B/op, matching 2026-08-18.
 
+> Superseded (2026-09-14): the ≈330 B/op estimate predates commit `6b1ad77`
+> (ADR 012, same day after this run), which removed the per-event `allKeys`
+> key set — the estimate's only real allocation. The production path now
+> measures **96 B/op**: see
+> [fory-perf-benchmark-results.md](fory-perf-benchmark-results.md), section
+> "JsonLogWriterBenchmark production-path run — 2026-09-14".
+
 ## Follow-up
 
-- Repoint `JsonLogWriterBenchmark.writeWithJsonLogWriter` at `writeJsonEventDirect`
-  (with a `ReusableByteArrayOutputStream`) so the headline comparison reflects
-  production; it should then show ≈330 B/op and confirm parity with 2026-08-18.
+- [x] Repoint `JsonLogWriterBenchmark.writeWithJsonLogWriter` at
+  `writeJsonEventDirect` (with a `ReusableByteArrayOutputStream`) so the
+  headline comparison reflects production. **Done 2026-09-14** — see
+  [fory-perf-benchmark-results.md](fory-perf-benchmark-results.md) (section
+  "JsonLogWriterBenchmark production-path run — 2026-09-14") and
+  [bench-jsonlogwriter-2026-09-14.csv](bench-jsonlogwriter-2026-09-14.csv). The
+  production path measures **96 B/op** (both throwable variants) and
+  0.331 / 1.431 us/op. That is *lower* than the ≈330 B/op predicted here
+  because this document's ThreadMXBean estimate predates commit `6b1ad77`
+  ("remove dedup code", ADR 012 — same day, after the 08-22 run), which removed
+  the per-event `allKeys` key set the estimate was based on; the 96 B/op is a
+  benchmark-harness artifact (3 × 32 B `Map.Entry` wrappers from the
+  `Map.of(...)` MDC map — see the 2026-09-14 section). Versus the 2026-08-18
+  baseline: faster (0.331/1.431 vs 0.507/5.706 us/op) and lower allocation
+  (96 vs 272 B/op).
 - Optionally, optimize `writeJsonEventStream`'s field prefixes (reuse pre-encoded
   `byte[]`/packed words + buffered number writes) so the fallback is not
   order-of-magnitude worse than the direct path — but this is an API-compat
   convenience method, not the hot path.
-- Re-confirm whether the no-throwable latency dip (0.507 → 0.563) is a real cost
-  or run-to-run noise on this short (sub-microsecond) benchmark.
+- [x] Re-confirm whether the no-throwable latency dip (0.507 → 0.563) is a real
+  cost or run-to-run noise on this short (sub-microsecond) benchmark.
+  **Answered 2026-09-14**: the dip was the stream-fallback's cost, not a
+  production cost — the production path now measures 0.331 us/op, below the
+  2026-08-18 baseline of 0.507.

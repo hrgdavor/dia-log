@@ -16,14 +16,13 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
-import hr.hrg.dialog.core.Wyhash64;
+import hr.hrg.dialog.core.ReusableByteArrayOutputStream;
 import org.openjdk.jmh.infra.Blackhole;
 import org.slf4j.event.KeyValuePair;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -31,7 +30,15 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Compare direct byte writer vs classic Jackson generator writer for complete log-line serialization.
+ * Compare the production direct-buffer writer vs the classic Jackson generator
+ * writer for complete log-line serialization.
+ *
+ * <p>{@code writeWithJsonLogWriter} exercises the production path exactly as
+ * {@link JsonAppender#writeOut} does: {@link JsonLogWriter#writeJsonEventDirect}
+ * into a reusable fixed-capacity {@link ReusableByteArrayOutputStream}
+ * (no-grow assembly, packed prefixes, bufferless numbers) — not the stream
+ * fallback. The classic leg writes through a Jackson {@link JsonGenerator}
+ * into the same sink.
  *
  * Suggested run for allocation/GC metrics:
  * java -cp <classpath> org.openjdk.jmh.Main hr.hrg.dialog.logback.JsonLogWriterBenchmark.* -prof gc -wi 3 -i 5 -f 1
@@ -53,7 +60,6 @@ public class JsonLogWriterBenchmark {
     private JsonFactory jsonFactory;
     private ReusableByteArrayOutputStream output;
     private LoggingEvent event;
-    private Wyhash64.Streaming hasher;
 
     @Setup(org.openjdk.jmh.annotations.Level.Trial)
     public void setup() {
@@ -62,7 +68,6 @@ public class JsonLogWriterBenchmark {
         mapper = new ObjectMapper();
         jsonFactory = JsonFactory.builder().build();
         output = new ReusableByteArrayOutputStream(16 * 1024);
-        hasher = new Wyhash64.Streaming(0);
 
         LoggerContext context = new LoggerContext();
         Logger logger = context.getLogger("bench.logger");
@@ -99,11 +104,17 @@ public class JsonLogWriterBenchmark {
 
     @Benchmark
     public void writeWithJsonLogWriter(Blackhole blackhole) throws IOException {
+        // Production path, mirroring JsonAppender.writeOut: the no-grow direct
+        // assembly returns the position after the closing '}', the newline
+        // always fits (RESERVE reserves the slot), and the result is checked
+        // so JMH keeps the output live.
         output.reset();
-        JsonLogWriterStream.writeJsonEvent(writer, mapper, event, output, hasher);
-        output.write('\n');
+        int pos = writer.writeJsonEventDirect(mapper, event, output);
+        output.pos = pos;
+        output.buf[pos] = JsonLogWriter.NL;
+        output.setPosition(pos + 1);
         blackhole.consume(output.size());
-        blackhole.consume(output.tailChecksum());
+        blackhole.consume(tailChecksum(output.buf, output.size()));
     }
 
     @Benchmark
@@ -115,7 +126,7 @@ public class JsonLogWriterBenchmark {
         }
         output.write('\n');
         blackhole.consume(output.size());
-        blackhole.consume(output.tailChecksum());
+        blackhole.consume(tailChecksum(output.buf, output.size()));
     }
 
     private static Throwable createThrowable() {
@@ -152,18 +163,13 @@ public class JsonLogWriterBenchmark {
         }
     }
 
-    public static class ReusableByteArrayOutputStream extends ByteArrayOutputStream {
-        public ReusableByteArrayOutputStream(int size) {
-            super(size);
+    /** Checksum over the used prefix of the sink buffer (keeps the output live). */
+    private static int tailChecksum(byte[] buf, int count) {
+        if (count == 0) {
+            return 0;
         }
-
-        public int tailChecksum() {
-            if (count == 0) {
-                return 0;
-            }
-            int first = buf[0] & 0xFF;
-            int last = buf[count - 1] & 0xFF;
-            return (count * 31) ^ (first << 8) ^ last;
-        }
+        int first = buf[0] & 0xFF;
+        int last = buf[count - 1] & 0xFF;
+        return (count * 31) ^ (first << 8) ^ last;
     }
 }

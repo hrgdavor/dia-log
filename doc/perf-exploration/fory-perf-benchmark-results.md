@@ -394,6 +394,71 @@ writer suites (`StackTrace*`, `Stacktrace*`, `JsonLogWriterBenchmark`,
 `AllocationBenchmark`) ran clean with no errors (reduced-iteration runs in
 `bench-misc-current.txt` / `bench-writers-current.txt`).
 
+## JsonLogWriterBenchmark production-path run — 2026-09-14
+
+The headline `JsonLogWriterBenchmark` (full event: fixed fields + MDC
+`traceId`/`spanId`/`tenant` + KV `requestId`/`attempt`/`cacheHit`/`latencyMs`,
+with and without a wrapping throwable) was repointed from the
+`writeJsonEventStream` fallback to the production
+`JsonLogWriter.writeJsonEventDirect` path, mirroring `JsonAppender#writeOut`
+(`reset()` → `writeJsonEventDirect` → `output.pos = pos` → `NL` →
+`setPosition(pos + 1)`). The classic leg (`JsonLogWriterClassic` over a
+Jackson `JsonGenerator`) is unchanged. The pre-change run and its follow-up
+are in [json-log-writer-rerun-2026-08-22.md](json-log-writer-rerun-2026-08-22.md).
+
+- Date: 2026-09-14
+- Machine: AMD Ryzen 9 7945HX, Windows (x86-64, little-endian)
+- JDK: 25.0.3, JMH: 1.37
+- Mode: average time + throughput, `-t 1`, `-f 1`, warmup 5 × 1 s,
+  measurement 10 × 1 s, `-prof gc`
+- `--add-opens java.base/java.lang=ALL-UNNAMED` on the launcher; forked VMs
+  inherit the launcher's VM options (JMH forks carry host options by
+  default — no `-jvmArgs` needed)
+
+Artifact: [bench-jsonlogwriter-2026-09-14.csv](bench-jsonlogwriter-2026-09-14.csv)
+
+| Leg (benchmark method) | includeThrowable | Avg (us/op) | Alloc (B/op) |
+| --- | --- | --- | --- |
+| `writeWithJsonLogWriter` — production `writeJsonEventDirect` | false | 0.331 ± 0.052 | **96.00** |
+| `writeWithJsonLogWriter` | true | 1.431 ± 0.079 | **96.01** |
+| `writeWithJsonLogWriterClassic` — Jackson `JsonGenerator` | false | 0.580 ± 0.093 | 544.00 |
+| `writeWithJsonLogWriterClassic` | true | 1.940 ± 0.084 | 632.01 |
+
+Reading:
+
+- **The production path is ~1.7×/1.5× faster than the stream fallback the
+  08-22 benchmark measured** (0.563 → 0.331 us/op no-throwable; 2.159 → 1.431
+  us/op with throwable) and allocates **96 B/op vs 456/592** — the fallback's
+  per-event `getBytes` field prefixes and bufferless-number scratch are gone,
+  as expected.
+- **The 96 B/op is not writer work.** The writer is zero-allocation (no
+  `new` in `JavaStackWriterLogback`; cached `ThrowableProxy` stack array;
+  field-access logback event accessors; allocation-free string/number
+  writers — verified by code walk, cross-checked with a short-warmup
+  ThreadMXBean probe). The 96 B is a benchmark-harness artifact: the MDC map
+  is a `Map.of(...)` immutable, and JDK `ImmutableCollections.MapN`
+  `entrySet()` iteration allocates one `Map.Entry` wrapper per entry
+  (3 × 32 B = 96 — exactly the measured norm; the KV `List.of(...)` iterator
+  is scalar-replaced under JMH). In production the MDC map comes from the
+  context's MDC adapter (a mutable per-thread `HashMap`-backed map), whose
+  `entrySet()` iteration costs at most one small iterator per event, not one
+  per entry.
+- **The throwable branch adds ≈ 0 B/op** (96.01 vs 96.00) and ≈1.10 us/op
+  (1.431 vs 0.331) — stack-trace assembly latency, zero allocation.
+- **The classic leg's −272 B/op vs the 08-22 run (816/904 → 544/632) is not a
+  benchmark change**: `JsonLogWriterClassic` allocated a per-event `allKeys`
+  `HashSet` (7 keys = 48 + 7 × 32 = 272 B) for KV/MDC key dedup, and commit
+  `6b1ad77` ("remove dedup code", ADR 012, 2026-08-22 — *after* the 08-22
+  run) removed it from both the classic and the production writers. The same
+  commit removed the production per-event `allKeys` set that the 08-22
+  re-run doc's ≈330 B/op ThreadMXBean estimate was based on; the 96 B/op
+  above is what the production path actually allocates today.
+- **Parity with the 2026-08-18 baseline (0.507/5.706 us/op, 272 B/op):** the
+  production path is now *faster* (0.331 no-throwable; 1.431 with — benefiting
+  from the shared stack-writer improvements since 08-18) and allocates
+  *less* (96 vs 272) because the per-event dedup set is gone. The 272 B/op
+  08-18 baseline *was* that dedup set; the writer internals never allocated.
+
 ## T10 — division-free jeaiii int/long writer (IntWriteBenchmark / LongWriteBenchmark)
 
 Full record: [t10-jeaiii-fast-writer.md](t10-jeaiii-fast-writer.md). The

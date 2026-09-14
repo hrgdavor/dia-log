@@ -12,29 +12,36 @@ Historical optimization timeline, previous runs, and step-by-step gains are trac
 
 ## Latest run
 
-- Date: 2026-08-22
+- Date: 2026-09-14
 - Machine: AMD Ryzen 9 7945HX, Windows (x86-64, little-endian)
 - JDK: 25.0.3
 - JMH: 1.37
-- Mode: average time
+- Mode: average time + throughput
 - Warmup: 5 x 1s
 - Measurement: 10 x 1s
 - Forks: 1, Threads: 1
 - Profiler: -prof gc
-- `--add-opens java.base/java.lang=ALL-UNNAMED` on launcher and forks
+- `--add-opens java.base/java.lang=ALL-UNNAMED` on the launcher; forked VMs
+  inherit the launcher options
+
+Since the 2026-08-22 run, `writeWithJsonLogWriter` exercises the production
+`JsonLogWriter.writeJsonEventDirect` path (mirroring `JsonAppender#writeOut`
+into a reusable `ReusableByteArrayOutputStream`) instead of the
+`writeJsonEventStream` fallback. The classic leg is unchanged.
 
 Artifacts:
 
-- [bench-jsonlogwriter-2026-08-22.csv](../perf-exploration/bench-jsonlogwriter-2026-08-22.csv)
+- [bench-jsonlogwriter-2026-09-14.csv](../perf-exploration/bench-jsonlogwriter-2026-09-14.csv)
+- [bench-jsonlogwriter-2026-08-22.csv](../perf-exploration/bench-jsonlogwriter-2026-08-22.csv) (previous run, stream fallback)
 
 ## Latest results
 
 | Benchmark method              | includeThrowable | Avg time    | Alloc norm   |
 | ----------------------------- | ---------------- | ----------- | ------------ |
-| writeWithJsonLogWriter        | false            | 0.563 us/op | 456.004 B/op |
-| writeWithJsonLogWriterClassic | false            | 0.612 us/op | 816.004 B/op |
-| writeWithJsonLogWriter        | true             | 2.159 us/op | 592.015 B/op |
-| writeWithJsonLogWriterClassic | true             | 2.093 us/op | 904.015 B/op |
+| writeWithJsonLogWriter        | false            | 0.331 us/op | 96.00 B/op   |
+| writeWithJsonLogWriterClassic | false            | 0.580 us/op | 544.00 B/op  |
+| writeWithJsonLogWriter        | true             | 1.431 us/op | 96.01 B/op   |
+| writeWithJsonLogWriterClassic | true             | 1.940 us/op | 632.01 B/op  |
 
 ### Comparison with the 2026-08-18 run
 
@@ -54,17 +61,22 @@ Notable changes since 2026-08-18 (full write-up in
 - **No-throwable latency lead narrowed**: `JsonLogWriter` 0.507 → 0.563 us/op
   (~11% slower); classic flat. JSON is now ~8% faster than classic without a
   throwable (was ~17%).
-- **Allocation in the stream-fallback path rose**: this benchmark calls the
-  test-side `JsonLogWriterStream` helper (the method was moved out of production
-  `JsonLogWriter` into `src/test`) — not the production `writeJsonEventDirect`
-  used by `JsonAppender`). The fallback allocates 272 → 456 B/op (no throwable)
-  and 272 → 592 B/op (with throwable) because its field prefixes are re-encoded
-  per event via `String.getBytes(UTF_8)` and numbers use the bufferless
-  `writeLong(out, long)` scratch. **Production `writeJsonEventDirect` allocates
-  ≈330 B/op — unchanged from the 2026-08-18 272 B/op baseline** (the only alloc
-  is the MDC+KV `allKeys` `HashSet`). The classic path is ~flat. So there is no
-  production allocation regression; the higher numbers are a measurement artifact
-  of benchmarking the fallback method.
+- **The 08-22 numbers measured the stream fallback.** That run called the
+  test-side `JsonLogWriterStream` helper — not the production
+  `writeJsonEventDirect` used by `JsonAppender` — and its per-event
+  `String.getBytes(UTF_8)` field prefixes + bufferless `writeLong(out, long)`
+  scratch explain 456/592 B/op. Since 08-22, commit `6b1ad77` ("remove dedup
+  code", ADR 012 — same day, after that run) removed the per-event `allKeys`
+  key set from **both** the production and classic writers; that set was the
+  272 B/op of the 08-18/08-22 `JsonLogWriter` numbers and the −272 B/op drop of
+  the classic leg (816/904 → 544/632) since 08-22.
+- **The 2026-09-14 run benchmarks the production path directly**:
+  `writeJsonEventDirect` measures **96 B/op** (both throwable variants) and
+  0.331 / 1.431 us/op — faster and lower-allocation than the 2026-08-18
+  baseline (0.507/5.706 us/op, 272 B/op). The 96 B/op is a benchmark-harness
+  artifact (3 × 32 B `Map.Entry` wrappers from the `Map.of(...)` MDC map —
+  production MDC iteration costs at most one small iterator per event); the
+  writer internals are zero-allocation.
 
 ## What the stream-fallback numbers actually measure
 
@@ -102,10 +114,10 @@ Contrast (this part is real and unchanged): `writeWithJsonLogWriterClassic` show
 
 ## Current interpretation
 
-1. JsonLogWriter matches or beats JsonLogWriterClassic on latency (≈8% faster without a throwable, within ~3% with one) and allocates substantially less in both cases (~44% less without, ~34% less with a throwable) — on the `JsonLogWriterStream` fallback path the benchmark exercises.
-2. The throwable path is dramatically faster than at 2026-08-18 for both writers, thanks to shared stack-trace writer improvements.
-3. **There is no production allocation regression.** The production path `writeJsonEventDirect` measures ≈330 B/op for the same MDC+KV event — essentially unchanged from the 2026-08-18 272 B/op (the only alloc is the MDC+KV `allKeys` `HashSet`; the throwable branch adds ≈0 B/op, 334 = 334 with/without). The 456 / 592 B/op figures are the `JsonLogWriterStream` fallback's `getBytes` field prefixes + bufferless number scratch, not the hot path.
+1. JsonLogWriter beats JsonLogWriterClassic on latency (0.331 vs 0.580 us/op without a throwable; 1.431 vs 1.940 with one) and allocates substantially less in both cases (96 vs 544/632 B/op) — on the production `writeJsonEventDirect` path the benchmark now exercises.
+2. The throwable path is dramatically faster than at 2026-08-18 for both writers, thanks to shared stack-trace writer improvements (JsonLogWriter 5.706 → 1.431 us/op since the 08-18 baseline).
+3. **There is no production allocation regression — and the benchmark now proves it directly.** `writeJsonEventDirect` measures **96 B/op** for the same MDC+KV event (the throwable branch adds ≈ 0 B/op). The ≈330 B/op figure quoted in the 2026-08-22 re-run predates commit `6b1ad77` (ADR 012, same day after that run), which removed the per-event `allKeys` key set — the estimate's only real allocation; the 96 B/op is a benchmark-harness artifact (3 × 32 B `Map.Entry` wrappers from the immutable `Map.of(...)` MDC map — in production, MDC iteration costs at most one small iterator per event). The 456 / 592 B/op figures remain the `JsonLogWriterStream` fallback's `getBytes` field prefixes + bufferless number scratch, not the hot path.
 
 ## Current recommendation
 
-Use JsonLogWriter as the default high-throughput path (the production `writeJsonEventDirect`). The `JsonLogWriterBenchmark` currently measures the `JsonLogWriterStream` fallback; to compare production-vs-classic honestly it should call `writeJsonEventDirect` (with a `ReusableByteArrayOutputStream`), which will show ≈330 B/op and confirm parity with the 2026-08-18 baseline.
+Use JsonLogWriter as the default high-throughput path (`JsonAppender` → the production `writeJsonEventDirect`). Since the 2026-09-14 run, `JsonLogWriterBenchmark` measures exactly that production path (with a `ReusableByteArrayOutputStream`, mirroring `JsonAppender#writeOut`), so the headline comparison is production-vs-classic: 96 B/op at 0.331–1.431 us/op vs 544–632 B/op at 0.580–1.940 us/op.
