@@ -270,7 +270,7 @@ class JsonAppenderIntegrationTest {
 
 ### Phase 3: Features (Week 2-4)
 - [ ] Implement automatic MDC cleanup (ADR 003)
-- [ ] Add async appender option
+- [ ] ~~Add async appender option~~ (**Declined** — see [`doc/design/async-not-supported.md`](doc/design/async-not-supported.md))
 - [ ] Add troubleshooting guide to README
 
 ### Phase 4: Testing (Week 2-3)
@@ -286,13 +286,13 @@ class JsonAppenderIntegrationTest {
 ## Risk Assessment
 
 ### Low Risk, High Impact
-- Documentation improvements (Phase 1)
+- Documentation improvements (Phase 1) ✅ **Completed**
 - Quick reference additions to README
 - CI/CD setup
 
 ### Medium Risk, High Impact
 - Automatic MDC cleanup (requires design decision)
-- Async appender (requires thread safety review)
+- Async appender (**intentionally not provided** — see [`doc/design/async-not-supported.md`](doc/design/async-not-supported.md))
 
 ### Low Risk, Low Impact
 - Code style cleanup

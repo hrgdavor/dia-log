@@ -38,6 +38,12 @@ The current JSON writer emits flat top-level fields such as `ts`, `level`, `logg
 - **Deterministic stack traces** — `JavaStackSanitizer` normalizes frames and produces a stable fingerprint for `errHash`. The logback appenders can exclude noisy/framework frames from fingerprinting via a configurable `<stackTraceFilter>` predicate (see [Filtering stack-trace frames](logback/README.md#filtering-stack-trace-frames-during-fingerprinting)).
 - **Generic builder pattern** — `LoggingEventBuilderWrapperBase` keeps fluent chaining intact for subclasses and no-op wrappers.
 
+### Design Decisions
+
+See [`doc/design/`](doc/design/) for design documents:
+
+- **[Async Logging Not Supported](doc/design/async-not-supported.md)** — Async appenders are intentionally not provided; zero-allocation design makes async unnecessary and problematic
+
 ## Performance Optimizations
 
 Dia-Log is built around a simple goal: **emit structured JSON as fast as possible while creating as few objects as possible**. Logging sits on the hot path of every request, and every allocation adds pressure on the garbage collector. The optimizations below are a best-effort engineering effort to keep both latency and GC pressure low — and the project remains open to suggestions for further improvements.
