@@ -74,7 +74,7 @@ JsonNumberWriterTest ensures byte-identical output; AllocationBenchmark shows 0 
 
 ---
 
-### 1.2 Benchmark Documentation (Medium Priority)
+### 1.2 Benchmark Documentation (Medium Priority) — **Completed ✅**
 
 **Issue:** Several benchmark results exist as CSV files but lack narrative context.
 
@@ -87,6 +87,8 @@ JsonNumberWriterTest ensures byte-identical output; AllocationBenchmark shows 0 
 - Summary of key findings
 - Comparison to previous baseline
 - Trade-off analysis (what was gained, what was sacrificed)
+
+**Status:** ✅ **Completed** — `doc/perf-exploration/json-log-writer-rerun-2026-08-22.md` carries the summary, 2026-08-18 baseline comparison, and trade-off interpretation for the writer re-run; `fory-perf-benchmark-results.md` covers the 2026-08-22 event/cursor and allocation suites and, since the 2026-09-14 run, the production-path re-point of the headline benchmark (artifact `bench-jsonlogwriter-2026-09-14.csv`).
 
 ---
 
@@ -106,7 +108,7 @@ JsonNumberWriterTest ensures byte-identical output; AllocationBenchmark shows 0 
 
 ## Priority 2: Code Quality
 
-### 2.1 Minor Code Issues (Low Priority)
+### 2.1 Minor Code Issues (Low Priority) — **Completed ✅**
 
 No critical issues found, but these minor points could be addressed:
 
@@ -115,6 +117,8 @@ No critical issues found, but these minor points could be addressed:
 - `JsonAppender.java:193` — unchecked suppression
 
 **Recommendation:** These are acceptable (Jackson is the only source), but could be documented in a comment explaining the trade-off.
+
+**Status:** ✅ **Completed** — `JsonLogWriter.writeValueDirect`'s `default` branch carries the comment explaining Jackson 3's wrapping (`JacksonException`/`DatabindException` around the root `BufferFullException`, both caught into the no-grow fallback), and `JsonAppender.instantiateStackTraceFilter` rethrows `ReflectiveOperationException` wrapped as `IllegalArgumentException` with the cause — nothing is silently swallowed.
 
 **Large Files:**
 - `Wyhash64.java` — 1,289 lines (59 KB)
@@ -211,7 +215,7 @@ Fix: Add `org.tukaani:xz:1.12` dependency, or use `.gz` in `fileNamePattern`.
 
 ---
 
-### 4.2 Integration Tests (Low Priority)
+### 4.2 Integration Tests (Low Priority) — **Completed ✅**
 
 **Observation:** Tests are well-isolated (unit tests only). No integration tests verify end-to-end flow through logback.xml configuration.
 
@@ -225,6 +229,8 @@ class JsonAppenderIntegrationTest {
     }
 }
 ```
+
+**Status:** ✅ **Completed** — `logback/src/test/java/hr/hrg/dialog/logback/JsonAppenderRollingSizeBasedTest.java` exercises the full pipeline (SLF4J → Logback → `JsonAppenderRolling` with `SizeAndTimeBasedRollingPolicy`): 80 events × ~300 B against a 10 KB `maxFileSize`, asserting on-disk JSON output, field presence, and archive creation.
 
 ---
 
@@ -339,4 +345,4 @@ All critical documentation gaps have been filled, and the troubleshooting guide 
 
 **Document Prepared By:** Automated Code Analysis  
 **Review Required By:** Project Maintainer  
-**Next Review Date:** TBD (after Phase 1 completion)
+**Next Review Date:** 2026-09-14 — review performed on the current state by the 2026-09-14 analysis pass: roadmap items 1.2, 2.1, 4.2 verified as done and marked, ADR 003's duplicated "Consequences" heading removed

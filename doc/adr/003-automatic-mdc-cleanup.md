@@ -43,8 +43,6 @@ This is a deliberate design decision, not an oversight. The library prioritizes 
 
 ## Consequences
 
-## Consequences
-
 * **Positive:** No performance overhead from MDC put/remove operations; MDC is managed by the application as SLF4J intended.
 * **Negative:** Developers must manage MDC lifecycle manually via `MDC.put()`/`MDC.remove()`/`MDC.clear()` when using thread-local context.
 * **Future consideration:** If automatic MDC cleanup becomes a strong requirement from users, it could be added as an optional feature (e.g., `MDCAdapter` implementation).
