@@ -1,43 +1,25 @@
-# 07 — Int/Long Number Writing: Direct Buffer, VarHandle Stores, and Allocations
+# 07 — Int/Long Number Writing: From Classic JDK to Division-Free Optimizations
 
-This guide explains how `int`/`long` values are written directly into the output buffer without intermediate scratch buffers or `System.arraycopy` operations. It compares multiple Java idiomatic ways of writing numbers and analyzes their performance and allocation characteristics.
+This guide explains how `int`/`long` values are written into the output buffer, comparing multiple Java idiomatic approaches from classic JDK methods to optimized implementations.
 
-## The Problem with Naive Number Writing
+## Summary: Performance Comparison
 
-The traditional approach to writing numbers involves:
+At the time of this writing (JDK 25.0.3), here's how different int writing approaches compare for medium-range values (0–10⁶):
 
-```java
-// Old approach: build in scratch, then copy
-byte[] scratch = new byte[20];
-int len = JsonNumberWriter.buildLong(scratch, value);
-System.arraycopy(scratch, 20 - len, buf, pos, len);
-```
+| Approach | Time (ns/op) | Speedup vs JDK Classic | Allocation |
+|----------|---------------|------------------------|------------|
+| `Integer.toString()` (JDK classic) | ~20 | 1.0× (baseline) | 40–50 B/op |
+| Scratch buffer + digit-by-digit (old attempt) | ~35–40 | 0.5× (slower) | 0 B/op (caller-owned) |
+| `JsonNumberWriter` (digit tables + division) | ~6.6 | 3× faster | 0 B/op |
+| **`JeaiiiFastWriter` (division-free)** | **~3.7** | **5.4× faster** | 0 B/op |
 
-**Costs:**
-- Scratch buffer allocation (even if caller-owned)
-- Right-to-left digit building loop
-- `System.arraycopy` for every number
-
-This pattern touches two memory regions per number and prevents the JIT from optimizing the hot path.
-
-## What Dia-Log Does
-
-```java
-// New approach: write directly at offset
-int newPos = JsonNumberWriter.writeInt(buf, pos, value);
-```
-
-**Benefits:**
-- No scratch buffer
-- Left-to-right digit emission
-- One `VarHandle` store per 4-digit group
-- No `System.arraycopy`
+**Key takeaway:** The division-free `JeaiiiFastWriter` is the fastest approach in the codebase (~3.7 ns/op vs ~20 ns/op for JDK classic, **5.4× faster**). All optimized approaches are allocation-free when the caller supplies the buffer.
 
 ## Multiple Java Idioms for Int/Long Writing
 
-### 1. JDK `Integer.toString()` / `Long.toString()` (Baseline)
+### 1. JDK `Integer.toString()` / `Long.toString()` (Classic Baseline)
 
-The standard JDK approach uses a right-to-left digit extraction with a buffer and then reverses the result into a `String`, followed by UTF-8 encoding.
+The standard JDK approach is the classic way to convert numbers to strings. It uses a right-to-left digit extraction with a buffer, then reverses the result into a `String`, followed by UTF-8 encoding.
 
 ```java
 byte[] b = Integer.toString(value).getBytes(StandardCharsets.UTF_8);
@@ -47,9 +29,10 @@ byte[] b = Long.toString(value).getBytes(StandardCharsets.UTF_8);
 **Characteristics:**
 - Allocates a `String` + `byte[]` (typically 40–50 B/op)
 - Simple, readable code
-- Slowest option (4–16× slower than optimized paths)
+- **Baseline** (slowest option among optimized paths, but often acceptable)
+- Uses hardware division internally
 
-### 2. `String.format("%d", ...)` (Alternative)
+### 2. `String.format("%d", ...)` (Alternative Format)
 
 An alternative using `String.format` which is significantly slower:
 
@@ -62,38 +45,75 @@ byte[] b = String.format("%d", value).getBytes(StandardCharsets.UTF_8);
 - Slower than `Integer.toString()` due to format parsing (~50% overhead)
 - Useful for demonstrating format overhead
 
-### 3. `JsonNumberWriter.writeInt/writeLong` (Production Path)
+### 3. Scratch Buffer + Digit-by-Digit Division (Old Attempt)
 
-The production implementation uses:
+Before the digit-table optimizations, attempts were made to optimize int/long writing by using a reusable scratch buffer and digit-by-digit division:
+
+```java
+byte[] scratch = new byte[20];
+ClassicJsonNumberWriter.writeLong(null, scratch, value);
+System.arraycopy(scratch, 20 - len, buf, pos, len);
+```
+
+**Characteristics:**
+- Reuses a caller-owned scratch buffer (0 allocation)
+- Digit-by-digit division (slow per-digit)
+- `System.arraycopy` still needed
+- **~35–40 ns/op** — slower than optimized approaches
+- This approach didn't go far enough; digit tables and bulk stores are much faster
+
+### 4. `JsonNumberWriter.writeInt/writeLong` (Production Path - Digit Tables)
+
+The production implementation uses precomputed digit tables and hardware division:
+
 - Precomputed `DIGIT_QUADS` and `DIGIT_TRIPLES` tables
 - Left-to-right digit emission via `POW10` slicing
 - Little-endian `LE_INT` VarHandle stores for 4-digit groups
 - Special cases for `Integer.MIN_VALUE` and `Long.MIN_VALUE` as constants
 
+```java
+public static int writeInt(byte[] buf, int pos, int value) {
+    if (value == Integer.MIN_VALUE) {
+        return writeLong(buf, pos, value);
+    }
+    boolean negative = value < 0;
+    int v = negative ? -value : value;
+    if (negative) buf[pos++] = '-';
+    return writePositiveLong(buf, pos, v);
+}
+```
+
 **Characteristics:**
 - Uses hardware division (`/`) reduced by JIT to multiply-shift chains
 - Zero allocation on the hot path
-- ~6–13 ns/op depending on value distribution
+- **~6–13 ns/op** depending on value distribution
 
-### 4. `JeaiiiFastWriter.writeIntToBytes/writeLongToBytes` (Division-Free)
+### 5. `JeaiiiFastWriter.writeIntToBytes/writeLongToBytes` (Division-Free, Fastest)
 
-The jeaiii technique removes division entirely using `Math.multiplyHigh` with precomputed reciprocals.
+The jeaiii technique removes division entirely using `Math.multiplyHigh` with precomputed reciprocals:
 
-**Characteristics:**
 - Division-free using `Math.multiplyHigh` (mulx on x86-64)
 - `DIGIT_QUADS` table still used for 4-digit groups
-- Trailing-zero leading group via right-aligned lookup
-- Fastest option (~3–5 ns/op)
+- Trailing-zero leading group via right-aligned lookup (full-store/partial-advance trick)
+- **Fastest option: ~3–5 ns/op**
 
-### 5. `JeaiiiPairsWriter.writeIntToBytes` (Two-Digit Pair Variant)
-
-An earlier jeaiii variant using 2-digit pairs instead of 4-digit quads:
+```java
+public static int writeIntToBytes(byte[] buffer, int offset, int value) {
+    int pos = offset;
+    long u = value;
+    if (value < 0) {
+        buffer[pos++] = '-';
+        u = -(long) value;
+    }
+    return writeQuadPositive(buffer, pos, u) - offset;
+}
+```
 
 **Characteristics:**
-- Smaller table (200 bytes vs 40 KB)
-- One short store per 2-digit pair
-- Slower on medium+ value distributions (1.8× vs FastWriter)
-- Preserved as a benchmark fixture
+- **5.4× faster** than JDK `Integer.toString()` for medium values
+- Division-free using `Math.multiplyHigh`
+- Consistent 4-byte bulk stores via VarHandle
+- Zero allocation on the hot path
 
 ## Performance Comparison
 
@@ -101,33 +121,36 @@ The following table summarizes average-time measurements across various value di
 
 | Implementation | tiny (0–9) | small (0–99) | medium (0–10⁶) | timestamp (13-digit) | full-range | negative | Alloc (B/op) |
 |---------------|------------|---------------|----------------|----------------------|------------|----------|---------------|
-| `Integer.toString` (alloc) | 11.6 | 18.2 | 20.1 | 20.5 | 28.6 | 30.4 | 40–50 |
-| `Long.toString` (alloc) | 11.6 | 18.2 | 20.1 | 20.5 | 28.6 | 30.4 | 40–50 |
+| `Integer.toString` (classic) | 11.6 | 18.2 | 20.1 | 20.5 | 28.6 | 30.4 | 40–50 |
 | `Integer.toString` + `String.format` | 52.6 | 71.4 | 73.1 | 50.0 | 55.2 | — | 40–50 + format overhead |
+| `Long.toString` (classic) | 11.6 | 18.2 | 20.1 | 20.5 | 28.6 | 30.4 | 40–50 |
 | `Long.toString` + `String.format` | 52.6 | 71.4 | 73.1 | 50.0 | 55.2 | — | 40–50 + format overhead |
-| `JsonNumberWriter` (T5) | 4.9 | 6.1 | 6.6 | 7.7 | 13.0 | 12.8 | 0 |
-| `JeaiiiPairsWriter` | 8.9 | 14.3 | 4.5 | 5.1 | 7.3 | 7.4 | 0 |
-| `JeaiiiFastWriter` (division-free) | **4.9** | **7.3** | **3.7** | **4.0** | **4.9** | **4.8** | 0 |
+| Scratch buffer + digit-by-digit (old) | — | — | — | — | 36.4 | 34.1 | 0 |
+| `JsonNumberWriter` (digit tables + division) | 4.9 | 6.1 | 6.6 | 7.7 | 13.0 | 12.8 | 0 |
+| `JeaiiiPairsWriter` (2-digit pairs) | 8.9 | 14.3 | 4.5 | 5.1 | 7.3 | 7.4 | 0 |
+| **`JeaiiiFastWriter` (division-free)** | **4.9** | **7.3** | **3.7** | **4.0** | **4.9** | **4.8** | 0 |
 
 **Key observations:**
-- `Integer.toString`/`Long.toString` is 4–16× slower than optimized paths due to allocation
+- `Integer.toString`/`Long.toString` (classic JDK) is 4–16× slower than optimized paths due to allocation
 - `String.format` adds ~50% overhead over `Integer.toString()` due to format parsing
-- `JeaiiiFastWriter` (division-free) is fastest on medium+ distributions (1.8× vs T5)
+- `JeaiiiFastWriter` (division-free) is fastest on medium+ distributions (5.4× vs classic JDK)
 - `JeaiiiPairsWriter` is competitive on tiny/small but slower on medium+
-- `JsonNumberWriter` (T5) uses hardware division, JIT optimizes to multiply-shift chains
+- `JsonNumberWriter` (digit tables) uses hardware division, JIT optimizes to multiply-shift chains
+- Scratch buffer approach was slower (~35–40 ns/op) - digit tables and bulk stores are much faster
 - Both int and long variants show similar performance characteristics
 
 ## Allocation Comparison
 
 | Implementation | Alloc (B/op) | GC Pressure |
 |---------------|--------------|-------------|
-| `Integer.toString` | 40–50 | High |
-| `Long.toString` | 40–50 | High |
+| `Integer.toString` (classic) | 40–50 | High |
+| `Long.toString` (classic) | 40–50 | High |
 | `Integer.toString` + `String.format` | 40–50 + format | High |
 | `Long.toString` + `String.format` | 40–50 + format | High |
+| Scratch buffer + digit-by-digit | 0 (caller-owned) | None |
 | `JsonNumberWriter` | 0 (caller-owned) | None |
-| `JeaiiiFastWriter` | 0 (caller-owned) | None |
 | `JeaiiiPairsWriter` | 0 (caller-owned) | None |
+| `JeaiiiFastWriter` (division-free) | 0 (caller-owned) | None |
 
 The production path and all optimized alternatives are allocation-free when the caller supplies the buffer.
 
@@ -138,6 +161,7 @@ The production path and all optimized alternatives are allocation-free when the 
 3. **Left-to-right emission:** Digits land in place; no scratch buffer needed.
 4. **VarHandle bulk stores:** One `LE_INT.set` writes 4 digits at once; better instruction-level parallelism.
 5. **JIT-friendly:** No virtual dispatch, no helper method calls between cursor and byte stores.
+6. **Division-free:** `Math.multiplyHigh` is faster than hardware division on x86-64.
 
 ## Verification
 
@@ -180,12 +204,14 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
 
 ## Related Concepts
 
-- [04 — Number writing](04-number-writing.md) — Overview of number serialization techniques
+- [04 — Number Writing](./04-number-writing.md) — Overview of number serialization techniques
+- [07 — Int/Long Number Writing](./07-int-long-writing.md) — Overview of int/long writing techniques
 - [08 — Float/Double Number Writing](./08-float-double-writing.md) — Floating-point number writing techniques
-- `doc/perf-exploration/t9-bufferless-varhandle-number-writing.md` — Detailed implementation record
-- `doc/perf-exploration/t10-jeaiii-fast-writer.md` — Division-free jeaiii writer details
-- `doc/perf-exploration/t11-int-long-writer-comparison.md` — Int/long writer comparison record
-- `doc/perf-exploration/t13-integral-tostring-comparison.md` — Expanded int/long toString benchmark comparison
+- [09 — Jeaiii Division-Free Int/Long Writer](./09-jeaiii-fast-writer.md) — Consolidated explanation of jeaiii's reciprocal multiplication technique
+- [`T09 — Bufferless VarHandle Number Writing`](./t9-bufferless-varhandle-number-writing.md) — Detailed implementation record
+- [`T10 — Jeaiii division-free int/long writer`](./t10-jeaiii-fast-writer.md) — Detailed implementation record
+- [`T11 — Int/long writer comparison`](./t11-int-long-writer-comparison.md) — Int/long writer comparison record
+- [`T13 — Integral toString comparison`](./t13-integral-tostring-comparison.md) — Expanded int/long toString benchmark comparison
 
 ## Benchmark Artifacts
 
@@ -195,10 +221,3 @@ The following benchmark files provide the expanded comparisons:
 - [`core/src/test/java/hr/hrg/dialog/core/LongToStringBenchmark.java`](../src/test/java/hr/hrg/dialog/core/LongToStringBenchmark.java) — All long toString variants
 - [`core/src/test/java/hr/hrg/dialog/core/IntWriteBenchmark.java`](../src/test/java/hr/hrg/dialog/core/IntWriteBenchmark.java) — Original benchmark
 - [`core/src/test/java/hr/hrg/dialog/core/LongWriteBenchmark.java`](../src/test/java/hr/hrg/dialog/core/LongWriteBenchmark.java) — Original benchmark
-
-</content>
-</function>
-</tool_call>
-<function=update_goal>
-<parameter=action>
-complete

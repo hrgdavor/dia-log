@@ -17,9 +17,15 @@ while (n >= 10) {
 
 ## What Dia-Log Does
 
-### T10: Jeaiii's Reciprocal Multiplication
+### Jeaiii's Reciprocal Multiplication
 
-Instead of division, use precomputed magic constants:
+Instead of division, use precomputed magic constants with `Math.multiplyHigh`:
+
+For more details on reciprocal multiplication and magic constants, see:
+- [jeaiii/itoa on GitHub](https://github.com/jeaiii/itoa) — Original implementation by jeaiii
+
+The technique of using reciprocal multiplication to avoid hardware division is a classic optimization. See also:
+- **[Division Algorithm on Wikipedia](https://en.wikipedia.org/wiki/Division_algorithm#Reciprocal_multiplication)** — Overview of division-free algorithms
 
 ```java
 // For divisor d = 10^k, precompute:
@@ -36,6 +42,40 @@ long r = value - q * 1_000_000_000L;  // Remainder
 ---
 
 ## The Techniques
+
+### Tiered Fast Path (1–4 digits)
+
+For common cases (1–4 digits), use specialized tables to avoid full quad extraction:
+
+```java
+if (n < 10) {
+    buf[pos++] = (byte)(n + '0');  // 1 byte store
+    return pos;
+}
+if (n < 100) {
+    LE_SHORT.set(buf, pos, TWO_DIGITS_LE[n]);  // 1 short store
+    pos += 2;
+    return pos;
+}
+if (n < 1000) {
+    LE_INT.set(buf, pos, TRAILING_TRIPLES[n]);  // 3 significant + trailing '0'
+    pos += 3;
+    return pos;
+}
+// Fall back to quads for 4+ digits
+```
+
+### Stage 4: Trailing-Zero Leading Group (Current Implementation)
+
+The 1–3 digit leading group is written as a full 4-byte word with trailing zeros:
+
+```java
+// TRAILING_TRIPLES[123] = 0x33333000  // "1230" (trailing '0' is overwritten)
+LE_INT.set(buf, pos, TRAILING_TRIPLES[n]);
+pos += 4;  // Advance by full 4 bytes, not 3
+```
+
+**Benefit:** One fixed-width store instead of variable-length byte stores. The trailing `'0'` bytes are either overwritten by the next group or never observed.
 
 ### Stage 1: Pairs Writer (2 digits per store)
 
@@ -66,38 +106,6 @@ int group = (int)q;  // One int store
 
 **Performance:** 4 digits per store, no division.
 
-### Stage 3: Tiered Fast Path
-
-For common cases (1–4 digits), avoid full quad table:
-
-```java
-if (n < 10) {
-    buf[pos++] = (byte)(n + '0');
-    return pos;
-}
-if (n < 100) {
-    buf[pos++] = (short)TWO_DIGITS_LE[n];
-    return pos;
-}
-if (n < 1000) {
-    buf[pos++] = TRAILING_TRIPLES[n];  // 3 digits + trailing '0'
-    return pos;
-}
-// Fall back to quads
-```
-
-### Stage 4: Trailing-Zero Leading Group
-
-The 1–3 digit leading group is written as a full 4-byte word with trailing zeros:
-
-```java
-// TRAILING_TRIPLES[123] = 0x33333000  // "1230" (trailing '0' is overwritten)
-LE_INT.set(buf, pos, TRAILING_TRIPLES[n]);
-pos += 4;
-```
-
-**Benefit:** One fixed-width store instead of variable-length byte stores.
-
 ---
 
 ## Performance Comparison
@@ -119,6 +127,7 @@ pos += 4;
 - **No hardware division** — 1 cycle vs 20–80 cycles
 - **Fewer stores** — 4 digits per int store
 - **Tiered fast path** — 0.89 ns for single-digit values
+- **Trailing-zero leading group** — Fixed 4-byte stores throughout
 
 ### Disadvantages
 - **Larger tables** — 44 KB total (40 KB quads + 4 KB triples + 200 B pairs)
@@ -133,11 +142,14 @@ pos += 4;
 - **Exhaustive testing:** All 2³² int values tested against division-based reference
 - **Unit tests:** 85+ tests covering boundaries and random values
 - **Benchmark:** `DigitGroupStoreBenchmark` measures cache effects of table sizes
+- **Zero allocation:** All hot paths use caller-owned buffers with no GC allocations
 
 ---
 
 ## Related Concepts
 
-- [04 — Number Writing](04-number-writing.md) — Overview of number serialization
-- T10 in `doc/perf-exploration/` — Detailed implementation record
-- `JsonNumberWriter` — Fory-style division-based writer (still used for compatibility)
+- [04 — Number Writing](./04-number-writing.md) — Overview of number serialization techniques
+- [07 — Int/Long Number Writing](./07-int-long-writing.md) — Overview of int/long writing techniques
+- [09 — Jeaiii Division-Free Int/Long Writer](./09-jeaiii-fast-writer.md) — Consolidated explanation of jeaiii's reciprocal multiplication technique
+- [`T10 — Jeaiii division-free int/long writer`](../t10-jeaiii-fast-writer.md) — Detailed implementation record
+[`JsonNumberWriter`](../JsonNumberWriter.java) — Fory-style division-based writer (still used for compatibility)

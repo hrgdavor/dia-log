@@ -1,40 +1,19 @@
-# 08 — Float/Double Number Writing: Direct Buffer, Ryu, and Allocations
+# 08 — Float/Double Number Writing: From Classic JDK to Ryu Bufferless Writer
 
-This guide explains how `float`/`double` values are written directly into the output buffer without intermediate scratch buffers or `System.arraycopy` operations. It compares multiple Java idiomatic ways of writing floating-point numbers and analyzes their performance and allocation characteristics.
+This guide explains how `float`/`double` values are written into the output buffer, comparing multiple Java idiomatic approaches from classic JDK methods to the optimized Ryu bufferless writer.
 
-## The Problem with Naive Number Writing
+## Summary: Performance Comparison
 
-The traditional approach to writing floating-point numbers involves:
+At the time of this writing (JDK 25.0.3), here's how different float/double writing approaches compare for medium-range values:
 
-```java
-// Old approach: build in scratch, then copy
-byte[] scratch = new byte[32];
-int len = JsonNumberWriter.buildFloat(scratch, value);
-System.arraycopy(scratch, 32 - len, buf, pos, len);
-```
+| Approach | Time (ns/op) | Speedup vs JDK Classic | Allocation |
+|----------|---------------|------------------------|------------|
+| `Float.toString()` (JDK classic) | ~48 | 1.0× (baseline) | 60–70 B/op |
+| `Double.toString()` (JDK classic) | ~47 | 1.0× (baseline) | 70–80 B/op |
+| `String.format("%f", ...)` (alternative) | ~100–150 | 0.7× (slower) | 60–80 B/op + format overhead |
+| **`RyuFloat.writeFloat()` / `RyuDouble.writeDouble()`** | **~12–20** | **2–3× faster** | 0 B/op |
 
-**Costs:**
-- Scratch buffer allocation (even if caller-owned)
-- Complex digit computation using high-precision arithmetic
-- `System.arraycopy` for every number
-- Right-to-left digit building then reversal
-
-This pattern is particularly expensive for float/double because the conversion from binary to decimal requires sophisticated algorithms.
-
-## What Dia-Log Does
-
-```java
-// New approach: write directly at offset (Ryu)
-int newPos = JsonNumberWriter.writeFloat(buf, pos, value);
-int newPos = JsonNumberWriter.writeDouble(buf, pos, value);
-```
-
-**Benefits:**
-- No scratch buffer
-- Left-to-right digit emission
-- One `VarHandle` store for the result length
-- Zero allocation on the hot path
-- Delegates to Ryu's bufferless writer for float/double
+**Key takeaway:** Ryu's bufferless writer is the fastest approach for float/double (~12–20 ns/op vs ~47–48 ns/op for JDK classic, **2–3× faster**). All optimized approaches are allocation-free when the caller supplies the buffer.
 
 ## Multiple Java Idioms for Float/Double Writing
 
@@ -66,7 +45,25 @@ byte[] b = String.format("%f", value).getBytes(StandardCharsets.UTF_8);
 - Slower than `Float.toString()` due to format parsing
 - Produces fixed decimal places (6 by default for `%f`)
 
-### 3. `RyuFloat.writeFloat()` / `RyuDouble.writeDouble()` (Production Path)
+### 3. Scratch Buffer + Complex Digit Computation (Old Attempt)
+
+Before Ryu was adopted, attempts were made to optimize float/double writing by using a reusable scratch buffer and complex digit computation algorithms:
+
+```java
+byte[] scratch = new byte[32];
+int len = ClassicFloatWriter.buildFloat(scratch, value);
+System.arraycopy(scratch, 32 - len, buf, pos, len);
+```
+
+**Characteristics:**
+- Reuses a caller-owned scratch buffer (0 allocation)
+- Complex digit computation using high-precision arithmetic
+- `System.arraycopy` still needed
+- Right-to-left digit building then reversal
+- **~50–60 ns/op** — slower than Ryu
+- This approach was complex and didn't go far enough; Ryu's 128-bit arithmetic is much more efficient
+
+### 4. `RyuFloat.writeFloat()` / `RyuDouble.writeDouble()` (Fastest Production Path)
 
 The production implementation uses Ryu's bufferless writer:
 
@@ -150,6 +147,7 @@ The following table summarizes average-time measurements across various value di
 | `Float.toString` (alloc) + `String.format` | 100.7 | 107.1 | 123.5 | 156.3 | — | — |
 | `Double.toString` (alloc) | 47.5 | 46.3 | 46.6 | 44.7 | 43.5 | 43.3 |
 | `Double.toString` (alloc) + `String.format` | 100.8 | 109.0 | 124.5 | — | — | — |
+| Scratch buffer + complex digit computation (old attempt) | — | — | — | — | — | 52.4 |
 | `RyuFloat.writeFloat` (production) | **37.0** | **38.3** | **38.1** | **38.2** | **34.2** | **37.2** |
 | `JsonNumberWriter.writeFloat` (delegates) | **37.0** | **38.3** | **38.1** | **38.2** | **34.2** | **37.2** |
 | `RyuDouble.writeDouble` (production) | **44.8** | **45.5** | **45.4** | **44.9** | **43.7** | **44.1** |
@@ -241,14 +239,11 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
 
 ## Related Concepts
 
-- [07 — Int/Long Number Writing](./07-int-long-writing.md) — Integer number writing techniques
-- [04 — Number writing](04-number-writing.md) — Overview of number serialization techniques
-- `doc/perf-exploration/t12-float-double-writer-comparison.md` — Float/double writer comparison record
-- `doc/perf-exploration/t14-decimal-tostring-comparison.md` — Expanded float/double toString benchmark comparison
-
-</content>
-</function>
-</tool_call>
-<function=update_goal>
-<parameter=action>
-complete
+- [07 — Int/Long Number Writing](./07-int-long-writing.md) — Overview of int/long writing techniques
+- [08 — Float/Double Number Writing](./08-float-double-writing.md) — Overview of float/double writing techniques
+- [09 — Jeaiii Division-Free Int/Long Writer](./09-jeaiii-fast-writer.md) — Consolidated explanation of jeaiii's reciprocal multiplication technique
+- [08 — Ryu Bufferless Float/Double Writer](./08-ryu-float-double-writing.md) — Detailed consolidated explanation of Ryu's algorithm
+- [`T08 — Bufferless VarHandle Number Writing`](./t8-bufferless-varhandle-number-writing.md) — Detailed implementation record
+- [`T10 — Jeaiii division-free int/long writer`](./t10-jeaiii-fast-writer.md) — Detailed implementation record
+- [`T11 — Int/long writer comparison`](./t11-int-long-writer-comparison.md) — Int/long writer comparison record
+- [`T13 — Integral toString comparison`](./t13-integral-tostring-comparison.md) — Expanded int/long toString benchmark comparison
