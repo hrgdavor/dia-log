@@ -14,7 +14,7 @@
   - largest number is double with 25 digits
   - plus space for end bracket and newline
 - 16MB or some other buffer limit is needed regardless if reserving a scratch buffer 
- - we could write to MMAP beyong 16MB but is still not a good idea
+  - we could write to MMAP beyong 16MB but is still not a good idea
 
 # To decide
 
@@ -48,7 +48,9 @@ go"; this one explains.
 8. [08-packed-word-varhandle-stores.md](08-packed-word-varhandle-stores.md) — full-store/partial-advance overwrite trick
 9. [09-jeaiii-fast-writer.md](09-jeaiii-fast-writer.md) — division-free int/long writer
 10. [10-no-grow-contracts.md](10-no-grow-contracts.md) — fixed-capacity buffers, negated-position writers
-11. [15-direct-json-generator-fallback.md](../perf-exploration/t15-direct-json-generator-fallback.md) — direct JsonGenerator fallback via writePOJO(), Jackson 3.x immutability model
+11. [11-fast-comptime-known-string-write.md](11-fast-comptime-known-string-write.md) — FFM API, JIT intrinsification, pre-packed string writing
+12. [12-SWAR-fast-string-matching.md](12-SWAR-fast-string-matching.md) — SWAR case-folding, delimiter scanning, header matching
+13. [15-direct-json-generator-fallback.md](../perf-exploration/t15-direct-json-generator-fallback.md) — direct JsonGenerator fallback via writePOJO(), Jackson 3.x immutability model
 
 ## The core principles
 
@@ -68,6 +70,12 @@ go"; this one explains.
 5. **Measure, and prove byte-identical output.** Every fast path must produce
    exactly the bytes the plain-stream path produces; JMH numbers and
    allocation profiles back every claim.
+6. **Use FFM API for high-performance string writing.** Pre-packed 64-bit literals
+   with `ValueLayout.JAVA_LONG_UNALIGNED` enable zero-runtime encoding and
+   multi-word string writes (see [11-fast-comptime-known-string-write.md](11-fast-comptime-known-string-write.md)).
+7. **Apply SWAR techniques for branch-free string matching.** SIMD within a register
+   enables case-insensitive matching and delimiter scanning in 8 bytes per register
+   operation (see [12-SWAR-fast-string-matching.md](12-SWAR-fast-string-matching.md)).
 
 ## Relation to `doc/perf-exploration/`
 
@@ -76,4 +84,3 @@ Fory commit analysis, the benchmark artifacts. When a new technique lands, its
 `t{N}` record goes there, and its explanation is folded into the relevant
 numbered topic here. If a topic here is ever in conflict with a `t{N}` record,
 the topic is the current explanation and the record is the historical note.
-
