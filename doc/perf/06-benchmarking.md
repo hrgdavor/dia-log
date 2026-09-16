@@ -41,6 +41,7 @@ The key suites and their recorded parameters:
 | `CursorBufferWriterBenchmark` | cursor-locality mixed workload | `-wi 3 -i 5 -f 1 -t 1` |
 | `PackedWordWriteBenchmark` | packed tail-store strategies | `-f 1 -wi 3 -i 5 -r 1s` |
 | `AllocationBenchmark` | allocation profile per primitive | `-wi 3 -i 5 -f 1 -t 1` |
+| `JsonFallbackBenchmark` | Jackson fallback path: mapper.writeValue() vs gen.writePOJO() | `-wi 4 -i 7 -f 1 -t 1 -prof gc` |
 
 ## Pitfalls found in this project
 

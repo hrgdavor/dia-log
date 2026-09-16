@@ -14,6 +14,8 @@ import hr.hrg.dialog.core.*;
 import org.slf4j.event.KeyValuePair;
 
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.util.RawValue;
 
@@ -173,7 +175,22 @@ public class JsonLogWriter {
      */
     private final Wyhash64.Streaming fingerprintStream = new Wyhash64.Streaming(0);
 
-    public JsonLogWriter() {}
+    /**
+     * Reusable Jackson generator for the fallback path. Created once at
+     * instance initialization with default writer settings. Reused across
+     * events to avoid per-call generator creation overhead. The generator is
+     * closed after each use (it's stateless between uses).
+     */
+    private tools.jackson.core.JsonGenerator gen;
+
+    public JsonLogWriter() {
+        // Jackson 3.x: generator is frozen at creation time, so we create it
+        // once with default settings. Customizations (features, codec) must
+        // be set at creation time. The generator is closed after each use,
+        // making it safe to reuse.
+        this.gen = new tools.jackson.databind.ObjectMapper().createGenerator(
+                new tools.jackson.core.json.JsonFactory());
+    }
 
     /**
      * Sets the predicate used to decide which stack trace frames are included in the {@code errHash} fingerprint.
@@ -574,10 +591,16 @@ public class JsonLogWriter {
                 // unchecked exception (JacksonException / DatabindException), so
                 // the catch must cover both: an unsized value that cannot be
                 // written is replaced by "V2BIG".
+                //
+                // Jackson 3.x: use cached gen for faster fallback serialization.
+                // gen is created once in the constructor (see field declaration
+                // above) and reused across events to avoid per-call generator
+                // creation overhead. Uses gen.writePOJO(value) instead of
+                // mapper.writeValue() — straight through the codec.
                 int valueStart = pos;
                 rbo.pos = pos;
                 try {
-                    mapper.writeValue(rbo, value);
+                    gen.writePOJO(value);
                     pos = rbo.pos;
                 } catch (JacksonException | BufferFullException e) {
                     return -valueStart;

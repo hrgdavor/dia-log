@@ -98,6 +98,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `jlx.conf` omits `paths` so its `[folders]` section is the fallback matched in
   file mode (relative `paths` never match).
 
+### Changed
+
+- `JsonLogWriter.writeValueDirect()` fallback path now uses direct `JsonGenerator`
+  via `gen.writePOJO()` instead of `mapper.writeValue()`. The generator is created
+  via `mapper.writer().createGenerator(rbo)` which inherits the writer's configuration
+  at instantiation time (Jackson 3.x immutability model). This avoids re-entering
+  the mapper's configuration resolution on every fallback call, reducing overhead
+  in the object serialization fallback path. See `doc/perf-exploration/t15-direct-json-generator-fallback.md`
+  for the full explanation.
+
 ## [1.0.0] - 2026-08-11
 
 ### Added

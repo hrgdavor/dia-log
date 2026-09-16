@@ -48,6 +48,7 @@ go"; this one explains.
 8. [08-packed-word-varhandle-stores.md](08-packed-word-varhandle-stores.md) — full-store/partial-advance overwrite trick
 9. [09-jeaiii-fast-writer.md](09-jeaiii-fast-writer.md) — division-free int/long writer
 10. [10-no-grow-contracts.md](10-no-grow-contracts.md) — fixed-capacity buffers, negated-position writers
+11. [15-direct-json-generator-fallback.md](../perf-exploration/t15-direct-json-generator-fallback.md) — direct JsonGenerator fallback via writePOJO(), Jackson 3.x immutability model
 
 ## The core principles
 
