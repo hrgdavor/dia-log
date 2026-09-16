@@ -96,4 +96,12 @@ public class IntWriteBenchmark {
         bh.consume(b[b.length - 1]);
         return b.length;
     }
+
+    /** String.format alternative (slower, but shows format overhead). */
+    @Benchmark
+    public int stringFormat(Blackhole bh) {
+        byte[] b = String.format("%d", values[index++ & (N - 1)]).getBytes(StandardCharsets.UTF_8);
+        bh.consume(b[b.length - 1]);
+        return b.length;
+    }
 }

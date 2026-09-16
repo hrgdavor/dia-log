@@ -16,6 +16,10 @@ Design and attribution for each technique:
 - [t8-packed-word-varhandle-stores.md](t8-packed-word-varhandle-stores.md) — direct VarHandle stores + full-store/partial-advance tails
 - [t9-bufferless-varhandle-number-writing.md](t9-bufferless-varhandle-number-writing.md) — bufferless offset number writing, `LE_INT` digit stores, no `arraycopy`
 - [t10-jeaiii-fast-writer.md](t10-jeaiii-fast-writer.md) — division-free jeaiii int/long writer: `multiplyHigh` reciprocals, trailing-zero quads
+- [t11-int-long-writer-comparison.md](t11-int-long-writer-comparison.md) — int/long writer comparison: multiple Java idioms (JDK `toString`, `JsonNumberWriter`, `JeaiiiFastWriter`, `JeaiiiPairsWriter`, scratch), scratch buffer vs direct, allocation analysis
+- [t12-float-double-writer-comparison.md](t12-float-double-writer-comparison.md) — float/double writer comparison: multiple Java idioms (JDK `toString`, `RyuFloat`, `RyuDouble`, scratch, per-byte `write(int)`), scratch buffer vs direct, allocation analysis
+- [t13-integral-tostring-comparison.md](t13-integral-tostring-comparison.md) — integral number toString comparison: expanded benchmarks with all idiomatic variants (JDK `Integer.toString()`, `Long.toString()`, `String.format()`, `JsonNumberWriter`, `JeaiiiFastWriter`, `JeaiiiPairsWriter`, `ClassicJsonNumberWriter`)
+- [t14-decimal-tostring-comparison.md](t14-decimal-tostring-comparison.md) — decimal number toString comparison: expanded benchmarks with all idiomatic variants (JDK `Float.toString()`, `Double.toString()`, `String.format()`, `RyuFloat`, `RyuDouble`, `String.valueOf()`)
 
 ## How the before/after comparison is measured
 

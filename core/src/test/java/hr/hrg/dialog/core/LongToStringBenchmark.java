@@ -1,5 +1,6 @@
 package hr.hrg.dialog.core;
 
+import hr.hrg.dialog.core.perf.ClassicJsonNumberWriter;
 import hr.hrg.dialog.core.perf.JeaiiiPairsWriter;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -15,19 +16,26 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Long writer comparison: the two jeaiii-style division-free variants
- * ({@code jeaiiiPairs} / {@code jeaiiiQuad}), the current production
- * {@link JsonNumberWriter#writeLong(byte[], int, long)}, and the plain JDK
- * {@link Long#toString(long)} round-trip most commonly found in the wild.
+ * Long toString comparison: all Java idiomatic ways of writing long to textual
+ * representation.
+ *
+ * <p>Includes:
+ * - Long.toString(long) + byte[] (JDK baseline, allocates)
+ * - JsonNumberWriter.writeLong (direct buffer, no allocation)
+ * - JeaiiiFastWriter.writeLongToBytes (division-free, fastest)
+ * - JeaiiiPairsWriter.writeLongToBytes (two-digit pair variant)
+ * - String.format("%d", ...) (slower format)
+ * - ClassicJsonNumberWriter.writeLong (digit-by-digit, scratch buffer)
  *
  * <p>Run:
- * {@code java -cp <test-classpath> org.openjdk.jmh.Main
- * hr.hrg.dialog.core.LongWriteBenchmark -wi 3 -i 5 -f 1}
+ * {@code java -cp <classpath> org.openjdk.jmh.Main
+ * hr.hrg.dialog.core.LongToStringBenchmark -wi 3 -i 5 -f 1}
  */
 @BenchmarkMode({Mode.Throughput, Mode.AverageTime})
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -35,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 @Measurement(iterations = 5, time = 1)
 @Fork(1)
 @State(Scope.Thread)
-public class LongWriteBenchmark {
+public class LongToStringBenchmark {
 
     /** Value distribution driving the digit-count mix. */
     @Param({"tiny", "medium", "timestamp", "full", "negative"})
@@ -61,9 +69,17 @@ public class LongWriteBenchmark {
                 default -> rnd.nextLong();
             };
         }
+        index = 0;
     }
 
-    /** Current production path: Fory digit tables with hardware division. */
+    @Benchmark
+    public int longToString(Blackhole bh) throws IOException {
+        long value = values[index++ & (N - 1)];
+        byte[] bytes = Long.toString(value).getBytes(StandardCharsets.UTF_8);
+        bh.consume(bytes[bytes.length - 1]);
+        return bytes.length;
+    }
+
     @Benchmark
     public int jsonNumberWriter(Blackhole bh) {
         int pos = JsonNumberWriter.writeLong(buf, 0, values[index++ & (N - 1)]);
@@ -71,35 +87,43 @@ public class LongWriteBenchmark {
         return pos;
     }
 
-    /** Jeaiii pair variant (200-byte table, one short store per pair). */
     @Benchmark
-    public int jeaiiiPairs(Blackhole bh) {
-        int len = JeaiiiPairsWriter.writeLongToBytes(buf, 0, values[index++ & (N - 1)]);
-        bh.consume(buf[len - 1]);
-        return len;
-    }
-
-    /** Jeaiii quad variant (40 KB table, one int store per 4-digit group). */
-    @Benchmark
-    public int jeaiiiQuad(Blackhole bh) {
+    public int jeaiiiFastWriter(Blackhole bh) {
         int len = JeaiiiFastWriter.writeLongToBytes(buf, 0, values[index++ & (N - 1)]);
         bh.consume(buf[len - 1]);
         return len;
     }
 
-    /** Plain JDK baseline (allocates a String + byte[] each call). */
     @Benchmark
-    public int standardToString(Blackhole bh) {
-        byte[] b = Long.toString(values[index++ & (N - 1)]).getBytes(StandardCharsets.UTF_8);
-        bh.consume(b[b.length - 1]);
-        return b.length;
+    public int jeaiiiPairsWriter(Blackhole bh) {
+        int len = JeaiiiPairsWriter.writeLongToBytes(buf, 0, values[index++ & (N - 1)]);
+        bh.consume(buf[len - 1]);
+        return len;
     }
 
-    /** String.format alternative (slower, but shows format overhead). */
     @Benchmark
     public int stringFormat(Blackhole bh) {
-        byte[] b = String.format("%d", values[index++ & (N - 1)]).getBytes(StandardCharsets.UTF_8);
-        bh.consume(b[b.length - 1]);
-        return b.length;
+        long value = values[index++ & (N - 1)];
+        byte[] bytes = String.format("%d", value).getBytes(StandardCharsets.UTF_8);
+        bh.consume(bytes[bytes.length - 1]);
+        return bytes.length;
+    }
+
+    @Benchmark
+    public int classicJsonNumberWriter(Blackhole bh) throws IOException {
+        byte[] scratch = new byte[JsonNumberWriter.MAX_LONG_BYTES];
+        ClassicJsonNumberWriter.writeLong(null, scratch, values[index++ & (N - 1)]);
+        bh.consume(scratch[0]);
+        return scratch.length;
+    }
+
+    @Override
+    public String toString() {
+        return "LongToStringBenchmark";
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj == this;
     }
 }
